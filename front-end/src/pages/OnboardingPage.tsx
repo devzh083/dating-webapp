@@ -17,27 +17,43 @@ const allInterests: { group: string; items: string[] }[] = [
   {
     group: "Social & content",
     items: [
-      "Instagram", "YouTube", "TikTok", "Podcasts", "Vlogging", "Social Media",
-      "Memes", "Netflix",
+      "Instagram",
+      "YouTube",
+      "TikTok",
+      "Podcasts",
+      "Vlogging",
+      "Social Media",
+      "Memes",
+      "Netflix",
     ],
   },
   {
     group: "Sports & fitness",
     items: [
-      "Gym", "Running", "Cricket", "Football", "Badminton", "Tennis",
-      "Basketball", "Cycling", "Swimming",
+      "Gym",
+      "Running",
+      "Cricket",
+      "Football",
+      "Badminton",
+      "Tennis",
+      "Basketball",
+      "Cycling",
+      "Swimming",
     ],
   },
   {
     group: "Music",
-    items: [
-      "Rock", "Pop", "Hip Hop", "EDM", "Bollywood", "Classical", "Indie",
-    ],
+    items: ["Rock", "Pop", "Hip Hop", "EDM", "Bollywood", "Classical", "Indie"],
   },
   {
     group: "Food & drink",
     items: [
-      "Biryani", "Street Food", "Coffee", "Tea", "Desserts", "Cocktails",
+      "Biryani",
+      "Street Food",
+      "Coffee",
+      "Tea",
+      "Desserts",
+      "Cocktails",
       "Mocktails",
     ],
   },
@@ -85,7 +101,15 @@ const educationLevels = [
   "Trade school",
 ];
 
-const OnboardingPage: React.FC = () => {
+type OnboardingPageProps = {
+  isLoggedIn: boolean;
+  onLogout: () => void;
+};
+
+const OnboardingPage: React.FC<OnboardingPageProps> = ({
+  isLoggedIn,
+  onLogout,
+}) => {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<number>(1);
@@ -128,7 +152,6 @@ const OnboardingPage: React.FC = () => {
   };
 
   const handleNext = () => {
-    // very light validation per step
     if (step === 1) {
       if (!firstName.trim() || !birthDate) {
         setErrorMsg("Please fill your name and birthday.");
@@ -210,7 +233,6 @@ const OnboardingPage: React.FC = () => {
         return (
           <>
             <h1 className="ob-title">What’s your basic info?</h1>
-
             <label className="ob-label">
               First name
               <input
@@ -220,7 +242,6 @@ const OnboardingPage: React.FC = () => {
                 placeholder="Dev"
               />
             </label>
-
             <label className="ob-label">
               Birthday
               <input
@@ -336,7 +357,8 @@ const OnboardingPage: React.FC = () => {
           <>
             <h1 className="ob-title">What are you into?</h1>
             <p className="ob-help-text">
-              Add up to {MAX_INTERESTS} interests to help us show you better matches.
+              Add up to {MAX_INTERESTS} interests to help us show you better
+              matches.
             </p>
             <p className="ob-help-text">
               Selected: {selectedInterests.length}/{MAX_INTERESTS}
@@ -352,7 +374,9 @@ const OnboardingPage: React.FC = () => {
                       <button
                         key={item}
                         type="button"
-                        className={"ob-chip" + (active ? " ob-chip--active" : "")}
+                        className={
+                          "ob-chip" + (active ? " ob-chip--active" : "")
+                        }
                         onClick={() => toggleInterest(item)}
                       >
                         {item}
@@ -480,7 +504,7 @@ const OnboardingPage: React.FC = () => {
 
   return (
     <div className="app-shell ob-shell">
-      <TopBar isLoggedIn={true} />
+      <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
 
       <main className="ob-main">
         <div className="ob-card">
@@ -497,7 +521,11 @@ const OnboardingPage: React.FC = () => {
 
           <div className="ob-footer">
             {step > 1 ? (
-              <button type="button" className="ob-secondary-btn" onClick={handleBack}>
+              <button
+                type="button"
+                className="ob-secondary-btn"
+                onClick={handleBack}
+              >
                 Back
               </button>
             ) : (

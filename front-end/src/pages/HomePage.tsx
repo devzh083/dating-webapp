@@ -6,6 +6,7 @@ import PremiumSection from "../components/PremiumSection";
 
 type HomePageProps = {
   isLoggedIn: boolean;
+  onLogout: () => void;
 };
 
 const people = [
@@ -51,7 +52,7 @@ const people = [
   },
 ];
 
-const HomePage: React.FC<HomePageProps> = ({ isLoggedIn }) => {
+const HomePage: React.FC<HomePageProps> = ({ isLoggedIn, onLogout }) => {
   const navigate = useNavigate();
   const location = "Visakhapatnam (Vizag)";
 
@@ -64,7 +65,7 @@ const HomePage: React.FC<HomePageProps> = ({ isLoggedIn }) => {
 
   return (
     <div className="app-shell">
-      <TopBar isLoggedIn={isLoggedIn} />
+      <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
 
       <main className="home-main">
         {/* HERO BANNER */}

@@ -1,10 +1,6 @@
-// front-end/src/App.tsx
+// src/App.tsx
 import React, { useEffect, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-
-import { auth, db } from "./firebase";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
 import HomePage from "./pages/HomePage";
 import ChatsPage from "./pages/ChatsPage";
@@ -14,36 +10,29 @@ import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import OnboardingPage from "./pages/OnboardingPage";
 
-const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+const AppInner: React.FC = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-
-      if (user) {
-        try {
-          const ref = doc(db, "users", user.uid);
-          const snap = await getDoc(ref);
-
-          const onboardingDone =
-            snap.exists() && snap.data().onboardingCompleted === true;
-          setNeedsOnboarding(!onboardingDone);
-        } catch (err) {
-          console.error("Error loading profile:", err);
-          setNeedsOnboarding(true);
-        }
-      } else {
-        setNeedsOnboarding(false);
-      }
-
-      setProfileLoaded(true);
-    });
-
-    return () => unsub();
+    const token = localStorage.getItem("access_token");
+    setIsLoggedIn(!!token);
+    setNeedsOnboarding(false); // adjust later if you have onboarding logic
+    setProfileLoaded(true);
   }, []);
+
+  const handleLoginSuccess = () => {
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    setIsLoggedIn(false);
+    navigate("/login");
+  };
 
   if (!profileLoaded) {
     return (
@@ -62,8 +51,6 @@ const App: React.FC = () => {
     );
   }
 
-  const isLoggedIn = !!currentUser;
-
   return (
     <Routes>
       <Route
@@ -72,7 +59,7 @@ const App: React.FC = () => {
           needsOnboarding && isLoggedIn ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <HomePage isLoggedIn={isLoggedIn} />
+            <HomePage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
           )
         }
       />
@@ -83,7 +70,7 @@ const App: React.FC = () => {
           needsOnboarding && isLoggedIn ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <ChatsPage isLoggedIn={isLoggedIn} />
+            <ChatsPage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
           )
         }
       />
@@ -94,7 +81,10 @@ const App: React.FC = () => {
           needsOnboarding && isLoggedIn ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <NotificationsPage isLoggedIn={isLoggedIn} />
+            <NotificationsPage
+              isLoggedIn={isLoggedIn}
+              onLogout={handleLogout}
+            />
           )
         }
       />
@@ -105,7 +95,7 @@ const App: React.FC = () => {
           needsOnboarding && isLoggedIn ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <CafesPage isLoggedIn={isLoggedIn} />
+            <CafesPage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
           )
         }
       />
@@ -120,7 +110,11 @@ const App: React.FC = () => {
               <Navigate to="/" replace />
             )
           ) : (
-            <LoginPage isLoggedIn={false} />
+            <LoginPage
+              isLoggedIn={isLoggedIn}
+              onLogout={handleLogout}
+              onLoginSuccess={handleLoginSuccess}
+            />
           )
         }
       />
@@ -128,14 +122,25 @@ const App: React.FC = () => {
       <Route
         path="/profile"
         element={
-          isLoggedIn ? <ProfilePage /> : <Navigate to="/login" replace />
+          isLoggedIn ? (
+            <ProfilePage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
         }
       />
 
       <Route
         path="/onboarding"
         element={
-          isLoggedIn ? <OnboardingPage /> : <Navigate to="/login" replace />
+          isLoggedIn ? (
+            <OnboardingPage
+              isLoggedIn={isLoggedIn}
+              onLogout={handleLogout}
+            />
+          ) : (
+            <Navigate to="/login" replace />
+          )
         }
       />
 
@@ -143,5 +148,7 @@ const App: React.FC = () => {
     </Routes>
   );
 };
+
+const App: React.FC = () => <AppInner />;
 
 export default App;

@@ -58,16 +58,17 @@ const chatMessages: Record<number, Message[]> = {
 
 type ChatsPageProps = {
   isLoggedIn: boolean;
+  onLogout: () => void;
 };
 
-const ChatsPage: React.FC<ChatsPageProps> = ({ isLoggedIn }) => {
+const ChatsPage: React.FC<ChatsPageProps> = ({ isLoggedIn, onLogout }) => {
   const navigate = useNavigate();
   const [activeChatId, setActiveChatId] = useState<number>(chats[0].id);
 
   if (!isLoggedIn) {
     return (
       <div className="app-shell">
-        <TopBar isLoggedIn={isLoggedIn} />
+        <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
         <main className="home-main locked-main">
           <div className="locked-card">
             <h2>Login to see your chats</h2>
@@ -89,7 +90,7 @@ const ChatsPage: React.FC<ChatsPageProps> = ({ isLoggedIn }) => {
 
   return (
     <div className="app-shell">
-      <TopBar isLoggedIn={isLoggedIn} />
+      <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
 
       <main className="home-main chats-main">
         <section className="chats-layout">

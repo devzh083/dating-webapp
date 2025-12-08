@@ -4,6 +4,7 @@ import TopBar from "../components/TopBar";
 
 type CafesPageProps = {
   isLoggedIn: boolean;
+  onLogout: () => void;
 };
 
 type Cafe = {
@@ -61,10 +62,10 @@ const cafes: Cafe[] = [
   },
 ];
 
-const CafesPage: React.FC<CafesPageProps> = ({ isLoggedIn }) => {
+const CafesPage: React.FC<CafesPageProps> = ({ isLoggedIn, onLogout }) => {
   return (
     <div className="app-shell">
-      <TopBar isLoggedIn={isLoggedIn} />
+      <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
 
       <main className="home-main cafes-main">
         {/* Hero banner */}

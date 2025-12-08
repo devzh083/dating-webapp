@@ -1,54 +1,43 @@
 // front-end/src/pages/ProfilePage.tsx
 import React from "react";
-import { useNavigate } from "react-router-dom";
-import { signOut } from "firebase/auth";
-
-import { auth } from "../firebase";
 import TopBar from "../components/TopBar";
 
 import "./ProfilePage.css";
 
-const ProfilePage: React.FC = () => {
-  const navigate = useNavigate();
-  const user = auth.currentUser;
+type ProfilePageProps = {
+  isLoggedIn: boolean;
+  onLogout: () => void;
+};
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigate("/login");
-    } catch (err) {
-      console.error("Error signing out:", err);
-    }
+const ProfilePage: React.FC<ProfilePageProps> = ({ isLoggedIn, onLogout }) => {
+  // For now, user info is not coming from backend; you can call /profile/ later.
+  // Placeholder values can be replaced with real data from Django/Firebase.
+  const fakeUser = {
+    displayName: "Your Name",
+    email: "you@example.com",
   };
 
   return (
     <div className="app-shell profile-shell">
-      <TopBar isLoggedIn={!!user} />
+      <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
 
       <main className="profile-main">
         <div className="profile-card">
           <h1 className="profile-title">Your profile</h1>
 
-          {user ? (
+          {isLoggedIn ? (
             <>
               <div className="profile-row">
                 <span className="profile-label">Name</span>
                 <span className="profile-value">
-                  {user.displayName || "Add your name in onboarding"}
+                  {fakeUser.displayName || "Add your name in onboarding"}
                 </span>
               </div>
 
               <div className="profile-row">
                 <span className="profile-label">Email</span>
-                <span className="profile-value">{user.email}</span>
+                <span className="profile-value">{fakeUser.email}</span>
               </div>
-
-              {user.phoneNumber && (
-                <div className="profile-row">
-                  <span className="profile-label">Phone</span>
-                  <span className="profile-value">{user.phoneNumber}</span>
-                </div>
-              )}
             </>
           ) : (
             <p className="profile-placeholder">
@@ -56,7 +45,7 @@ const ProfilePage: React.FC = () => {
             </p>
           )}
 
-          <button className="profile-logout-btn" onClick={handleLogout}>
+          <button className="profile-logout-btn" onClick={onLogout}>
             Log out
           </button>
         </div>

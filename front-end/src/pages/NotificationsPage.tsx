@@ -60,17 +60,19 @@ const iconForType = (type: NotificationItem["type"]) => {
 
 type NotificationsPageProps = {
   isLoggedIn: boolean;
+  onLogout: () => void;
 };
 
 const NotificationsPage: React.FC<NotificationsPageProps> = ({
   isLoggedIn,
+  onLogout,
 }) => {
   const navigate = useNavigate();
 
   if (!isLoggedIn) {
     return (
       <div className="app-shell">
-        <TopBar isLoggedIn={isLoggedIn} />
+        <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
         <main className="home-main locked-main">
           <div className="locked-card">
             <h2>Login to view notifications</h2>
@@ -89,7 +91,7 @@ const NotificationsPage: React.FC<NotificationsPageProps> = ({
 
   return (
     <div className="app-shell">
-      <TopBar isLoggedIn={isLoggedIn} />
+      <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
 
       <main className="home-main notifications-main">
         <header className="notifications-header">

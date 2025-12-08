@@ -1,11 +1,13 @@
+// src/components/TopBar.tsx
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 interface TopBarProps {
   isLoggedIn: boolean;
+  onLogout: () => void;
 }
 
-const TopBar: React.FC<TopBarProps> = ({ isLoggedIn }) => {
+const TopBar: React.FC<TopBarProps> = ({ isLoggedIn, onLogout }) => {
   const navigate = useNavigate();
 
   const handleBrandClick = () => {
@@ -14,7 +16,7 @@ const TopBar: React.FC<TopBarProps> = ({ isLoggedIn }) => {
 
   const handleLoginClick = () => {
     if (isLoggedIn) {
-      console.log("Open profile");
+      onLogout();
     } else {
       navigate("/login");
     }
@@ -40,7 +42,7 @@ const TopBar: React.FC<TopBarProps> = ({ isLoggedIn }) => {
           Cafés
         </NavLink>
         <button className="login-pill" onClick={handleLoginClick}>
-          {isLoggedIn ? "Profile" : "Login/SignUp"}
+          {isLoggedIn ? "Logout" : "Login/SignUp"}
         </button>
       </nav>
     </header>
