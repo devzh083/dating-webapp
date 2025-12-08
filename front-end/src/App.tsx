@@ -13,13 +13,34 @@ import OnboardingPage from "./pages/OnboardingPage";
 const AppInner: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false); // keep for later
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    setIsLoggedIn(!!token);
-    setNeedsOnboarding(false); // adjust later if you have onboarding logic
+    // 1) check if Google callback put tokens in query string
+    const params = new URLSearchParams(window.location.search);
+    const accessFromQuery = params.get("access_token");
+    const refreshFromQuery = params.get("refresh_token");
+
+    if (accessFromQuery) {
+      localStorage.setItem("access_token", accessFromQuery);
+      if (refreshFromQuery) {
+        localStorage.setItem("refresh_token", refreshFromQuery);
+      }
+
+      // remove tokens from URL for cleanliness and security
+      window.history.replaceState({}, "", window.location.pathname);
+
+      setIsLoggedIn(true);
+      setNeedsOnboarding(false); // TODO: compute based on backend/profile if needed
+      setProfileLoaded(true);
+      return;
+    }
+
+    // 2) normal initial check from localStorage
+    const storedAccess = localStorage.getItem("access_token");
+    setIsLoggedIn(!!storedAccess);
+    setNeedsOnboarding(false);
     setProfileLoaded(true);
   }, []);
 
