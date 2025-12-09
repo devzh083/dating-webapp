@@ -1,7 +1,7 @@
 // src/pages/LoginPage.tsx
 import "./LoginPage.css";
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import TopBar from "../components/TopBar";
 
 type LoginPageProps = {
@@ -18,11 +18,31 @@ const LoginPage: React.FC<LoginPageProps> = ({
   onLoginSuccess,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Handle redirect back from Google: tokens in query string
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const accessFromUrl = params.get("access_token");
+    const refreshFromUrl = params.get("refresh_token");
+
+    if (accessFromUrl && refreshFromUrl) {
+      localStorage.setItem("access_token", accessFromUrl);
+      localStorage.setItem("refresh_token", refreshFromUrl);
+
+      // Clean URL so tokens are not visible
+      window.history.replaceState({}, "", window.location.pathname);
+
+      onLoginSuccess();
+      navigate("/");
+    }
+  }, [location.search, navigate, onLoginSuccess]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -37,16 +57,17 @@ const LoginPage: React.FC<LoginPageProps> = ({
 
     try {
       const username = emailOrPhone.trim();
-
       if (!username || !password) {
         throw new Error("Try entering correct email and password.");
       }
+
+      const payload = { username, password };
 
       if (isSignUpMode) {
         const registerRes = await fetch(`${API_BASE_URL}/register/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
+          body: JSON.stringify(payload),
         });
         const registerData = await registerRes.json();
 
@@ -56,37 +77,23 @@ const LoginPage: React.FC<LoginPageProps> = ({
               "This email is already registered. Try logging in."
           );
         }
-
-        const loginRes = await fetch(`${API_BASE_URL}/login/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
-        });
-        const loginData = await loginRes.json();
-
-        if (!loginRes.ok) {
-          throw new Error(loginData.detail || "Login after signup failed.");
-        }
-
-        localStorage.setItem("access_token", loginData.access);
-        localStorage.setItem("refresh_token", loginData.refresh);
-      } else {
-        const loginRes = await fetch(`${API_BASE_URL}/login/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
-        });
-        const loginData = await loginRes.json();
-
-        if (!loginRes.ok) {
-          throw new Error(
-            loginData.detail || "Try entering correct email and password."
-          );
-        }
-
-        localStorage.setItem("access_token", loginData.access);
-        localStorage.setItem("refresh_token", loginData.refresh);
       }
+
+      const loginRes = await fetch(`${API_BASE_URL}/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const loginData = await loginRes.json();
+
+      if (!loginRes.ok) {
+        throw new Error(
+          loginData.detail || "Try entering correct email and password."
+        );
+      }
+
+      localStorage.setItem("access_token", loginData.access);
+      localStorage.setItem("refresh_token", loginData.refresh);
 
       onLoginSuccess();
       navigate("/");
@@ -213,12 +220,28 @@ const LoginPage: React.FC<LoginPageProps> = ({
           ) : (
             <>
               <p style={{ marginTop: 16 }}>You are logged in.</p>
+
+              {/* Round profile avatar button */}
               <button
                 type="button"
-                className="login-button"
-                onClick={onLogout}
+                onClick={() => navigate("/profile")}
+                style={{
+                  marginTop: 12,
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  border: "2px solid #f97316",
+                  padding: 0,
+                  overflow: "hidden",
+                  backgroundColor: "transparent",
+                  cursor: "pointer",
+                }}
               >
-                Logout
+                <img
+                  src="https://via.placeholder.com/64x64.png?text=U"
+                  alt="Profile"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
               </button>
             </>
           )}

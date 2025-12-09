@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 
 interface TopBarProps {
   isLoggedIn: boolean;
-  onLogout: () => void;
+  onLogout: () => void; // still available if you want to use it elsewhere
 }
 
 const TopBar: React.FC<TopBarProps> = ({ isLoggedIn, onLogout }) => {
@@ -15,11 +15,11 @@ const TopBar: React.FC<TopBarProps> = ({ isLoggedIn, onLogout }) => {
   };
 
   const handleLoginClick = () => {
-    if (isLoggedIn) {
-      onLogout();
-    } else {
-      navigate("/login");
-    }
+    navigate("/login");
+  };
+
+  const handleProfileClick = () => {
+    navigate("/profile");
   };
 
   return (
@@ -41,9 +41,39 @@ const TopBar: React.FC<TopBarProps> = ({ isLoggedIn, onLogout }) => {
         <NavLink to="/cafes" className="site-nav-link">
           Cafés
         </NavLink>
-        <button className="login-pill" onClick={handleLoginClick}>
-          {isLoggedIn ? "Logout" : "Login/SignUp"}
-        </button>
+
+        {isLoggedIn ? (
+          // Colorful circular profile button
+          <button
+            type="button"
+            onClick={handleProfileClick}
+            style={{
+              marginLeft: 16,
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              border: "0",
+              padding: 0,
+              background:
+                "linear-gradient(135deg, #f97316 0%, #ec4899 45%, #6366f1 100%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#ffffff",
+              fontWeight: 600,
+              fontSize: 16,
+              boxShadow: "0 0 0 2px rgba(255,255,255,0.8)",
+              cursor: "pointer",
+            }}
+            aria-label="Open profile"
+          >
+            U
+          </button>
+        ) : (
+          <button className="login-pill" onClick={handleLoginClick}>
+            Login/SignUp
+          </button>
+        )}
       </nav>
     </header>
   );
