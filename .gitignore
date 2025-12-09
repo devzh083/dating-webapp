@@ -42,3 +42,6 @@ backend/sheet_reading.py
 previewConfig.json
 __pycache__/
 *.pyc
+# Ignore sqlite databases
+backend/db.sqlite3
+*.sqlite3
