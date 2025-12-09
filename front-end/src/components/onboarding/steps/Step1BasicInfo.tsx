@@ -118,3 +118,5 @@ export const Step1BasicInfo = ({
     </StepLayout>
   );
 };
+
+export default Step1BasicInfo;

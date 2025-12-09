@@ -13,11 +13,42 @@ import OnboardingPage from "./pages/OnboardingPage";
 const AppInner: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
-
-  // we'll start with this off; later we’ll hook it to backend/onboarding flag
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   const navigate = useNavigate();
+
+  // Function to check profile via API
+  const checkProfile = async (accessToken: string) => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/auth/status/", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Profile API Response:", data);
+      
+      // Check if profile exists based on your API response structure
+      const profileExists = data.profile_exists || Object.keys(data.profile).length > 0;
+      
+      // Set onboarding based on profile existence
+      setNeedsOnboarding(!profileExists);
+      
+      return profileExists;
+    } catch (error) {
+      console.error("Profile check failed:", error);
+      // Default to no onboarding if API fails
+      setNeedsOnboarding(false);
+      return false;
+    }
+  };
 
   useEffect(() => {
     // 1) check Google callback query params
@@ -35,19 +66,33 @@ const AppInner: React.FC = () => {
       window.history.replaceState({}, "", window.location.pathname);
 
       setIsLoggedIn(true);
-      setNeedsOnboarding(false); // later: decide from backend/profile
-      setProfileLoaded(true);
+      
+      // Check profile after setting login state
+      checkProfile(accessFromQuery).finally(() => {
+        setProfileLoaded(true);
+      });
       return;
     }
 
     // 2) normal startup check
     const storedAccess = localStorage.getItem("access_token");
-    setIsLoggedIn(!!storedAccess);
-    setNeedsOnboarding(false); // later: read flag when you have it
-    setProfileLoaded(true);
+    if (storedAccess) {
+      setIsLoggedIn(true);
+      // Check profile for existing token
+      checkProfile(storedAccess).finally(() => {
+        setProfileLoaded(true);
+      });
+    } else {
+      setIsLoggedIn(false);
+      setProfileLoaded(true);
+    }
   }, []);
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = async () => {
+    const accessToken = localStorage.getItem("access_token");
+    if (accessToken) {
+      await checkProfile(accessToken);
+    }
     setIsLoggedIn(true);
   };
 
@@ -55,6 +100,7 @@ const AppInner: React.FC = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     setIsLoggedIn(false);
+    setNeedsOnboarding(false);
     navigate("/login");
   };
 

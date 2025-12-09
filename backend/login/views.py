@@ -234,3 +234,35 @@ class GoogleCallbackView(APIView):
             f"&is_new_user={created}"
         )
         return redirect(redirect_url)
+
+class AuthStatusView(APIView):
+    """
+    Returns whether the authenticated user is new or existing,
+    based on presence of a profile document in Firestore.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        email = request.user.username
+        
+        # Check if profile exists for this email
+        profile = FirebaseProfileManager.get_profile(email)
+        has_profile = profile is not None
+        
+        # Boolean flag as requested: true if profile exists, false otherwise
+        profile_exists = bool(profile)
+        
+        # Get Firebase user data for completeness
+        firebase_user = FirebaseAuthManager.get_user_by_email(email)
+
+        return Response(
+            {
+                "email": email,
+                "profile_exists": profile_exists,  # true/false as requested
+                "has_profile": has_profile,        # same boolean, kept for backward compatibility
+                "firebase_user": firebase_user or {},
+                "profile": profile or {},
+            },
+            status=status.HTTP_200_OK,
+        )
+
