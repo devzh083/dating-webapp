@@ -5,6 +5,7 @@ import { PillButton } from "../PillButton";
 import { CheckboxField } from "../CheckboxField";
 import { User } from "lucide-react";
 
+
 interface Step1Props {
   data: {
     firstName: string;
@@ -19,8 +20,10 @@ interface Step1Props {
   onSkip: () => void;
 }
 
+
 const genderOptions = ["Man", "Woman", "Beyond Binary", "Other"];
 const interestOptions = ["Men", "Women", "Everyone", "Beyond Binary"];
+
 
 export const Step1BasicInfo = ({
   data,
@@ -38,7 +41,9 @@ export const Step1BasicInfo = ({
     }
   };
 
+
   const canProceed = data.firstName.trim() !== "" && data.dateOfBirth && data.gender;
+
 
   return (
     <StepLayout
@@ -62,23 +67,25 @@ export const Step1BasicInfo = ({
           icon={<User className="w-5 h-5" />}
         />
 
+
         {/* Date of Birth */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
+          <label className="block text-sm font-medium text-gray-900">
             Date of birth
           </label>
           <DatePicker
             value={data.dateOfBirth}
             onChange={(dateOfBirth) => onChange({ ...data, dateOfBirth })}
           />
-          <p className="text-xs text-muted-foreground mt-2">
+          <p className="text-xs text-gray-500 mt-2">
             Your age will be shown on your profile, but not your birthday
           </p>
         </div>
 
+
         {/* Gender */}
         <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">
+          <label className="block text-sm font-medium text-gray-900">
             I identify as
           </label>
           <div className="flex flex-wrap gap-3">
@@ -98,9 +105,10 @@ export const Step1BasicInfo = ({
           />
         </div>
 
+
         {/* Interested In */}
         <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">
+          <label className="block text-sm font-medium text-gray-900">
             I'd like to see
           </label>
           <div className="flex flex-wrap gap-3">
@@ -118,5 +126,6 @@ export const Step1BasicInfo = ({
     </StepLayout>
   );
 };
+
 
 export default Step1BasicInfo;
