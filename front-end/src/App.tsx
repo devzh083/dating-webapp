@@ -13,11 +13,14 @@ import OnboardingPage from "./pages/OnboardingPage";
 const AppInner: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false); // keep for later
+
+  // we'll start with this off; later we’ll hook it to backend/onboarding flag
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 1) check if Google callback put tokens in query string
+    // 1) check Google callback query params
     const params = new URLSearchParams(window.location.search);
     const accessFromQuery = params.get("access_token");
     const refreshFromQuery = params.get("refresh_token");
@@ -28,19 +31,19 @@ const AppInner: React.FC = () => {
         localStorage.setItem("refresh_token", refreshFromQuery);
       }
 
-      // remove tokens from URL for cleanliness and security
+      // clean URL
       window.history.replaceState({}, "", window.location.pathname);
 
       setIsLoggedIn(true);
-      setNeedsOnboarding(false); // TODO: compute based on backend/profile if needed
+      setNeedsOnboarding(false); // later: decide from backend/profile
       setProfileLoaded(true);
       return;
     }
 
-    // 2) normal initial check from localStorage
+    // 2) normal startup check
     const storedAccess = localStorage.getItem("access_token");
     setIsLoggedIn(!!storedAccess);
-    setNeedsOnboarding(false);
+    setNeedsOnboarding(false); // later: read flag when you have it
     setProfileLoaded(true);
   }, []);
 
@@ -154,14 +157,7 @@ const AppInner: React.FC = () => {
       <Route
         path="/onboarding"
         element={
-          isLoggedIn ? (
-            <OnboardingPage
-              isLoggedIn={isLoggedIn}
-              onLogout={handleLogout}
-            />
-          ) : (
-            <Navigate to="/login" replace />
-          )
+          isLoggedIn ? <OnboardingPage /> : <Navigate to="/login" replace />
         }
       />
 
