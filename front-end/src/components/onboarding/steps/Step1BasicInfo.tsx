@@ -5,7 +5,6 @@ import { PillButton } from "../PillButton";
 import { CheckboxField } from "../CheckboxField";
 import { User } from "lucide-react";
 
-
 interface Step1Props {
   data: {
     firstName: string;
@@ -20,10 +19,8 @@ interface Step1Props {
   onSkip: () => void;
 }
 
-
 const genderOptions = ["Man", "Woman", "Beyond Binary", "Other"];
 const interestOptions = ["Men", "Women", "Everyone", "Beyond Binary"];
-
 
 export const Step1BasicInfo = ({
   data,
@@ -41,9 +38,8 @@ export const Step1BasicInfo = ({
     }
   };
 
-
-  const canProceed = data.firstName.trim() !== "" && data.dateOfBirth && data.gender;
-
+  const canProceed =
+    data.firstName.trim() !== "" && data.dateOfBirth && data.gender;
 
   return (
     <StepLayout
@@ -57,19 +53,18 @@ export const Step1BasicInfo = ({
       canProceed={!!canProceed}
       showBack={false}
     >
-      <div className="space-y-8">
+      <div className="space-y-8 pt-2 pb-4">
         {/* First Name */}
         <TextInput
           value={data.firstName}
           onChange={(firstName) => onChange({ ...data, firstName })}
           placeholder="Enter your first name"
           label="First name"
-          icon={<User className="w-5 h-5" />}
+          icon={<User className="w-5 h-5 text-gray-400" />}
         />
 
-
         {/* Date of Birth */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <label className="block text-sm font-medium text-gray-900">
             Date of birth
           </label>
@@ -77,11 +72,10 @@ export const Step1BasicInfo = ({
             value={data.dateOfBirth}
             onChange={(dateOfBirth) => onChange({ ...data, dateOfBirth })}
           />
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-gray-500 mt-1">
             Your age will be shown on your profile, but not your birthday
           </p>
         </div>
-
 
         {/* Gender */}
         <div className="space-y-3">
@@ -105,7 +99,6 @@ export const Step1BasicInfo = ({
           />
         </div>
 
-
         {/* Interested In */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-gray-900">
@@ -126,6 +119,5 @@ export const Step1BasicInfo = ({
     </StepLayout>
   );
 };
-
 
 export default Step1BasicInfo;
