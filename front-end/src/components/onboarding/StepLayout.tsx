@@ -53,7 +53,7 @@ export const StepLayout = ({
               Skip
             </button>
           </div>
-          <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
+          
         </div>
       </header>
 

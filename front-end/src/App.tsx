@@ -2,6 +2,9 @@
 import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
+import Landing from "./pages/Landing";
+import NotFound from "./pages/NotFound";
+
 import HomePage from "./pages/HomePage";
 import ChatsPage from "./pages/ChatsPage";
 import NotificationsPage from "./pages/NotificationsPage";
@@ -17,13 +20,13 @@ const AppInner: React.FC = () => {
 
   const navigate = useNavigate();
 
-  // Function to check profile via API
+  // check profile via API
   const checkProfile = async (accessToken: string) => {
     try {
       const response = await fetch("http://127.0.0.1:8000/api/auth/status/", {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
       });
@@ -33,52 +36,43 @@ const AppInner: React.FC = () => {
       }
 
       const data = await response.json();
-      console.log("Profile API Response:", data);
-      
-      // Check if profile exists based on your API response structure
-      const profileExists = data.profile_exists || Object.keys(data.profile).length > 0;
-      
-      // Set onboarding based on profile existence
+      const profileExists =
+        data.profile_exists || Object.keys(data.profile || {}).length > 0;
+
       setNeedsOnboarding(!profileExists);
-      
       return profileExists;
     } catch (error) {
       console.error("Profile check failed:", error);
-      // Default to no onboarding if API fails
       setNeedsOnboarding(false);
       return false;
     }
   };
 
   useEffect(() => {
-    // 1) check Google callback query params
     const params = new URLSearchParams(window.location.search);
     const accessFromQuery = params.get("access_token");
     const refreshFromQuery = params.get("refresh_token");
 
+    // Google OAuth callback
     if (accessFromQuery) {
       localStorage.setItem("access_token", accessFromQuery);
       if (refreshFromQuery) {
         localStorage.setItem("refresh_token", refreshFromQuery);
       }
 
-      // clean URL
       window.history.replaceState({}, "", window.location.pathname);
-
       setIsLoggedIn(true);
-      
-      // Check profile after setting login state
+
       checkProfile(accessFromQuery).finally(() => {
         setProfileLoaded(true);
       });
       return;
     }
 
-    // 2) normal startup check
+    // normal startup
     const storedAccess = localStorage.getItem("access_token");
     if (storedAccess) {
       setIsLoggedIn(true);
-      // Check profile for existing token
       checkProfile(storedAccess).finally(() => {
         setProfileLoaded(true);
       });
@@ -123,10 +117,13 @@ const AppInner: React.FC = () => {
 
   return (
     <Routes>
+      {/* ROOT */}
       <Route
         path="/"
         element={
-          needsOnboarding && isLoggedIn ? (
+          !isLoggedIn ? (
+            <Landing />
+          ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
             <HomePage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
@@ -137,7 +134,9 @@ const AppInner: React.FC = () => {
       <Route
         path="/chats"
         element={
-          needsOnboarding && isLoggedIn ? (
+          !isLoggedIn ? (
+            <Navigate to="/" replace />
+          ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
             <ChatsPage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
@@ -148,7 +147,9 @@ const AppInner: React.FC = () => {
       <Route
         path="/notifications"
         element={
-          needsOnboarding && isLoggedIn ? (
+          !isLoggedIn ? (
+            <Navigate to="/" replace />
+          ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
             <NotificationsPage
@@ -162,7 +163,9 @@ const AppInner: React.FC = () => {
       <Route
         path="/cafes"
         element={
-          needsOnboarding && isLoggedIn ? (
+          !isLoggedIn ? (
+            <Navigate to="/" replace />
+          ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
             <CafesPage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
@@ -195,7 +198,7 @@ const AppInner: React.FC = () => {
           isLoggedIn ? (
             <ProfilePage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to="/" replace />
           )
         }
       />
@@ -203,11 +206,12 @@ const AppInner: React.FC = () => {
       <Route
         path="/onboarding"
         element={
-          isLoggedIn ? <OnboardingPage /> : <Navigate to="/login" replace />
+          isLoggedIn ? <OnboardingPage /> : <Navigate to="/" replace />
         }
       />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* 404 */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
