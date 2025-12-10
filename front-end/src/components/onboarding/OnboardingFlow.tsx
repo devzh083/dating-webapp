@@ -1,6 +1,9 @@
+// src/components/onboarding/OnboardingFlow.tsx
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ProgressBar } from "./ProgressBar";  // ← Add import
+import { useNavigate } from "react-router-dom";
+
+import { ProgressBar } from "./ProgressBar";
 import { Step1BasicInfo } from "./steps/Step1BasicInfo";
 import { Step2Orientation } from "./steps/Step2Orientation";
 import { Step3Distance } from "./steps/Step3Distance";
@@ -9,8 +12,6 @@ import { Step5Communication } from "./steps/Step5Communication";
 import { Step6Interests } from "./steps/Step6Interests";
 import { Step7Location } from "./steps/Step7Location";
 import { Step8Review } from "./steps/Step8Review";
-import { useToast } from "../../hooks/use-toast";
-
 
 interface OnboardingData {
   firstName: string;
@@ -34,7 +35,6 @@ interface OnboardingData {
   useCurrentLocation: boolean;
 }
 
-
 const initialData: OnboardingData = {
   firstName: "",
   dateOfBirth: undefined,
@@ -57,37 +57,35 @@ const initialData: OnboardingData = {
   useCurrentLocation: false,
 };
 
+interface OnboardingFlowProps {
+  onComplete: () => void;
+}
 
-export const OnboardingFlow = () => {
+export const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<OnboardingData>(initialData);
-  const { toast } = useToast();
-
+  const navigate = useNavigate();
 
   const goNext = () => {
-    if (step < 8) {
-      setStep(step + 1);
-    } else {
-      // Complete onboarding
-      toast({
-        title: "Welcome to the app! 🎉",
-        description: "Your profile is set up. Start matching now!",
-      });
-    }
+    setStep((prev) => (prev < 8 ? prev + 1 : prev));
   };
-
 
   const goBack = () => {
-    if (step > 1) {
-      setStep(step - 1);
-    }
+    setStep((prev) => (prev > 1 ? prev - 1 : prev));
   };
-
 
   const handleSkip = () => {
     goNext();
   };
 
+  // 🔹 This is ONLY used on step 8
+  const handleFinish = () => {
+    onComplete();        // tell App.tsx “onboarding done”
+    navigate("/home");   // then go to home
+  };
+
+  const mergeData = (partial: Partial<OnboardingData>) =>
+    setData((prev) => ({ ...prev, ...partial }));
 
   const renderStep = () => {
     switch (step) {
@@ -101,7 +99,7 @@ export const OnboardingFlow = () => {
               showGender: data.showGender,
               interestedIn: data.interestedIn,
             }}
-            onChange={(stepData) => setData({ ...data, ...stepData })}
+            onChange={mergeData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -115,7 +113,7 @@ export const OnboardingFlow = () => {
               showOrientation: data.showOrientation,
               relationshipType: data.relationshipType,
             }}
-            onChange={(stepData) => setData({ ...data, ...stepData })}
+            onChange={mergeData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -128,7 +126,7 @@ export const OnboardingFlow = () => {
               distance: data.distance,
               strictDistance: data.strictDistance,
             }}
-            onChange={(stepData) => setData({ ...data, ...stepData })}
+            onChange={mergeData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -143,7 +141,7 @@ export const OnboardingFlow = () => {
               workout: data.workout,
               pets: data.pets,
             }}
-            onChange={(stepData) => setData({ ...data, ...stepData })}
+            onChange={mergeData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -156,7 +154,7 @@ export const OnboardingFlow = () => {
               communicationStyle: data.communicationStyle,
               responsePace: data.responsePace,
             }}
-            onChange={(stepData) => setData({ ...data, ...stepData })}
+            onChange={mergeData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -166,7 +164,7 @@ export const OnboardingFlow = () => {
         return (
           <Step6Interests
             data={{ interests: data.interests }}
-            onChange={(stepData) => setData({ ...data, ...stepData })}
+            onChange={mergeData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -179,7 +177,7 @@ export const OnboardingFlow = () => {
               location: data.location,
               useCurrentLocation: data.useCurrentLocation,
             }}
-            onChange={(stepData) => setData({ ...data, ...stepData })}
+            onChange={mergeData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -189,9 +187,9 @@ export const OnboardingFlow = () => {
         return (
           <Step8Review
             data={data}
-            onNext={goNext}
+            onNext={handleFinish}   // ✅ last next → home
             onBack={goBack}
-            onSkip={handleSkip}
+            onSkip={handleFinish}   // ✅ last skip → home
           />
         );
       default:
@@ -199,22 +197,19 @@ export const OnboardingFlow = () => {
     }
   };
 
-
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Progress Bar at the top */}
-      <div className="px-6 py-6 border-b border-gray-200">
+    <div className="min-h-[70vh] bg-white flex flex-col">
+      <div className="px-6 pt-4 pb-6">
         <ProgressBar currentStep={step} totalSteps={8} />
       </div>
 
-      {/* Step content */}
       <AnimatePresence mode="wait">
         <motion.div
           key={step}
-          initial={{ opacity: 0, x: 50 }}
+          initial={{ opacity: 0, x: 40 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
+          exit={{ opacity: 0, x: -40 }}
+          transition={{ duration: 0.25, ease: "easeInOut" }}
           className="flex-1"
         >
           {renderStep()}

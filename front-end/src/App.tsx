@@ -95,7 +95,7 @@ const AppInner: React.FC = () => {
     localStorage.removeItem("refresh_token");
     setIsLoggedIn(false);
     setNeedsOnboarding(false);
-    navigate("/login");
+    navigate("/"); // <- go back to landing
   };
 
   if (!profileLoaded) {
@@ -117,12 +117,24 @@ const AppInner: React.FC = () => {
 
   return (
     <Routes>
-      {/* ROOT */}
+      {/* Landing – always at "/" */}
       <Route
         path="/"
         element={
-          !isLoggedIn ? (
+          isLoggedIn ? (
+            <Navigate to="/home" replace />
+          ) : (
             <Landing />
+          )
+        }
+      />
+
+      {/* Home – main app shell */}
+      <Route
+        path="/home"
+        element={
+          !isLoggedIn ? (
+            <Navigate to="/" replace />
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
@@ -180,7 +192,7 @@ const AppInner: React.FC = () => {
             needsOnboarding ? (
               <Navigate to="/onboarding" replace />
             ) : (
-              <Navigate to="/" replace />
+              <Navigate to="/home" replace />
             )
           ) : (
             <LoginPage
@@ -206,7 +218,16 @@ const AppInner: React.FC = () => {
       <Route
         path="/onboarding"
         element={
-          isLoggedIn ? <OnboardingPage /> : <Navigate to="/" replace />
+          isLoggedIn ? (
+            <OnboardingPage
+              onComplete={() => {
+                // when last step finishes, we’re done with onboarding
+                setNeedsOnboarding(false);
+              }}
+            />
+          ) : (
+            <Navigate to="/" replace />
+          )
         }
       />
 

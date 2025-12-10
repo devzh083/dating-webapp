@@ -1,3 +1,4 @@
+import TopBar from "@/components/layout/TopBar";
 .cafes-main {
   padding-top: 24px;
 }

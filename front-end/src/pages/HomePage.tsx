@@ -1,138 +1,127 @@
-import "./HomePage.css";
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
+
 import TopBar from "../components/TopBar";
-import PremiumSection from "../components/PremiumSection";
+
+// Lovable-style components
+import { ProfileCompletion } from "../components/home/ProfileCompletion";
+import { MatchCard } from "../components/home/MatchCard";
+import { NearbyBanner } from "../components/home/NearbyBanner";
+import { PremiumBanner } from "../components/home/PremiumBanner";
 
 type HomePageProps = {
   isLoggedIn: boolean;
   onLogout: () => void;
 };
 
-const people = [
+// mock data (same as Lovable, safe placeholder)
+const mockMatches = [
   {
-    id: 1,
-    name: "Aaradhya",
-    age: 22,
-    city: "Vizag",
-    imageUrl:
-      "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&w=800",
-  },
-  {
-    id: 2,
-    name: "Rohit",
-    age: 24,
-    city: "Vizag",
-    imageUrl:
-      "https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&w=800",
-  },
-  {
-    id: 3,
-    name: "Sahana",
-    age: 23,
-    city: "Gajuwaka",
-    imageUrl:
-      "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&w=800",
-  },
-  {
-    id: 4,
-    name: "Aditya",
+    id: "1",
+    name: "Sarah",
     age: 26,
-    city: "Madhurawada",
-    imageUrl:
-      "https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&w=800",
+    distance: "2 km away",
+    bio: "Coffee lover ☕ | Travel enthusiast ✈️ | Dog mom 🐕",
+    photos: [
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop",
+    ],
+    interests: ["Travel", "Coffee", "Dogs", "Photography"],
   },
   {
-    id: 5,
-    name: "Meghana",
-    age: 25,
-    city: "Siripuram",
-    imageUrl:
-      "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&w=800",
+    id: "2",
+    name: "Emma",
+    age: 24,
+    distance: "5 km away",
+    bio: "Yoga instructor 🧘 | Foodie 🍜 | Nature lover 🌿",
+    photos: [
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&auto=format&fit=crop",
+    ],
+    interests: ["Yoga", "Food", "Nature", "Hiking"],
+  },
+  {
+    id: "3",
+    name: "Maya",
+    age: 28,
+    distance: "3 km away",
+    bio: "Artist 🎨 | Music lover 🎵 | Bookworm 📚",
+    photos: [
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop",
+    ],
+    interests: ["Art", "Music", "Reading", "Movies"],
   },
 ];
 
 const HomePage: React.FC<HomePageProps> = ({ isLoggedIn, onLogout }) => {
   const navigate = useNavigate();
-  const location = "Visakhapatnam (Vizag)";
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [exitDirection, setExitDirection] = useState<"left" | "right" | null>(
+    null
+  );
 
-  const handleGoPremium = () => {
-    alert("Premium flow coming soon.");
+  // later replace with real profile data
+  const userName = "U";
+  const profileCompletion = 75;
+
+  // ✅ KEEP existing locked behavior (same as ChatsPage)
+  if (!isLoggedIn) {
+    return (
+      <div className="app-shell">
+        <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
+        <main className="home-main locked-main">
+          <div className="locked-card">
+            <h2>Login to see your matches</h2>
+            <p>You need to be logged in to discover people nearby.</p>
+            <button
+              className="hero-primary"
+              onClick={() => navigate("/login")}
+            >
+              Go to Login
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const handleSwipe = (direction: "left" | "right") => {
+    setExitDirection(direction);
+    setTimeout(() => {
+      setCurrentMatchIndex((prev) => (prev + 1) % mockMatches.length);
+      setExitDirection(null);
+    }, 300);
   };
 
-  const goToLogin = () => navigate("/login");
-  const goToSignUp = () => navigate("/login"); // later you can route to /signup
+  const currentMatch = mockMatches[currentMatchIndex];
 
+  // ✅ Lovable layout
   return (
-    <div className="app-shell">
+    <div className="min-h-screen bg-background">
       <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
 
-      <main className="home-main">
-        {/* HERO BANNER */}
-        <section className="home-hero">
-          <div
-            className="home-hero-image"
-            style={{
-              backgroundImage:
-                "url(https://images.pexels.com/photos/935759/pexels-photo-935759.jpeg?auto=compress&w=1400)",
-            }}
-          />
-          <div className="home-hero-overlay">
-            <h1>Find your next date, effortlessly.</h1>
-            <p>
-              Discover people who match your vibe and meet at curated partner
-              cafés in your city.
-            </p>
+      <main className="container px-4 md:px-8 py-6 max-w-4xl mx-auto">
+        <ProfileCompletion percentage={profileCompletion} />
 
-            <div className="home-hero-actions">
-              <button className="hero-primary" onClick={goToLogin}>
-                Login
-              </button>
-              <button className="hero-secondary" onClick={goToSignUp}>
-                Sign up
-              </button>
-            </div>
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
+            Discover
+          </h2>
+
+          <div className="relative h-[500px] flex items-center justify-center">
+            <AnimatePresence mode="wait">
+              <MatchCard
+                key={currentMatch.id}
+                match={currentMatch}
+                onLike={() => handleSwipe("right")}
+                onPass={() => handleSwipe("left")}
+                exitDirection={exitDirection}
+              />
+            </AnimatePresence>
           </div>
         </section>
 
-        {/* FILTERS */}
-        <section className="home-filters">
-          <button className="filter-pill">Filter</button>
-          <button className="filter-pill">Interests</button>
-          <button className="filter-pill">Within 5 km</button>
-          <button className="filter-pill">Age 21–30</button>
-          <button className="filter-pill">Online now</button>
-          <button className="filter-pill">Verified profiles</button>
-        </section>
-
-        {/* SUGGESTED MATCHES */}
-        <section className="matches-section">
-          <div className="matches-header">
-            <h2 className="section-title">Suggested Matches</h2>
-            <span className="location-pill">{location}</span>
-          </div>
-
-          <div className="matches-grid">
-            {people.map((user) => (
-              <article key={user.id} className="match-card">
-                <div
-                  className="match-photo"
-                  style={{ backgroundImage: `url(${user.imageUrl})` }}
-                />
-                <div className="match-info">
-                  <div className="match-name-row">
-                    <span className="match-name">{user.name}</span>
-                    <span className="match-age">{user.age}</span>
-                  </div>
-                  <span className="match-city">{user.city}</span>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        {/* PREMIUM BANNER */}
-        <PremiumSection onGoPremium={handleGoPremium} />
+        <NearbyBanner />
+        <PremiumBanner />
       </main>
     </div>
   );

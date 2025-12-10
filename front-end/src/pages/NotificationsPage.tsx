@@ -1,7 +1,7 @@
 import "./NotificationsPage.css";
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import TopBar from "../components/TopBar";
+import TopBar from "@/components/layout/TopBar";
 import { FiHeart, FiUserPlus, FiCoffee, FiBell } from "react-icons/fi";
 
 type NotificationItem = {
