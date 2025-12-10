@@ -9,7 +9,6 @@ import {
   MapPin,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-// adjust this import if your Button lives somewhere else
 import { Button } from "../components/ui/button";
 
 const profiles = [
@@ -60,46 +59,54 @@ const features = [
   },
 ];
 
+// shared gradient class
+const PRIMARY_GRADIENT =
+  "bg-[linear-gradient(to_right,#0095E0,#00B4D8,#00C98B)]";
+
 const Landing = () => {
   const navigate = useNavigate();
   const goToAuth = () => navigate("/login");
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* NAVBAR */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-2"
+            className="flex items-center gap-3"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-start to-primary-end flex items-center justify-center">
+            <div
+              className={`w-10 h-10 rounded-xl ${PRIMARY_GRADIENT} flex items-center justify-center shadow-md`}
+            >
               <Heart className="w-5 h-5 text-white fill-white" />
             </div>
-            <span className="text-xl font-bold">The dating app</span>
+            <span className="text-lg font-bold text-gray-900">
+              The dating app
+            </span>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="hidden md:flex items-center gap-8 text-sm"
+            className="hidden md:flex items-center gap-10 text-sm"
           >
             <a
               href="#features"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
             >
               Features
             </a>
             <a
               href="#stories"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
             >
               Stories
             </a>
             <a
               href="#safety"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
             >
               Safety
             </a>
@@ -108,17 +115,17 @@ const Landing = () => {
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-3"
+            className="flex items-center gap-4"
           >
             <Button
               variant="ghost"
-              className="hidden sm:inline-flex"
+              className="hidden sm:inline-flex text-gray-700 hover:text-gray-900 hover:bg-gray-50"
               onClick={goToAuth}
             >
               Sign in
             </Button>
             <Button
-              className="bg-gradient-to-r from-primary-start to-primary-end hover:opacity-90 text-white shadow-lg shadow-primary/25"
+              className={`${PRIMARY_GRADIENT} text-white shadow-md hover:brightness-110 transition-all font-medium px-6 border-none`}
               onClick={goToAuth}
             >
               Get Started
@@ -128,9 +135,9 @@ const Landing = () => {
       </nav>
 
       {/* HERO */}
-      <section className="relative pt-32 pb-20 overflow-hidden bg-gradient-to-b from-primary/5 to-background">
+      <section className="relative pt-32 pb-20 overflow-hidden bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
             {/* LEFT */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -138,21 +145,21 @@ const Landing = () => {
               transition={{ duration: 0.6 }}
               className="text-center lg:text-left"
             >
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6">
+              <h1 className="text-6xl md:text-7xl lg:text-8xl font-black leading-tight mb-8 text-gray-900">
                 Find your{" "}
-                <span className="bg-gradient-to-r from-primary-start to-primary-end bg-clip-text text-transparent">
+                <span className="bg-[linear-gradient(to_right,#0095E0,#00B4D8,#00C98B)] bg-clip-text text-transparent">
                   perfect
                 </span>{" "}
                 match
               </h1>
-              <p className="text-xl text-muted-foreground mb-8 max-w-lg mx-auto lg:mx-0">
+              <p className="text-xl text-gray-600 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
                 We exist to bring people closer to love. Find meaningful
                 connections that ignite confidence and joy.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <Button
                   size="lg"
-                  className="bg-gradient-to-r from-primary-start to-primary-end hover:opacity-90 text-white text-lg px-8 py-6 shadow-xl shadow-primary/30"
+                  className={`${PRIMARY_GRADIENT} text-white text-lg px-8 py-7 shadow-lg hover:brightness-110 transition-all font-semibold border-none`}
                   onClick={goToAuth}
                 >
                   <Sparkles className="w-5 h-5 mr-2" />
@@ -160,102 +167,141 @@ const Landing = () => {
                 </Button>
                 <Button
                   size="lg"
+                  className="text-gray-900 border-2 border-gray-900 hover:bg-gray-900 hover:text-white text-lg px-8 py-7 font-semibold transition-all"
                   variant="outline"
-                  className="text-lg px-8 py-6 border-2"
                 >
                   Learn More
                 </Button>
               </div>
 
               {/* STATS */}
-              <div className="flex gap-8 mt-12 justify-center lg:justify-start">
+              <div className="flex gap-12 mt-16 justify-center lg:justify-start flex-wrap">
                 <div>
-                  <div className="text-3xl font-bold">50M+</div>
-                  <div className="text-muted-foreground text-sm">
+                  <div className="text-4xl font-black text-gray-900">
+                    50M+
+                  </div>
+                  <div className="text-gray-600 text-sm font-medium mt-1">
                     Active Users
                   </div>
                 </div>
-                <div className="w-px bg-border" />
+                <div className="w-px bg-gray-300" />
                 <div>
-                  <div className="text-3xl font-bold">10M+</div>
-                  <div className="text-muted-foreground text-sm">
+                  <div className="text-4xl font-black text-gray-900">
+                    10M+
+                  </div>
+                  <div className="text-gray-600 text-sm font-medium mt-1">
                     Matches Made
                   </div>
                 </div>
-                <div className="w-px bg-border" />
+                <div className="w-px bg-gray-300" />
                 <div>
-                  <div className="text-3xl font-bold">150+</div>
-                  <div className="text-muted-foreground text-sm">
+                  <div className="text-4xl font-black text-gray-900">
+                    150+
+                  </div>
+                  <div className="text-gray-600 text-sm font-medium mt-1">
                     Countries
                   </div>
                 </div>
               </div>
             </motion.div>
 
-            {/* RIGHT: PROFILE CARDS */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="relative h-[500px] hidden lg:block"
-            >
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                <span className="text-[180px] font-black text-muted/30 tracking-tighter">
-                  love
-                </span>
-              </div>
+           {/* RIGHT: PROFILE CARDS */}
+                    {/* RIGHT: PROFILE CARDS */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="relative h-[500px] hidden lg:flex items-center justify-center perspective-1000"
+          >
+            {profiles.map((profile, index) => {
+              // Logic to determine position based on index
+              // 0: Left, 1: Center (Top), 2: Right
+              const isCenter = index === 1;
+              const isLeft = index === 0;
+              const isRight = index === 2;
 
-              {profiles.map((profile, index) => (
+              return (
                 <motion.div
                   key={profile.name}
-                  initial={{ opacity: 0, y: 50, rotate: (index - 1) * 8 }}
-                  animate={{ opacity: 1, y: 0, rotate: (index - 1) * 8 }}
-                  transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
-                  className="absolute w-56 h-72 rounded-3xl overflow-hidden shadow-2xl"
+                  initial={{ 
+                    opacity: 0, 
+                    x: "-50%", 
+                    y: "-50%", 
+                    rotate: 0, 
+                    scale: 0.8 
+                  }}
+                  animate={{ 
+                    opacity: 1, 
+                    // Base position is center (50%, 50%). We adjust x/y from there.
+                    x: isCenter ? "-50%" : isLeft ? "-140%" : "40%", 
+                    y: isCenter ? "-60%" : "-45%", 
+                    rotate: isCenter ? 0 : isLeft ? -12 : 12,
+                    scale: isCenter ? 1.1 : 0.95,
+                    zIndex: isCenter ? 20 : 10
+                  }}
+                  transition={{
+                    duration: 0.8,
+                    delay: 0.4 + index * 0.1,
+                    type: "spring",
+                    stiffness: 100,
+                    damping: 20
+                  }}
+                  className="absolute left-1/2 top-1/2 w-72 h-96 rounded-[2rem] overflow-hidden shadow-2xl border-[6px] border-white/40 backdrop-blur-sm"
                   style={{
-                    left: `${20 + index * 25}%`,
-                    top: `${10 + Math.abs(index - 1) * 15}%`,
-                    zIndex: 3 - Math.abs(index - 1),
+                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
                   }}
                 >
                   <img
                     src={profile.image}
                     alt={profile.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover" 
                   />
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                    <div className="text-white font-semibold text-lg">
-                      {profile.name}, {profile.age}
+                  
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-90" />
+                  
+                  {/* Card Content */}
+                  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="text-2xl font-bold">
+                        {profile.name}, {profile.age}
+                      </h3>
+                      {isCenter && (
+                        <div className="bg-green-500 w-3 h-3 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
+                      )}
                     </div>
-                    <div className="flex items-center gap-1 text-white/80 text-sm">
-                      <MapPin className="w-3 h-3" />
-                      2 km away
+                    
+                    <div className="flex items-center gap-2 text-white/90 text-sm font-medium backdrop-blur-md bg-white/10 w-fit px-3 py-1.5 rounded-full">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>2 km away</span>
                     </div>
                   </div>
                 </motion.div>
-              ))}
-            </motion.div>
+              );
+            })}
+          </motion.div>
+
           </div>
         </div>
 
-        {/* blur blobs like Lovable */}
-        <div className="absolute top-1/4 left-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-10 w-96 h-96 bg-primary-end/10 rounded-full blur-3xl pointer-events-none" />
+        {/* Subtle blur blobs */}
+        <div className="absolute top-1/3 right-0 w-96 h-96 bg-cyan-200/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 left-1/4 w-80 h-80 bg-cyan-100/30 rounded-full blur-3xl pointer-events-none" />
       </section>
 
       {/* FEATURES */}
-      <section id="features" className="py-24 bg-background">
+      <section id="features" className="py-32 bg-white">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-center mb-16"
+            className="text-center mb-20"
           >
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+            <h2 className="text-5xl md:text-6xl font-black mb-6 text-gray-900">
               Why choose us?
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
               We're building a dating experience that prioritizes authenticity
               and genuine connection.
             </p>
@@ -269,15 +315,17 @@ const Landing = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="group p-8 rounded-3xl bg-card border border-border/50 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300"
+                className="group p-8 rounded-2xl bg-gray-50 border border-gray-200 hover:border-cyan-300 hover:shadow-xl hover:shadow-cyan-100/50 transition-all duration-300 hover:-translate-y-1"
               >
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-start/10 to-primary-end/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <feature.icon className="w-7 h-7 text-primary" />
+                <div className="w-16 h-16 rounded-2xl bg-cyan-100/60 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-cyan-200 transition-all">
+                  <feature.icon className="w-8 h-8 text-cyan-600" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3">
+                <h3 className="text-lg font-bold mb-3 text-gray-900">
                   {feature.title}
                 </h3>
-                <p className="text-muted-foreground">{feature.description}</p>
+                <p className="text-gray-600 leading-relaxed text-sm">
+                  {feature.description}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -285,8 +333,12 @@ const Landing = () => {
       </section>
 
       {/* CTA */}
-      <section className="py-24 bg-gradient-to-br from-primary-start to-primary-end relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00eiIvPjwvZz48L2c+PC9zdmc+')] opacity-30" />
+      <section
+        className={`py-32 ${PRIMARY_GRADIENT} relative overflow-hidden`}
+      >
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00eiIvPjwvZz48L2c+PC9zdmc+')]"></div>
+        </div>
 
         <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
           <motion.div
@@ -294,16 +346,16 @@ const Landing = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+            <h2 className="text-5xl md:text-6xl font-black text-white mb-8">
               Ready to find your person?
             </h2>
-            <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto">
+            <p className="text-2xl text-white/90 mb-12 max-w-2xl mx-auto leading-relaxed font-medium">
               Join millions of people who have found meaningful connections.
               Your story could be next.
             </p>
             <Button
               size="lg"
-              className="bg-white text-primary hover:bg-white/90 text-lg px-10 py-6 shadow-xl"
+              className="bg-white text-[#0095E0] hover:bg-gray-100 text-lg px-12 py-7 shadow-xl hover:shadow-2xl font-bold transition-all"
               onClick={goToAuth}
             >
               Get Started Free
@@ -313,32 +365,46 @@ const Landing = () => {
       </section>
 
       {/* FOOTER */}
-      <footer className="py-12 bg-muted/30 border-t border-border/50">
+      <footer className="py-12 bg-gray-900 border-t border-gray-800">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-start to-primary-end flex items-center justify-center">
-                <Heart className="w-4 h-4 text-white fill-white" />
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-9 h-9 rounded-lg ${PRIMARY_GRADIENT} flex items-center justify-center shadow-md`}
+              >
+                <Heart className="w-5 h-5 text-white fill-white" />
               </div>
-              <span className="font-semibold">The dating app</span>
+              <span className="font-bold text-white">The dating app</span>
             </div>
 
-            <div className="flex gap-6 text-sm text-muted-foreground">
-              <a href="#" className="hover:text-foreground transition-colors">
+            <div className="flex gap-8 text-sm text-gray-400">
+              <a
+                href="#"
+                className="hover:text-white transition-colors font-medium"
+              >
                 Privacy
               </a>
-              <a href="#" className="hover:text-foreground transition-colors">
+              <a
+                href="#"
+                className="hover:text-white transition-colors font-medium"
+              >
                 Terms
               </a>
-              <a href="#" className="hover:text-foreground transition-colors">
+              <a
+                href="#"
+                className="hover:text-white transition-colors font-medium"
+              >
                 Safety
               </a>
-              <a href="#" className="hover:text-foreground transition-colors">
+              <a
+                href="#"
+                className="hover:text-white transition-colors font-medium"
+              >
                 Support
               </a>
             </div>
 
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-gray-500">
               © {new Date().getFullYear()} The dating app. All rights reserved.
             </div>
           </div>
