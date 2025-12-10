@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { ProgressBar } from "./ProgressBar";  // ← Add import
 import { Step1BasicInfo } from "./steps/Step1BasicInfo";
 import { Step2Orientation } from "./steps/Step2Orientation";
 import { Step3Distance } from "./steps/Step3Distance";
@@ -9,6 +10,7 @@ import { Step6Interests } from "./steps/Step6Interests";
 import { Step7Location } from "./steps/Step7Location";
 import { Step8Review } from "./steps/Step8Review";
 import { useToast } from "../../hooks/use-toast";
+
 
 interface OnboardingData {
   firstName: string;
@@ -32,6 +34,7 @@ interface OnboardingData {
   useCurrentLocation: boolean;
 }
 
+
 const initialData: OnboardingData = {
   firstName: "",
   dateOfBirth: undefined,
@@ -54,10 +57,12 @@ const initialData: OnboardingData = {
   useCurrentLocation: false,
 };
 
+
 export const OnboardingFlow = () => {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<OnboardingData>(initialData);
   const { toast } = useToast();
+
 
   const goNext = () => {
     if (step < 8) {
@@ -71,15 +76,18 @@ export const OnboardingFlow = () => {
     }
   };
 
+
   const goBack = () => {
     if (step > 1) {
       setStep(step - 1);
     }
   };
 
+
   const handleSkip = () => {
     goNext();
   };
+
 
   const renderStep = () => {
     switch (step) {
@@ -191,19 +199,29 @@ export const OnboardingFlow = () => {
     }
   };
 
+
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={step}
-        initial={{ opacity: 0, x: 50 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -50 }}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="min-h-screen"
-      >
-        {renderStep()}
-      </motion.div>
-    </AnimatePresence>
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Progress Bar at the top */}
+      <div className="px-6 py-6 border-b border-gray-200">
+        <ProgressBar currentStep={step} totalSteps={8} />
+      </div>
+
+      {/* Step content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={step}
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -50 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className="flex-1"
+        >
+          {renderStep()}
+        </motion.div>
+      </AnimatePresence>
+    </div>
   );
 };
+
 export default OnboardingFlow;
