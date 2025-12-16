@@ -7,6 +7,7 @@ import PremiumBanner from "@/components/home/PremiumBanner";
 import AnonymousProfileCard from "@/components/home/AnonymousProfileCard";
 import AnonymousReviewsBanner from "@/components/home/AnonymousReviewsBanner";
 import SecurityBanner from "@/components/home/SecurityBanner";
+import { toast } from "sonner";
 
 /* ---------------- MOCK DATA (SAME AS LOVABLE) ---------------- */
 
