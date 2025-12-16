@@ -157,3 +157,10 @@ GOOGLE_CALLBACK_URL = env_config("GOOGLE_CALLBACK_URL")
 FRONTEND_URL = env_config("FRONTEND_URL")
 FRONTEND_HOME_URL = env_config("FRONTEND_HOME_URL")
 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'venleonink@gmail.com'
+EMAIL_HOST_PASSWORD = 'fzrj kdzl pzgc jjex'
+DEFAULT_FROM_EMAIL = 'venleonink@gmail.com'

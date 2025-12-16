@@ -3,17 +3,36 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.conf import settings
 from django.shortcuts import redirect
-from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+from django.core.cache import cache
+
 import urllib.parse
 import requests
+import random
+import string
 
 from .models import FirebaseAuthManager, FirebaseProfileManager
 
 User = get_user_model()
 
+# ---------- OTP helpers ----------
+
+def generate_otp(length=6):
+    digits = string.digits
+    return ''.join(random.choice(digits) for _ in range(length))
+
+def send_otp_email(email, otp):
+    subject = "Your login OTP"
+    message = f"Your OTP for login is: {otp}. It is valid for 5 minutes."
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER)
+    send_mail(subject, message, from_email, [email])
+    # store with 5‑minute expiry
+    cache.set(f"login_otp_{email}", otp, timeout=300)
+
+# ---------- Existing views ----------
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -34,10 +53,8 @@ class RegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Django user (username is email)
         user = User.objects.create_user(username=username, password=password)
 
-        # Firestore users collection: one doc per email
         FirebaseAuthManager.create_or_update_user(
             email=username,
             auth_provider="email",
@@ -55,6 +72,9 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
+    """
+    Normal username+password login (no OTP).
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -96,11 +116,6 @@ class LoginView(APIView):
 
 
 class ProfileView(APIView):
-    """
-    Authenticated user profile.
-    Stores and returns arbitrary key-value pairs for personal details.
-    """
-
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -115,10 +130,6 @@ class ProfileView(APIView):
         )
 
     def post(self, request):
-        """
-        Body can be any key-value pairs:
-        { "name": "...", "age": 25, "gender": "female", ... }
-        """
         email = request.user.username
         FirebaseProfileManager.create_profile(email, **request.data)
         return Response(
@@ -128,10 +139,6 @@ class ProfileView(APIView):
 
 
 class ProfileDetailView(APIView):
-    """
-    Public profile by email (optional; remove if you do not need public access).
-    """
-
     permission_classes = [AllowAny]
 
     def get(self, request, email):
@@ -160,11 +167,9 @@ class GoogleLoginView(APIView):
 
 class GoogleCallbackView(APIView):
     """
-    Handles Google OAuth callback.
-    IMPORTANT: does NOT create any profile document.
-    Only updates `users` collection and Django user.
+    Handles Google OAuth callback, updates Firestore user,
+    and redirects to frontend with JWT tokens.
     """
-
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -172,7 +177,6 @@ class GoogleCallbackView(APIView):
         if not code:
             return redirect(f"{settings.FRONTEND_URL}/login?error=oauth_no_code")
 
-        # 1) Exchange code for tokens
         token_url = "https://oauth2.googleapis.com/token"
         token_data = {
             "code": code,
@@ -187,7 +191,6 @@ class GoogleCallbackView(APIView):
         if not google_access_token:
             return redirect(f"{settings.FRONTEND_URL}/login?error=oauth_no_tokens")
 
-        # 2) Get user info
         userinfo_res = requests.get(
             "https://www.googleapis.com/oauth2/v3/userinfo",
             headers={"Authorization": f"Bearer {google_access_token}"},
@@ -200,7 +203,6 @@ class GoogleCallbackView(APIView):
         if not email:
             return redirect(f"{settings.FRONTEND_URL}/login?error=oauth_no_email")
 
-        # 3) Upsert Django user (email used as username)
         user, created = User.objects.get_or_create(
             username=email,
             defaults={
@@ -210,7 +212,6 @@ class GoogleCallbackView(APIView):
             },
         )
 
-        # 4) Upsert Firestore `users` doc by email (no profile write)
         FirebaseAuthManager.create_or_update_user(
             email=email,
             auth_provider="google",
@@ -219,7 +220,6 @@ class GoogleCallbackView(APIView):
             name=name,
         )
 
-        # 5) Issue JWT and redirect back to frontend
         refresh = RefreshToken.for_user(user)
         access_token_jwt = str(refresh.access_token)
         refresh_token_jwt = str(refresh)
@@ -235,34 +235,125 @@ class GoogleCallbackView(APIView):
         )
         return redirect(redirect_url)
 
+
 class AuthStatusView(APIView):
     """
-    Returns whether the authenticated user is new or existing,
-    based on presence of a profile document in Firestore.
+    Returns whether the authenticated user already has a profile document.
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         email = request.user.username
-        
-        # Check if profile exists for this email
         profile = FirebaseProfileManager.get_profile(email)
         has_profile = profile is not None
-        
-        # Boolean flag as requested: true if profile exists, false otherwise
-        profile_exists = bool(profile)
-        
-        # Get Firebase user data for completeness
         firebase_user = FirebaseAuthManager.get_user_by_email(email)
 
         return Response(
             {
                 "email": email,
-                "profile_exists": profile_exists,  # true/false as requested
-                "has_profile": has_profile,        # same boolean, kept for backward compatibility
+                "profile_exists": bool(profile),
+                "has_profile": has_profile,
                 "firebase_user": firebase_user or {},
                 "profile": profile or {},
             },
             status=status.HTTP_200_OK,
         )
 
+# ---------- New OTP login endpoints ----------
+
+class SendLoginOTPView(APIView):
+    """
+    Step 1: client sends { "username": "<email>" }
+    Sends OTP to email if user exists.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get("username")
+        if not username:
+            return Response(
+                {"detail": "Username (email) required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        otp = generate_otp()
+        send_otp_email(username, otp)
+
+        return Response(
+            {"message": "OTP sent to email"},
+            status=status.HTTP_200_OK,
+        )
+
+
+class VerifyLoginOTPView(APIView):
+    """
+    Step 2: client sends { "username": "<email>", "otp": "123456" }
+    If OTP matches, returns JWT tokens and user data.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get("username")
+        otp = request.data.get("otp")
+
+        if not username or not otp:
+            return Response(
+                {"detail": "Username (email) and OTP are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get OTP from cache
+        cache_key = f"login_otp_{username}"
+        saved_otp = cache.get(cache_key)
+
+        if not saved_otp:
+            return Response(
+                {"detail": "OTP expired or not found"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if str(saved_otp) != str(otp):
+            return Response(
+                {"detail": "Invalid OTP"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # OTP valid; remove it from cache
+        cache.delete(cache_key)
+
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Issue JWT tokens
+        refresh = RefreshToken.for_user(user)
+        email = user.username
+
+        firebase_user = FirebaseAuthManager.get_user_by_email(email)
+        profile = FirebaseProfileManager.get_profile(email)
+
+        return Response(
+            {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "user": {
+                    "id": user.id,
+                    "email": email,
+                    "firebase_user": firebase_user or {},
+                    "profile": profile or {},
+                },
+            },
+            status=status.HTTP_200_OK,
+        )

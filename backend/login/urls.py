@@ -14,4 +14,7 @@ urlpatterns = [
 
     # Auth status (existing vs new user)
     path("auth/status/", views.AuthStatusView.as_view(), name="auth-status"),
+
+    path("login/send-otp/", views.SendLoginOTPView.as_view(), name="send-login-otp"),
+    path("login/verify-otp/", views.VerifyLoginOTPView.as_view(), name="verify-login-otp"),
 ]
