@@ -98,3 +98,4 @@ export const Step7Location = ({
     </StepLayout>
   );
 };
+export default Step7Location;

@@ -107,3 +107,4 @@ export const Step5Communication = ({
     </StepLayout>
   );
 };
+export default Step5Communication;

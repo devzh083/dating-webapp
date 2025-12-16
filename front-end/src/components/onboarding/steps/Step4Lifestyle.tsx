@@ -132,3 +132,4 @@ export const Step4Lifestyle = ({
     </StepLayout>
   );
 };
+export default Step4Lifestyle;

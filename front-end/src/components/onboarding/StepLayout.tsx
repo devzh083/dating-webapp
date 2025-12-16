@@ -1,5 +1,6 @@
+// src/components/onboarding/StepLayout.tsx
 import { ReactNode } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 
 interface StepLayoutProps {
   currentStep: number;
@@ -9,9 +10,10 @@ interface StepLayoutProps {
   onBack?: () => void;
   onNext: () => void;
   onSkip?: () => void;
-  canProceed: boolean;
+  canProceed?: boolean;
   showBack?: boolean;
   children: ReactNode;
+  nextLabel?: string;
 }
 
 export const StepLayout = ({
@@ -22,13 +24,18 @@ export const StepLayout = ({
   onBack,
   onNext,
   onSkip,
-  canProceed,
+  canProceed = true,
   showBack = true,
   children,
+  nextLabel = "Next",
 }: StepLayoutProps) => {
+  const handleSkip = () => {
+    if (onSkip) onSkip();
+    else onNext();
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-8">
-      {/* Top row: step info + Skip */}
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium text-gray-500">
           Step {currentStep} of {totalSteps}
@@ -36,25 +43,20 @@ export const StepLayout = ({
 
         <button
           type="button"
-          onClick={onSkip ?? onNext} // if onSkip is passed, it will be used
+          onClick={handleSkip}
           className="text-sm font-medium text-gray-500 hover:text-gray-900"
         >
           Skip
         </button>
       </div>
 
-      {/* Title + subtitle */}
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
-        {subtitle && (
-          <p className="text-sm text-gray-500 max-w-xl">{subtitle}</p>
-        )}
+        {subtitle && <p className="text-sm text-gray-500 max-w-xl">{subtitle}</p>}
       </div>
 
-      {/* Main content */}
       <div className="flex-1">{children}</div>
 
-      {/* Footer buttons */}
       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
         {showBack ? (
           <button
@@ -81,7 +83,7 @@ export const StepLayout = ({
             "hover:bg-[#21b4ad] disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >
-          Next
+          {nextLabel}
         </button>
       </div>
     </div>

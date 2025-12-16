@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Search, SlidersHorizontal, Star, MapPin, Clock } from "lucide-react";
 import TopBar from "@/components/layout/TopBar";
 
+
 const filters = [
   "Book a table",
   "Within 5km",

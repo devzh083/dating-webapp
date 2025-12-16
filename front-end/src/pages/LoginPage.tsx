@@ -1,8 +1,16 @@
 // src/pages/LoginPage.tsx
-import "./LoginPage.css";
-import React, { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import TopBar from "../components/TopBar";
+
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Eye, EyeOff, ArrowLeft, Heart } from "lucide-react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import TopBar from "@/components/layout/TopBar";
+
+type AuthView = "login" | "signup";
 
 type LoginPageProps = {
   isLoggedIn: boolean;
@@ -12,251 +20,253 @@ type LoginPageProps = {
 
 const API_BASE_URL = "http://127.0.0.1:8000/api";
 
-const LoginPage: React.FC<LoginPageProps> = ({
+export default function LoginPage({
   isLoggedIn,
   onLogout,
   onLoginSuccess,
-}) => {
+}: LoginPageProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [isSignUpMode, setIsSignUpMode] = useState(false);
-  const [emailOrPhone, setEmailOrPhone] = useState("");
+  const [view, setView] = useState<AuthView>("login");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Handle redirect back from Google: tokens in query string
+  /* ---------------- GOOGLE REDIRECT HANDLING ---------------- */
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const accessFromUrl = params.get("access_token");
-    const refreshFromUrl = params.get("refresh_token");
+    const access = params.get("access_token");
+    const refresh = params.get("refresh_token");
 
-    if (accessFromUrl && refreshFromUrl) {
-      localStorage.setItem("access_token", accessFromUrl);
-      localStorage.setItem("refresh_token", refreshFromUrl);
-
-      // Clean URL so tokens are not visible
+    if (access && refresh) {
+      localStorage.setItem("access_token", access);
+      localStorage.setItem("refresh_token", refresh);
       window.history.replaceState({}, "", window.location.pathname);
-
       onLoginSuccess();
-      navigate("/");
+      navigate("/home");
     }
   }, [location.search, navigate, onLoginSuccess]);
 
-  useEffect(() => {
-    if (isLoggedIn) {
-      // navigate("/");
-    }
-  }, [isLoggedIn, navigate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  /* ---------------- LOGIN ---------------- */
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setLoading(true);
 
     try {
-      const username = emailOrPhone.trim();
-      if (!username || !password) {
-        throw new Error("Try entering correct email and password.");
-      }
-
-      const payload = { username, password };
-
-      if (isSignUpMode) {
-        const registerRes = await fetch(`${API_BASE_URL}/register/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const registerData = await registerRes.json();
-
-        if (!registerRes.ok) {
-          throw new Error(
-            registerData.detail ||
-              "This email is already registered. Try logging in."
-          );
-        }
-      }
-
-      const loginRes = await fetch(`${API_BASE_URL}/login/`, {
+      const res = await fetch(`${API_BASE_URL}/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          username: email.trim(),
+          password,
+        }),
       });
-      const loginData = await loginRes.json();
 
-      if (!loginRes.ok) {
-        throw new Error(
-          loginData.detail || "Try entering correct email and password."
-        );
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Invalid credentials");
       }
 
-      localStorage.setItem("access_token", loginData.access);
-      localStorage.setItem("refresh_token", loginData.refresh);
+      localStorage.setItem("access_token", data.access);
+      localStorage.setItem("refresh_token", data.refresh);
 
       onLoginSuccess();
-      navigate("/");
+      navigate("/home");
     } catch (err: any) {
-      console.error("Auth error:", err);
-      setErrorMsg(err.message || "Try entering correct email and password.");
+      setErrorMsg(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  /* ---------------- SIGNUP ---------------- */
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
     setErrorMsg(null);
+
+    if (password !== confirmPassword) {
+      setErrorMsg("Passwords do not match");
+      return;
+    }
+
+    if (password.length < 8) {
+      setErrorMsg("Password must be at least 8 characters");
+      return;
+    }
+
     setLoading(true);
 
+    try {
+      const registerRes = await fetch(`${API_BASE_URL}/register/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: email.trim(),
+          password,
+        }),
+      });
+
+      const registerData = await registerRes.json();
+
+      if (!registerRes.ok) {
+        throw new Error(registerData.detail || "Signup failed");
+      }
+
+      // Auto-login after signup
+      await handleLogin(e as any);
+    } catch (err: any) {
+      setErrorMsg(err.message);
+      setLoading(false);
+    }
+  };
+
+  /* ---------------- GOOGLE LOGIN ---------------- */
+  const handleGoogleLogin = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/google-login/`);
       const data = await res.json();
 
       if (!res.ok || !data.auth_url) {
-        throw new Error("Google login failed. Try again.");
+        throw new Error("Google login failed");
       }
 
       window.location.href = data.auth_url;
-    } catch (err: any) {
-      console.error("Google login error:", err);
-      setErrorMsg("Google login failed. Try again.");
-      setLoading(false);
+    } catch {
+      setErrorMsg("Google login failed");
     }
   };
 
-  const toggleMode = () => {
-    setIsSignUpMode((prev) => !prev);
-    setErrorMsg(null);
-  };
-
-  const handleCafePartnerLogin = () => {
-    alert("Café Partner Login coming soon.");
-  };
-
+  /* ---------------- UI ---------------- */
   return (
-    <div className="app-shell">
-      <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background">
+      <TopBar userName="User" />
 
-      <main className="login-page">
-        <div className="login-card">
-          <h1 className="login-title">The Dating App</h1>
-          <h2 className="login-heading">
-            {isLoggedIn ? "Account" : isSignUpMode ? "Sign up" : "Login"}
-          </h2>
-
-          {!isLoggedIn ? (
-            <>
-              <form className="login-form" onSubmit={handleSubmit}>
-                <label className="form-label">
-                  Email
-                  <input
-                    type="email"
-                    className="form-input"
-                    placeholder="you@example.com"
-                    value={emailOrPhone}
-                    onChange={(e) => setEmailOrPhone(e.target.value)}
-                    required
-                  />
-                </label>
-
-                <label className="form-label">
-                  Password
-                  <input
-                    type="password"
-                    className="form-input"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </label>
-
-                {errorMsg && (
-                  <p style={{ color: "#dc2626", fontSize: 12, margin: 0 }}>
-                    {errorMsg}
-                  </p>
-                )}
-
+      <div className="pt-32 pb-20 flex items-center justify-center px-4">
+        <AnimatePresence mode="wait">
+          {view === "signup" ? (
+            <motion.div
+              key="signup"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="w-full max-w-md"
+            >
+              <div className="bg-card rounded-3xl shadow-2xl border p-8">
                 <button
-                  type="submit"
-                  className="login-button"
-                  disabled={loading}
+                  onClick={() => setView("login")}
+                  className="flex items-center gap-2 text-muted-foreground mb-6"
                 >
-                  {loading
-                    ? isSignUpMode
-                      ? "Creating account..."
-                      : "Logging in..."
-                    : isSignUpMode
-                    ? "Sign up"
-                    : "Login"}
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to login
                 </button>
-              </form>
 
-              <button
-                type="button"
-                className="google-login-btn"
-                onClick={handleGoogleLogin}
-                disabled={loading}
-              >
-                <img
-                  src="https://developers.google.com/identity/images/g-logo.png"
-                  alt="Google"
-                  className="google-icon"
-                />
-                Continue with Google
-              </button>
+                <h1 className="text-2xl font-bold text-center mb-6">
+                  Create Account
+                </h1>
 
-              <button
-                className="link-button"
-                type="button"
-                onClick={toggleMode}
-              >
-                {isSignUpMode
-                  ? "Already have an account? Login"
-                  : "New user? Sign up"}
-              </button>
-            </>
+                <form onSubmit={handleSignup} className="space-y-4">
+                  <Label>Email</Label>
+                  <Input value={email} onChange={(e) => setEmail(e.target.value)} required />
+
+                  <Label>Password</Label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3"
+                    >
+                      {showPassword ? <EyeOff /> : <Eye />}
+                    </button>
+                  </div>
+
+                  <Label>Confirm Password</Label>
+                  <Input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+
+                  {errorMsg && <p className="text-red-500 text-sm">{errorMsg}</p>}
+
+                  <Button className="w-full" disabled={loading}>
+                    {loading ? "Creating account..." : "Sign Up"}
+                  </Button>
+                </form>
+              </div>
+            </motion.div>
           ) : (
-            <>
-              <p style={{ marginTop: 16 }}>You are logged in.</p>
+            <motion.div
+              key="login"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-md"
+            >
+              <div className="bg-card rounded-3xl shadow-2xl border p-8">
+                <h1 className="text-2xl font-bold text-center mb-6">
+                  The Dating App
+                </h1>
 
-              {/* Round profile avatar button */}
-              <button
-                type="button"
-                onClick={() => navigate("/profile")}
-                style={{
-                  marginTop: 12,
-                  width: 64,
-                  height: 64,
-                  borderRadius: "50%",
-                  border: "2px solid #f97316",
-                  padding: 0,
-                  overflow: "hidden",
-                  backgroundColor: "transparent",
-                  cursor: "pointer",
-                }}
-              >
-                <img
-                  src="https://via.placeholder.com/64x64.png?text=U"
-                  alt="Profile"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </button>
-            </>
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <Label>Email</Label>
+                  <Input value={email} onChange={(e) => setEmail(e.target.value)} required />
+
+                  <Label>Password</Label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3"
+                    >
+                      {showPassword ? <EyeOff /> : <Eye />}
+                    </button>
+                  </div>
+
+                  {errorMsg && <p className="text-red-500 text-sm">{errorMsg}</p>}
+
+                  <Button className="w-full" disabled={loading}>
+                    {loading ? "Logging in..." : "Login"}
+                  </Button>
+
+                  <Button variant="outline" className="w-full" onClick={handleGoogleLogin}>
+                    Continue with Google
+                  </Button>
+                </form>
+
+                <div className="mt-6 text-center">
+                  <button
+                    onClick={() => setView("signup")}
+                    className="text-primary text-sm"
+                  >
+                    New user? Sign up
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           )}
-
-          <button
-            className="link-button secondary"
-            type="button"
-            onClick={handleCafePartnerLogin}
-          >
-            Café Partner Login
-          </button>
-        </div>
-      </main>
+        </AnimatePresence>
+      </div>
     </div>
   );
-};
-
-export default LoginPage;
+}

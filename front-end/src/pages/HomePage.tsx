@@ -1,128 +1,144 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { Users, Sparkles } from "lucide-react";
+import TopBar from "@/components/layout/TopBar";
+import ProfileCompletion from "@/components/home/ProfileCompletion";
+import NearbyBanner from "@/components/home/NearbyBanner";
+import PremiumBanner from "@/components/home/PremiumBanner";
+import AnonymousProfileCard from "@/components/home/AnonymousProfileCard";
+import AnonymousReviewsBanner from "@/components/home/AnonymousReviewsBanner";
+import SecurityBanner from "@/components/home/SecurityBanner";
 
-import TopBar from "../components/TopBar";
+/* ---------------- MOCK DATA (SAME AS LOVABLE) ---------------- */
 
-// Lovable-style components
-import { ProfileCompletion } from "../components/home/ProfileCompletion";
-import { MatchCard } from "../components/home/MatchCard";
-import { NearbyBanner } from "../components/home/NearbyBanner";
-import { PremiumBanner } from "../components/home/PremiumBanner";
-
-type HomePageProps = {
-  isLoggedIn: boolean;
-  onLogout: () => void;
-};
-
-// mock data (same as Lovable, safe placeholder)
-const mockMatches = [
+const mockAnonymousProfiles = [
   {
     id: "1",
-    name: "Sarah",
-    age: 26,
-    distance: "2 km away",
-    bio: "Coffee lover ☕ | Travel enthusiast ✈️ | Dog mom 🐕",
-    photos: [
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop",
-    ],
-    interests: ["Travel", "Coffee", "Dogs", "Photography"],
+    selfDescription:
+      "A curious soul who finds magic in everyday moments and deep conversations over coffee.",
+    vibeTags: ["Calm", "Deep thinker", "Witty"],
+    conversationHook:
+      "If you could have dinner with any fictional character, who would it be and why?",
   },
   {
     id: "2",
-    name: "Emma",
-    age: 24,
-    distance: "5 km away",
-    bio: "Yoga instructor 🧘 | Foodie 🍜 | Nature lover 🌿",
-    photos: [
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&auto=format&fit=crop",
-    ],
-    interests: ["Yoga", "Food", "Nature", "Hiking"],
+    selfDescription:
+      "Adventure seeker by day, stargazer by night. I believe the best stories are yet to be written.",
+    vibeTags: ["Adventurous", "Optimistic", "Creative"],
+    conversationHook: "What's the most spontaneous thing you've ever done?",
   },
   {
     id: "3",
-    name: "Maya",
-    age: 28,
-    distance: "3 km away",
-    bio: "Artist 🎨 | Music lover 🎵 | Bookworm 📚",
-    photos: [
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop",
-    ],
-    interests: ["Art", "Music", "Reading", "Movies"],
+    selfDescription:
+      "Part philosopher, part comedian. I make playlists for every mood and overthink song lyrics.",
+    vibeTags: ["Sarcastic", "Thoughtful", "Music lover"],
+    conversationHook:
+      "What song perfectly describes your current chapter in life?",
+  },
+  {
+    id: "4",
+    selfDescription:
+      "Quiet confidence with loud dreams. I find peace in chaos and stories in silence.",
+    vibeTags: ["Introspective", "Ambitious", "Gentle"],
+    conversationHook:
+      "What's something you've been wanting to try but haven't yet?",
   },
 ];
 
-const HomePage: React.FC<HomePageProps> = ({ isLoggedIn, onLogout }) => {
-  const navigate = useNavigate();
-  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
-  const [exitDirection, setExitDirection] = useState<"left" | "right" | null>(
-    null
-  );
+/* ---------------- PAGE ---------------- */
 
-  // later replace with real profile data
-  const userName = "U";
-  const profileCompletion = 75;
+const HomePage = () => {
+  const userName = "User"; // mock, same as Lovable
+  const profileCompletion = 36; // mock percentage
 
-  // ✅ KEEP existing locked behavior (same as ChatsPage)
-  if (!isLoggedIn) {
-    return (
-      <div className="app-shell">
-        <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
-        <main className="home-main locked-main">
-          <div className="locked-card">
-            <h2>Login to see your matches</h2>
-            <p>You need to be logged in to discover people nearby.</p>
-            <button
-              className="hero-primary"
-              onClick={() => navigate("/login")}
-            >
-              Go to Login
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  const handleSwipe = (direction: "left" | "right") => {
-    setExitDirection(direction);
-    setTimeout(() => {
-      setCurrentMatchIndex((prev) => (prev + 1) % mockMatches.length);
-      setExitDirection(null);
-    }, 300);
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    window.location.href = "/";
   };
 
-  const currentMatch = mockMatches[currentMatchIndex];
+  const handleRequestChat = () => {
+    toast.success("Chat request sent!", {
+      description: "You'll be notified if they accept.",
+    });
+  };
 
-  // ✅ Lovable layout
   return (
-    <div className="min-h-screen bg-background">
-      <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
+    <div className="min-h-screen">
+      {/* TOP BAR */}
+      <TopBar userName={userName} onLogout={handleLogout} />
 
-      <main className="container px-4 md:px-8 py-6 max-w-4xl mx-auto">
-        <ProfileCompletion percentage={profileCompletion} />
+      {/* HERO SECTION */}
+      <section className="py-10">
+        <div className="container mx-auto px-4 max-w-7xl">
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mb-10"
+          >
+            <div className="inline-flex items-center gap-2 mb-4">
+              <Sparkles className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                Anonymous Connections
+              </span>
+            </div>
 
-        <section className="mt-8">
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            Discover
-          </h2>
+            <h1 className="text-3xl font-bold mb-2">
+              Discover Real Connections
+            </h1>
 
-          <div className="relative h-[500px] flex items-center justify-center">
-            <AnimatePresence mode="wait">
-              <MatchCard
-                key={currentMatch.id}
-                match={currentMatch}
-                onLike={() => handleSwipe("right")}
-                onPass={() => handleSwipe("left")}
-                exitDirection={exitDirection}
-              />
-            </AnimatePresence>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              No photos, no names — just genuine personalities.
+            </p>
+          </motion.div>
+
+          {/* MAIN GRID */}
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* LEFT COLUMN */}
+            <div className="space-y-6">
+              <ProfileCompletion percentage={profileCompletion} />
+              <NearbyBanner />
+              <PremiumBanner />
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div className="lg:col-span-2">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <Users className="w-5 h-5" />
+                  <div>
+                    <h2 className="font-bold">Discover People</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Based on vibes, not looks
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                {mockAnonymousProfiles.map((profile, index) => (
+                  <AnonymousProfileCard
+                    key={profile.id}
+                    profile={profile}
+                    index={index}
+                    onRequestChat={handleRequestChat}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <NearbyBanner />
-        <PremiumBanner />
-      </main>
+      {/* REVIEWS + SECURITY */}
+      <section className="py-12">
+        <div className="container mx-auto px-4 max-w-7xl">
+          <div className="grid md:grid-cols-2 gap-8">
+            <AnonymousReviewsBanner />
+            <SecurityBanner />
+          </div>
+        </div>
+      </section>
     </div>
   );
 };

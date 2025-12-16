@@ -1,7 +1,10 @@
+// src/pages/ChatsPage.tsx
+
 import "./ChatsPage.css";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TopBar from "@/components/layout/TopBar";
+
 
 type ChatPreview = {
   id: number;
@@ -65,18 +68,18 @@ const ChatsPage: React.FC<ChatsPageProps> = ({ isLoggedIn, onLogout }) => {
   const navigate = useNavigate();
   const [activeChatId, setActiveChatId] = useState<number>(chats[0].id);
 
+  // 🔥 FIX: Define userName so TopBar can use it
+  const userName = "User";
+
   if (!isLoggedIn) {
     return (
       <div className="app-shell">
-        <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
+        <TopBar userName={userName} onLogout={onLogout} />
         <main className="home-main locked-main">
           <div className="locked-card">
             <h2>Login to see your chats</h2>
             <p>You need to be logged in to view and message your connections.</p>
-            <button
-              className="hero-primary"
-              onClick={() => navigate("/login")}
-            >
+            <button className="hero-primary" onClick={() => navigate("/login")}>
               Go to Login
             </button>
           </div>
@@ -90,7 +93,7 @@ const ChatsPage: React.FC<ChatsPageProps> = ({ isLoggedIn, onLogout }) => {
 
   return (
     <div className="app-shell">
-      <TopBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
+      <TopBar userName={userName} onLogout={onLogout} />
 
       <main className="home-main chats-main">
         <section className="chats-layout">
@@ -159,10 +162,7 @@ const ChatsPage: React.FC<ChatsPageProps> = ({ isLoggedIn, onLogout }) => {
                 </div>
 
                 <footer className="chat-input-bar">
-                  <input
-                    className="chat-input"
-                    placeholder="Type a message..."
-                  />
+                  <input className="chat-input" placeholder="Type a message..." />
                   <button className="chat-send-btn">Send</button>
                 </footer>
               </>

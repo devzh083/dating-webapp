@@ -110,3 +110,4 @@ export const Step2Orientation = ({
     </StepLayout>
   );
 };
+export default Step2Orientation;

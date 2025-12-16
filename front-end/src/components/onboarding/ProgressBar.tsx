@@ -1,3 +1,4 @@
+// src/components/onboarding/ProgressBar.tsx
 import { motion } from "framer-motion";
 
 interface ProgressBarProps {
@@ -19,3 +20,5 @@ export const ProgressBar = ({ currentStep, totalSteps }: ProgressBarProps) => {
     </div>
   );
 };
+
+export default ProgressBar;

@@ -68,3 +68,4 @@ export const Step3Distance = ({
     </StepLayout>
   );
 };
+export default Step3Distance;

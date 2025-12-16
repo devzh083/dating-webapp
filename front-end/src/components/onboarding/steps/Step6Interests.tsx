@@ -130,3 +130,4 @@ export const Step6Interests = ({
     </StepLayout>
   );
 };
+export default Step6Interests;

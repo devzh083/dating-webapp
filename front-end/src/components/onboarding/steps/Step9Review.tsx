@@ -1,14 +1,11 @@
-import { StepLayout } from "../StepLayout";
+// src/components/onboarding/steps/Step9Review.tsx
+import React from "react";
 import { motion } from "framer-motion";
-import {
-  Heart,
-  MapPin,
-  Sparkles,
-  MessageCircle,
-} from "lucide-react";
 import { differenceInYears } from "date-fns";
+import StepLayout from "../StepLayout";
+import { MapPin, Heart, Sparkles, MessageCircle } from "lucide-react";
 
-interface OnboardingData {
+type OnboardingData = {
   firstName: string;
   dateOfBirth: Date | undefined;
   gender: string;
@@ -28,61 +25,55 @@ interface OnboardingData {
   interests: string[];
   location: string;
   useCurrentLocation: boolean;
-}
+  photos?: string[];
+};
 
-interface Step8Props {
+interface Step9Props {
   data: OnboardingData;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
 }
 
-export const Step8Review = ({
-  data,
-  onNext,
-  onBack,
-  onSkip,
-}: Step8Props) => {
-  const age = data.dateOfBirth
-    ? differenceInYears(new Date(), data.dateOfBirth)
-    : null;
+const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => {
+  const age = data.dateOfBirth ? differenceInYears(new Date(), data.dateOfBirth) : null;
+
+  // safe guard for empty/missing name
+  const safeFirst = data.firstName || "User";
+  const firstInitial = (safeFirst.charAt(0) || "U").toUpperCase();
 
   const lifestyleTags = [
     data.drinking && `🍷 ${data.drinking}`,
     data.smoking && `🚬 ${data.smoking}`,
     data.workout && `💪 ${data.workout}`,
     data.pets && `🐕 ${data.pets}`,
-  ].filter(Boolean) as string[];
+  ].filter(Boolean);
 
   return (
     <StepLayout
-      currentStep={8}
-      totalSteps={8}
+      currentStep={9}
+      totalSteps={9}
       title="Looking good! ✨"
-      subtitle="Here’s a preview of your profile"
+      subtitle="Here's your profile preview"
       onBack={onBack}
-      onNext={onNext}     // ✅ will navigate to home via OnboardingFlow
-      onSkip={onSkip}     // ✅ will navigate to home via OnboardingFlow
-      canProceed={true}   // ✅ CRITICAL: enables the Next button
+      onNext={onNext}
+      onSkip={onSkip}
+      nextLabel="Finish & Start Matching"
     >
       <div className="space-y-6">
-        {/* Profile Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-card rounded-2xl border border-border p-6 shadow-lg"
         >
-          {/* Header */}
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-20 h-20 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-3xl font-bold shadow-lg">
-              {data.firstName.charAt(0).toUpperCase()}
+            <div className="w-20 h-20 rounded-full gradient-primary flex items-center justify-center text-3xl font-bold text-primary-foreground shadow-lg shadow-primary/30">
+              {firstInitial}
             </div>
             <div>
               <h2 className="text-2xl font-bold text-foreground">
-                {data.firstName}
-                {age && (
-                  <span className="text-muted-foreground">, {age}</span>
-                )}
+                {safeFirst}
+                {age && <span className="text-muted-foreground">, {age}</span>}
               </h2>
               {data.showGender && data.gender && (
                 <p className="text-muted-foreground">{data.gender}</p>
@@ -90,48 +81,45 @@ export const Step8Review = ({
             </div>
           </div>
 
-          {/* Details */}
-          <div className="space-y-4 text-sm">
+          <div className="space-y-4">
             {data.location && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 text-sm">
                 <MapPin className="w-4 h-4 text-primary" />
-                <span>
-                  {data.location} · {data.distance} km max
-                </span>
+                <span className="text-foreground">{data.location}</span>
+                <span className="text-muted-foreground">• {data.distance} km away max</span>
               </div>
             )}
 
             {data.relationshipType && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 text-sm">
                 <Heart className="w-4 h-4 text-primary" />
-                <span>Looking for: {data.relationshipType}</span>
+                <span className="text-foreground">Looking for: {data.relationshipType}</span>
               </div>
             )}
 
             {data.showOrientation && data.orientation.length > 0 && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 text-sm">
                 <Sparkles className="w-4 h-4 text-primary" />
-                <span>{data.orientation.join(", ")}</span>
+                <span className="text-foreground">{data.orientation.join(", ")}</span>
               </div>
             )}
 
             {data.responsePace && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 text-sm">
                 <MessageCircle className="w-4 h-4 text-primary" />
-                <span>{data.responsePace} responder</span>
+                <span className="text-foreground">{data.responsePace} responder</span>
               </div>
             )}
           </div>
 
-          {/* Lifestyle */}
           {lifestyleTags.length > 0 && (
             <div className="mt-6">
-              <h3 className="text-sm font-medium mb-2">Lifestyle</h3>
+              <h3 className="text-sm font-medium text-foreground mb-3">Lifestyle</h3>
               <div className="flex flex-wrap gap-2">
-                {lifestyleTags.map((tag, i) => (
+                {lifestyleTags.map((tag, index) => (
                   <span
-                    key={i}
-                    className="px-3 py-1.5 rounded-full bg-muted border text-sm"
+                    key={index}
+                    className="px-3 py-1.5 rounded-full bg-chip border border-chip-border text-sm text-foreground"
                   >
                     {tag}
                   </span>
@@ -140,15 +128,14 @@ export const Step8Review = ({
             </div>
           )}
 
-          {/* Interests */}
           {data.interests.length > 0 && (
             <div className="mt-6">
-              <h3 className="text-sm font-medium mb-2">Interests</h3>
+              <h3 className="text-sm font-medium text-foreground mb-3">Interests</h3>
               <div className="flex flex-wrap gap-2">
                 {data.interests.map((interest) => (
                   <span
                     key={interest}
-                    className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium"
+                    className="px-3 py-1.5 rounded-full bg-chip-selected border border-chip-border-selected text-sm text-primary font-medium"
                   >
                     {interest}
                   </span>
@@ -158,13 +145,11 @@ export const Step8Review = ({
           )}
         </motion.div>
 
-        {/* Footer text */}
-        <p className="text-center text-sm text-muted-foreground">
-          You can edit your profile anytime later
-        </p>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="text-center py-4">
+          <p className="text-muted-foreground text-sm">You can always update your profile later in settings</p>
+        </motion.div>
       </div>
     </StepLayout>
   );
 };
-
-export default Step8Review;
+export default Step9Review;

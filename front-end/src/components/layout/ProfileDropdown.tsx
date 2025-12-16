@@ -1,74 +1,72 @@
-import { useState, useRef, useEffect } from "react";
-import { User, Settings, LogOut } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { LogOut, Settings } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 interface ProfileDropdownProps {
   userName: string;
-  onLogout: () => void;   // <-- new
+  onLogout?: () => void;
 }
 
-export const ProfileDropdown = ({ userName, onLogout }: ProfileDropdownProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const initial = userName.charAt(0).toUpperCase();
+export default function ProfileDropdown({ userName, onLogout }: ProfileDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
       }
     };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleLogoutClick = () => {
-    setIsOpen(false);
-    onLogout();             // <-- let App.tsx handle tokens + navigation
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+
+    if (onLogout) onLogout();
+    navigate("/", { replace: true });
   };
 
   return (
-    <div className="relative ml-2" ref={dropdownRef}>
+    <div ref={ref} className="relative ml-2">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => setOpen(!open)}
         className={cn(
-          "w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-sm transition-all",
-          "hover:ring-2 hover:ring-primary/30 hover:ring-offset-2",
-          isOpen && "ring-2 ring-primary/30 ring-offset-2"
+          "h-10 w-10 rounded-full bg-primary text-white font-semibold",
+          "hover:ring-2 hover:ring-primary/40"
         )}
       >
-        {initial}
+        {userName.charAt(0).toUpperCase()}
       </button>
 
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-background rounded-xl shadow-lg border border-border py-1 z-50">
-          <div className="px-4 py-3 border-b border-border">
-            <p className="text-sm font-medium text-foreground">{userName}</p>
-            <p className="text-xs text-muted-foreground">View your profile</p>
+      {open && (
+        <div className="absolute right-0 mt-2 w-48 rounded-xl border bg-background shadow-lg">
+          <div className="px-4 py-3 border-b">
+            <p className="font-medium">{userName}</p>
+            <p className="text-xs text-muted-foreground">Account</p>
           </div>
 
-          {/* Edit profile – we’ll wire this page later */}
           <Link
-            to="/edit-profile"
-            className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
-            onClick={() => setIsOpen(false)}
+            to="/profile"
+            className="flex items-center gap-2 px-4 py-2 hover:bg-muted"
           >
-            <Settings className="w-4 h-4 text-muted-foreground" />
+            <Settings className="h-4 w-4" />
             Edit Profile
           </Link>
 
           <button
-            onClick={handleLogoutClick}
-            className="flex items-center gap-3 px-4 py-2.5 text-sm text-destructive hover:bg-muted transition-colors w-full"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-2 px-4 py-2 text-destructive hover:bg-muted"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="h-4 w-4" />
             Logout
           </button>
         </div>
       )}
     </div>
   );
-};
+}

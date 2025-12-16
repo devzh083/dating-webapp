@@ -1,6 +1,6 @@
 // front-end/src/pages/ProfilePage.tsx
 import React from "react";
-import TopBar from "../components/TopBar";
+import TopBar from "@/components/layout/TopBar";
 
 import "./ProfilePage.css";
 

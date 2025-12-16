@@ -1,29 +1,43 @@
-import { MapPin, Users } from "lucide-react";
+import React from "react";
 
-export const NearbyBanner = () => {
-  const nearbyCount = 24; // later this can come from an API
+const NearbyBanner: React.FC = () => {
+  // sample avatars
+  const avatars = [
+    "https://i.pravatar.cc/40?img=12",
+    "https://i.pravatar.cc/40?img=15",
+    "https://i.pravatar.cc/40?img=20",
+    "https://i.pravatar.cc/40?img=22",
+  ];
 
   return (
-    <section className="mt-8">
-      <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-2xl p-5 border border-primary/20">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-            <MapPin className="w-6 h-6 text-primary" />
+    <div className="bg-card p-4 rounded-2xl border border-border max-w-xl">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">📍</div>
+          <div>
+            <h4 className="text-sm font-semibold text-foreground">People Nearby</h4>
+            <p className="text-xs text-muted-foreground">Find matches close to you</p>
           </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-foreground flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary" />
-              {nearbyCount} people nearby
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Based on your location preferences
-            </p>
-          </div>
-          <button className="px-4 py-2 bg-primary text-primary-foreground rounded-full text-sm font-medium hover:opacity-90 transition-opacity">
-            View all
-          </button>
+        </div>
+
+        <div className="text-sm text-muted-foreground">16 nearby</div>
+      </div>
+
+      <div className="mt-3 flex items-center -space-x-3">
+        {avatars.map((a, i) => (
+          <img
+            key={i}
+            src={a}
+            className="w-8 h-8 rounded-full border-2 border-white shadow-sm"
+            alt={`avatar-${i}`}
+          />
+        ))}
+        <div className="w-8 h-8 rounded-full border-2 border-white bg-muted flex items-center justify-center text-sm font-medium text-foreground">
+          +12
         </div>
       </div>
-    </section>
+    </div>
   );
 };
+
+export default NearbyBanner;

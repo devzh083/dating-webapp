@@ -1,21 +1,27 @@
 // src/pages/OnboardingPage.tsx
 import React from "react";
-import OnboardingFlow from "../components/onboarding/OnboardingFlow";
-import { TopBar } from "@/components/layout/TopBar";
+import { useNavigate } from "react-router-dom";
+import TopBar from "@/components/layout/TopBar";
+import OnboardingFlow, { OnboardingData } from "@/components/onboarding/OnboardingFlow";
 
-interface OnboardingPageProps {
-  onComplete: () => void;
-}
+type OnboardingPageProps = {
+  onComplete?: () => void; // App will pass this
+};
 
 const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
-  return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* global top bar during onboarding */}
-      <TopBar userName="User" />
+  const navigate = useNavigate();
 
-      <main className="flex-1 flex items-start justify-center">
-        <OnboardingFlow onComplete={onComplete} />
-      </main>
+  const handleFinish = () => {
+    // let App update its state
+    onComplete?.();
+
+    // final navigation to home
+    navigate("/home", { replace: true });
+  };
+
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      <OnboardingFlow onComplete={handleFinish} />
     </div>
   );
 };
