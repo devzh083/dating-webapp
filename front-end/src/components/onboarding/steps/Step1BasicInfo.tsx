@@ -1,4 +1,4 @@
-import { StepLayout } from "../StepLayout";
+import StepLayout from "../StepLayout";
 import { TextInput } from "../TextInput";
 import { DatePicker } from "../DatePicker";
 import { PillButton } from "../PillButton";

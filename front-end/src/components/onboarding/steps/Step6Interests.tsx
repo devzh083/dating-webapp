@@ -1,4 +1,5 @@
-import { StepLayout } from "../StepLayout";
+import StepLayout from "../StepLayout";
+
 import { ChipSelector } from "../ChipSelector";
 import { motion } from "framer-motion";
 

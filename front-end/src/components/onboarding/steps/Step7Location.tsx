@@ -1,4 +1,5 @@
-import { StepLayout } from "../StepLayout";
+import StepLayout from "../StepLayout";
+
 import { TextInput } from "../TextInput";
 import { MapPin, Navigation } from "lucide-react";
 import { motion } from "framer-motion";

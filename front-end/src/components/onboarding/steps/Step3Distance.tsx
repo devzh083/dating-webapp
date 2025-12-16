@@ -1,4 +1,5 @@
-import { StepLayout } from "../StepLayout";
+import StepLayout from "../StepLayout";
+
 import { CustomSlider } from "../CustomSlider";
 import { ToggleSwitch } from "../ToggleSwitch";
 import { MapPin } from "lucide-react";
