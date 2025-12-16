@@ -1,15 +1,12 @@
+// src/components/onboarding/steps/Step2Orientation.tsx
 import StepLayout from "../StepLayout";
-
 import { ChipSelector } from "../ChipSelector";
 import { CheckboxField } from "../CheckboxField";
+import { OnboardingData } from "../OnboardingFlow";
 
 interface Step2Props {
-  data: {
-    orientation: string[];
-    showOrientation: boolean;
-    relationshipType: string;
-  };
-  onChange: (data: Step2Props["data"]) => void;
+  data: Pick<OnboardingData, 'orientation' | 'showOrientation' | 'relationshipType'>;
+  onChange: (data: Step2Props['data']) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -57,7 +54,7 @@ export const Step2Orientation = ({
   return (
     <StepLayout
       currentStep={2}
-      totalSteps={8}
+      totalSteps={9}
       title="Your identity & intentions"
       subtitle="Help us understand what you're looking for"
       onBack={onBack}
@@ -65,7 +62,6 @@ export const Step2Orientation = ({
       onSkip={onSkip}
     >
       <div className="space-y-8">
-        {/* Sexual Orientation */}
         <div className="space-y-3">
           <label className="text-sm font-medium text-foreground">
             Sexual orientation
@@ -90,7 +86,6 @@ export const Step2Orientation = ({
           />
         </div>
 
-        {/* Relationship Type */}
         <div className="space-y-3">
           <label className="text-sm font-medium text-foreground">
             What are you looking for?
@@ -111,4 +106,5 @@ export const Step2Orientation = ({
     </StepLayout>
   );
 };
+
 export default Step2Orientation;

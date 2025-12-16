@@ -12,9 +12,13 @@ urlpatterns = [
     path("profile/", views.ProfileView.as_view(), name="profile"),
     path("profiles/<str:email>/", views.ProfileDetailView.as_view(), name="profile-detail"),
 
+    # Photo upload (media + URL stored in Firestore)
+    path("photos/upload/", views.PhotoUploadView.as_view(), name="photo-upload"),
+
     # Auth status (existing vs new user)
     path("auth/status/", views.AuthStatusView.as_view(), name="auth-status"),
 
+    # OTP login
     path("login/send-otp/", views.SendLoginOTPView.as_view(), name="send-login-otp"),
     path("login/verify-otp/", views.VerifyLoginOTPView.as_view(), name="verify-login-otp"),
 ]

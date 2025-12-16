@@ -164,3 +164,7 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'venleonink@gmail.com'
 EMAIL_HOST_PASSWORD = 'fzrj kdzl pzgc jjex'
 DEFAULT_FROM_EMAIL = 'venleonink@gmail.com'
+
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")

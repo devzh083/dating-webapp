@@ -1,28 +1,56 @@
 // src/components/onboarding/steps/Step8Photos.tsx
 import React, { useState } from "react";
 import StepLayout from "../StepLayout";
+import { OnboardingData } from "../OnboardingFlow";
 
-interface Props {
-  data: { photos: string[] };
-  onChange: (d: Partial<{ photos: string[] }>) => void;
+interface Step8Props {
+  data: Pick<OnboardingData, "photos">;
+  onChange: (data: Step8Props["data"]) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
 }
 
-const Step8Photos: React.FC<Props> = ({ data, onChange, onNext, onBack, onSkip }) => {
+const Step8Photos: React.FC<Step8Props> = ({
+  data,
+  onChange,
+  onNext,
+  onBack,
+  onSkip,
+}) => {
   const [local, setLocal] = useState<string[]>(data.photos || []);
 
   const handleFile = async (file: File | null) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base = reader.result as string;
-      const next = [...local, base].slice(0, 6);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/photos/upload/", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${
+            localStorage.getItem("access_token") || ""
+          }`,
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        console.error("Upload failed", await res.text());
+        return;
+      }
+
+      const json = await res.json();
+      const url = json.url as string;
+
+      const next = [...local, url].slice(0, 6);
       setLocal(next);
       onChange({ photos: next });
-    };
-    reader.readAsDataURL(file);
+    } catch (e) {
+      console.error("Error uploading photo", e);
+    }
   };
 
   const removeAt = (i: number) => {
@@ -45,8 +73,15 @@ const Step8Photos: React.FC<Props> = ({ data, onChange, onNext, onBack, onSkip }
       <div className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
           {local.map((p, i) => (
-            <div key={i} className="relative rounded-lg overflow-hidden border border-border">
-              <img src={p} alt={`photo-${i}`} className="w-full h-32 object-cover" />
+            <div
+              key={i}
+              className="relative rounded-lg overflow-hidden border border-border"
+            >
+              <img
+                src={p}
+                alt={`photo-${i}`}
+                className="w-full h-32 object-cover"
+              />
               <button
                 onClick={() => removeAt(i)}
                 className="absolute top-1 right-1 bg-white/80 rounded-full p-1"
@@ -63,7 +98,9 @@ const Step8Photos: React.FC<Props> = ({ data, onChange, onNext, onBack, onSkip }
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => handleFile(e.target.files ? e.target.files[0] : null)}
+                onChange={(e) =>
+                  handleFile(e.target.files ? e.target.files[0] : null)
+                }
               />
               <div className="text-center">
                 <div className="font-medium">Upload photo</div>

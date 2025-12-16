@@ -1,14 +1,12 @@
+// src/components/onboarding/steps/Step5Communication.tsx
 import StepLayout from "../StepLayout";
-
 import { ChipSelector } from "../ChipSelector";
 import { MessageCircle, Zap, Clock, Coffee } from "lucide-react";
+import { OnboardingData } from "../OnboardingFlow";
 
 interface Step5Props {
-  data: {
-    communicationStyle: string[];
-    responsePace: string;
-  };
-  onChange: (data: Step5Props["data"]) => void;
+  data: Pick<OnboardingData, 'communicationStyle' | 'responsePace'>;
+  onChange: (data: Step5Props['data']) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -50,7 +48,7 @@ export const Step5Communication = ({
   return (
     <StepLayout
       currentStep={5}
-      totalSteps={8}
+      totalSteps={9}  // ✅ Changed from 8 to 9
       title="How do you vibe best?"
       subtitle="Let's find your communication match"
       onBack={onBack}
@@ -108,4 +106,5 @@ export const Step5Communication = ({
     </StepLayout>
   );
 };
+
 export default Step5Communication;

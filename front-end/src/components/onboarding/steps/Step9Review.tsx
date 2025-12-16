@@ -4,29 +4,7 @@ import { motion } from "framer-motion";
 import { differenceInYears } from "date-fns";
 import StepLayout from "../StepLayout";
 import { MapPin, Heart, Sparkles, MessageCircle } from "lucide-react";
-
-type OnboardingData = {
-  firstName: string;
-  dateOfBirth: Date | undefined;
-  gender: string;
-  showGender: boolean;
-  interestedIn: string[];
-  orientation: string[];
-  showOrientation: boolean;
-  relationshipType: string;
-  distance: number;
-  strictDistance: boolean;
-  drinking: string;
-  smoking: string;
-  workout: string;
-  pets: string;
-  communicationStyle: string[];
-  responsePace: string;
-  interests: string[];
-  location: string;
-  useCurrentLocation: boolean;
-  photos?: string[];
-};
+import { OnboardingData } from "../OnboardingFlow";
 
 interface Step9Props {
   data: OnboardingData;
@@ -38,7 +16,6 @@ interface Step9Props {
 const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => {
   const age = data.dateOfBirth ? differenceInYears(new Date(), data.dateOfBirth) : null;
 
-  // safe guard for empty/missing name
   const safeFirst = data.firstName || "User";
   const firstInitial = (safeFirst.charAt(0) || "U").toUpperCase();
 
@@ -47,7 +24,7 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
     data.smoking && `🚬 ${data.smoking}`,
     data.workout && `💪 ${data.workout}`,
     data.pets && `🐕 ${data.pets}`,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 
   return (
     <StepLayout
@@ -73,7 +50,9 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
             <div>
               <h2 className="text-2xl font-bold text-foreground">
                 {safeFirst}
-                {age && <span className="text-muted-foreground">, {age}</span>}
+                {age !== null && (
+                  <span className="text-muted-foreground">, {age}</span>
+                )}
               </h2>
               {data.showGender && data.gender && (
                 <p className="text-muted-foreground">{data.gender}</p>
@@ -86,35 +65,45 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
               <div className="flex items-center gap-3 text-sm">
                 <MapPin className="w-4 h-4 text-primary" />
                 <span className="text-foreground">{data.location}</span>
-                <span className="text-muted-foreground">• {data.distance} km away max</span>
+                <span className="text-muted-foreground">
+                  • {data.distance} km away max
+                </span>
               </div>
             )}
 
             {data.relationshipType && (
               <div className="flex items-center gap-3 text-sm">
                 <Heart className="w-4 h-4 text-primary" />
-                <span className="text-foreground">Looking for: {data.relationshipType}</span>
+                <span className="text-foreground">
+                  Looking for: {data.relationshipType}
+                </span>
               </div>
             )}
 
             {data.showOrientation && data.orientation.length > 0 && (
               <div className="flex items-center gap-3 text-sm">
                 <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-foreground">{data.orientation.join(", ")}</span>
+                <span className="text-foreground">
+                  {data.orientation.join(", ")}
+                </span>
               </div>
             )}
 
             {data.responsePace && (
               <div className="flex items-center gap-3 text-sm">
                 <MessageCircle className="w-4 h-4 text-primary" />
-                <span className="text-foreground">{data.responsePace} responder</span>
+                <span className="text-foreground">
+                  {data.responsePace} responder
+                </span>
               </div>
             )}
           </div>
 
           {lifestyleTags.length > 0 && (
             <div className="mt-6">
-              <h3 className="text-sm font-medium text-foreground mb-3">Lifestyle</h3>
+              <h3 className="text-sm font-medium text-foreground mb-3">
+                Lifestyle
+              </h3>
               <div className="flex flex-wrap gap-2">
                 {lifestyleTags.map((tag, index) => (
                   <span
@@ -130,7 +119,9 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
 
           {data.interests.length > 0 && (
             <div className="mt-6">
-              <h3 className="text-sm font-medium text-foreground mb-3">Interests</h3>
+              <h3 className="text-sm font-medium text-foreground mb-3">
+                Interests
+              </h3>
               <div className="flex flex-wrap gap-2">
                 {data.interests.map((interest) => (
                   <span
@@ -145,11 +136,19 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
           )}
         </motion.div>
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="text-center py-4">
-          <p className="text-muted-foreground text-sm">You can always update your profile later in settings</p>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-center py-4"
+        >
+          <p className="text-muted-foreground text-sm">
+            You can always update your profile later in settings
+          </p>
         </motion.div>
       </div>
     </StepLayout>
   );
 };
+
 export default Step9Review;

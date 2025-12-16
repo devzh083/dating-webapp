@@ -1,19 +1,15 @@
+// src/components/onboarding/steps/Step1BasicInfo.tsx
 import StepLayout from "../StepLayout";
 import { TextInput } from "../TextInput";
 import { DatePicker } from "../DatePicker";
 import { PillButton } from "../PillButton";
 import { CheckboxField } from "../CheckboxField";
 import { User } from "lucide-react";
+import { OnboardingData } from "../OnboardingFlow";
 
 interface Step1Props {
-  data: {
-    firstName: string;
-    dateOfBirth: Date | undefined;
-    gender: string;
-    showGender: boolean;
-    interestedIn: string[];
-  };
-  onChange: (data: Step1Props["data"]) => void;
+  data: Pick<OnboardingData, 'firstName' | 'dateOfBirth' | 'gender' | 'showGender' | 'interestedIn'>;
+  onChange: (data: Step1Props['data']) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -44,7 +40,7 @@ export const Step1BasicInfo = ({
   return (
     <StepLayout
       currentStep={1}
-      totalSteps={8}
+      totalSteps={9}
       title="Let's start with the basics"
       subtitle="Tell us a bit about yourself"
       onBack={onBack}
@@ -54,7 +50,6 @@ export const Step1BasicInfo = ({
       showBack={false}
     >
       <div className="space-y-8 pt-2 pb-4">
-        {/* First Name */}
         <TextInput
           value={data.firstName}
           onChange={(firstName) => onChange({ ...data, firstName })}
@@ -63,7 +58,6 @@ export const Step1BasicInfo = ({
           icon={<User className="w-5 h-5 text-gray-400" />}
         />
 
-        {/* Date of Birth */}
         <div className="space-y-1">
           <label className="block text-sm font-medium text-gray-900">
             Date of birth
@@ -77,7 +71,6 @@ export const Step1BasicInfo = ({
           </p>
         </div>
 
-        {/* Gender */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-gray-900">
             I identify as
@@ -99,7 +92,6 @@ export const Step1BasicInfo = ({
           />
         </div>
 
-        {/* Interested In */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-gray-900">
             I'd like to see

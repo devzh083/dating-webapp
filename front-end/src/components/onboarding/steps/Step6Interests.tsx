@@ -1,12 +1,11 @@
+// src/components/onboarding/steps/Step6Interests.tsx
 import StepLayout from "../StepLayout";
-
 import { ChipSelector } from "../ChipSelector";
 import { motion } from "framer-motion";
+import { OnboardingData } from "../OnboardingFlow";
 
 interface Step6Props {
-  data: {
-    interests: string[];
-  };
+  data: Pick<OnboardingData, "interests">;
   onChange: (data: Step6Props["data"]) => void;
   onNext: () => void;
   onBack: () => void;
@@ -17,34 +16,88 @@ const interestCategories = [
   {
     title: "Movies & TV",
     emoji: "🎬",
-    options: ["Action", "Comedy", "Drama", "Horror", "Sci-Fi", "Documentaries", "Anime", "Reality TV"],
+    options: [
+      "Action",
+      "Comedy",
+      "Drama",
+      "Horror",
+      "Sci-Fi",
+      "Documentaries",
+      "Anime",
+      "Reality TV",
+    ],
   },
   {
     title: "Music",
     emoji: "🎵",
-    options: ["Pop", "Hip-Hop", "Rock", "Electronic", "R&B", "Country", "Jazz", "Classical"],
+    options: [
+      "Pop",
+      "Hip-Hop",
+      "Rock",
+      "Electronic",
+      "R&B",
+      "Country",
+      "Jazz",
+      "Classical",
+    ],
   },
   {
     title: "Sports",
     emoji: "⚽",
-    options: ["Football", "Basketball", "Tennis", "Swimming", "Running", "Yoga", "Cycling", "Golf"],
+    options: [
+      "Football",
+      "Basketball",
+      "Tennis",
+      "Swimming",
+      "Running",
+      "Yoga",
+      "Cycling",
+      "Golf",
+    ],
   },
   {
     title: "Food & Drink",
     emoji: "🍕",
-    options: ["Cooking", "Fine Dining", "Street Food", "Coffee", "Wine", "Cocktails", "Vegan", "BBQ"],
+    options: [
+      "Cooking",
+      "Fine Dining",
+      "Street Food",
+      "Coffee",
+      "Wine",
+      "Cocktails",
+      "Vegan",
+      "BBQ",
+    ],
   },
   {
     title: "Hobbies",
     emoji: "🎨",
-    options: ["Photography", "Reading", "Gaming", "Art", "Writing", "Gardening", "DIY", "Crafts"],
+    options: [
+      "Photography",
+      "Reading",
+      "Gaming",
+      "Art",
+      "Writing",
+      "Gardening",
+      "DIY",
+      "Crafts",
+    ],
   },
   {
     title: "Travel & Adventure",
     emoji: "✈️",
-    options: ["Beach", "Mountains", "City Trips", "Backpacking", "Road Trips", "Camping", "Cruises", "Staycations"],
+    options: [
+      "Beach",
+      "Mountains",
+      "City Trips",
+      "Backpacking",
+      "Road Trips",
+      "Camping",
+      "Cruises",
+      "Staycations",
+    ],
   },
-];
+] as const;
 
 const MAX_INTERESTS = 10;
 
@@ -70,7 +123,7 @@ export const Step6Interests = ({
   return (
     <StepLayout
       currentStep={6}
-      totalSteps={8}
+      totalSteps={9} // ✅ updated to 9
       title="What are you into?"
       subtitle="Pick your top interests to help find better matches"
       onBack={onBack}
@@ -131,4 +184,5 @@ export const Step6Interests = ({
     </StepLayout>
   );
 };
+
 export default Step6Interests;

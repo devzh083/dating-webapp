@@ -1,14 +1,12 @@
+// src/components/onboarding/steps/Step7Location.tsx
 import StepLayout from "../StepLayout";
-
 import { TextInput } from "../TextInput";
 import { MapPin, Navigation } from "lucide-react";
 import { motion } from "framer-motion";
+import { OnboardingData } from "../OnboardingFlow";
 
 interface Step7Props {
-  data: {
-    location: string;
-    useCurrentLocation: boolean;
-  };
+  data: Pick<OnboardingData, "location" | "useCurrentLocation">;
   onChange: (data: Step7Props["data"]) => void;
   onNext: () => void;
   onBack: () => void;
@@ -23,13 +21,17 @@ export const Step7Location = ({
   onSkip,
 }: Step7Props) => {
   const handleUseCurrentLocation = () => {
-    onChange({ ...data, useCurrentLocation: true, location: "Using current location" });
+    onChange({
+      ...data,
+      useCurrentLocation: true,
+      location: "Using current location",
+    });
   };
 
   return (
     <StepLayout
       currentStep={7}
-      totalSteps={8}
+      totalSteps={9} // ✅ changed from 8 to 9
       title="Where are you?"
       subtitle="Help us show you people nearby"
       onBack={onBack}
@@ -52,7 +54,9 @@ export const Step7Location = ({
         {/* Location Input */}
         <TextInput
           value={data.location}
-          onChange={(location) => onChange({ ...data, location, useCurrentLocation: false })}
+          onChange={(location) =>
+            onChange({ ...data, location, useCurrentLocation: false })
+          }
           placeholder="Enter your city"
           icon={<MapPin className="w-5 h-5" />}
         />
@@ -90,7 +94,8 @@ export const Step7Location = ({
                 Your privacy is protected
               </p>
               <p className="text-xs text-muted-foreground">
-                We use your location to show you people nearby. Your exact location is never shared with other users.
+                We use your location to show you people nearby. Your exact
+                location is never shared with other users.
               </p>
             </div>
           </div>
@@ -99,4 +104,5 @@ export const Step7Location = ({
     </StepLayout>
   );
 };
+
 export default Step7Location;

@@ -1,15 +1,11 @@
+// src/components/onboarding/steps/Step4Lifestyle.tsx
 import StepLayout from "../StepLayout";
-
 import { ChipSelector } from "../ChipSelector";
+import { OnboardingData } from "../OnboardingFlow";
 
 interface Step4Props {
-  data: {
-    drinking: string;
-    smoking: string;
-    workout: string;
-    pets: string;
-  };
-  onChange: (data: Step4Props["data"]) => void;
+  data: Pick<OnboardingData, 'drinking' | 'smoking' | 'workout' | 'pets'>;
+  onChange: (data: Step4Props['data']) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -38,7 +34,7 @@ const lifestyleOptions = {
     { label: "Allergic", emoji: "🤧" },
     { label: "None", emoji: "🚫" },
   ],
-};
+} as const;
 
 export const Step4Lifestyle = ({
   data,
@@ -50,7 +46,7 @@ export const Step4Lifestyle = ({
   return (
     <StepLayout
       currentStep={4}
-      totalSteps={8}
+      totalSteps={9}  // ✅ Changed from 8 to 9
       title="Your lifestyle"
       subtitle="No judgment here — just finding your vibe"
       onBack={onBack}
@@ -133,4 +129,5 @@ export const Step4Lifestyle = ({
     </StepLayout>
   );
 };
+
 export default Step4Lifestyle;
