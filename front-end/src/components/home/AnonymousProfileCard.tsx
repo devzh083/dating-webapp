@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { MessageCircle, User, Sparkles } from "lucide-react";
+import { MessageCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface AnonymousProfile {
@@ -15,85 +15,115 @@ interface AnonymousProfileCardProps {
   index?: number;
 }
 
-export const AnonymousProfileCard = ({ profile, onRequestChat, index = 0 }: AnonymousProfileCardProps) => {
+/* ---------- AVATAR VARIANTS (LOVABLE STYLE) ---------- */
+
+const avatarVariants = [
+  { gradient: "from-violet-500 via-purple-500 to-fuchsia-500" },
+  { gradient: "from-cyan-500 via-teal-500 to-emerald-500" },
+  { gradient: "from-orange-500 via-amber-500 to-yellow-500" },
+  { gradient: "from-rose-500 via-pink-500 to-red-500" },
+  { gradient: "from-blue-500 via-indigo-500 to-violet-500" },
+  { gradient: "from-emerald-500 via-green-500 to-lime-500" },
+];
+
+const AnimatedAvatar = ({ index }: { index: number }) => {
+  const variant = avatarVariants[index % avatarVariants.length];
+
+  return (
+    <div className="relative w-12 h-12">
+      <motion.div
+        className={`absolute inset-0 rounded-full bg-gradient-to-br ${variant.gradient}`}
+        animate={{ scale: [1, 1.05, 1] }}
+        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <div className="absolute inset-1 rounded-full bg-background/30 backdrop-blur-sm" />
+    </div>
+  );
+};
+
+/* ---------- MAIN CARD ---------- */
+
+const AnonymousProfileCard = ({
+  profile,
+  onRequestChat,
+  index = 0,
+}: AnonymousProfileCardProps) => {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1, duration: 0.4 }}
-      className="group relative bg-gradient-to-br from-card via-card to-muted/30 rounded-2xl p-6 border border-border/50 shadow-sm hover:shadow-lg hover:border-primary/20 transition-all duration-300"
+      transition={{ delay: index * 0.05 }}
+      className="bg-card rounded-xl border border-border hover:border-primary/30 hover:shadow-md transition-all"
     >
-      {/* Hover Gradient */}
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-      <div className="relative z-10">
-        {/* Avatar + Header */}
-        <div className="flex items-start gap-4 mb-4">
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-3">
           <div className="relative">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-muted via-muted to-muted-foreground/10 flex items-center justify-center border-2 border-border/50 group-hover:border-primary/30 transition-colors">
-              <User className="w-7 h-7 text-muted-foreground/60" />
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-r from-primary to-primary-end flex items-center justify-center">
-              <Sparkles className="w-3 h-3 text-primary-foreground" />
+            <AnimatedAvatar index={index} />
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+              <Sparkles className="w-2.5 h-2.5 text-primary-foreground" />
             </div>
           </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Anonymous
+          <div>
+            <span className="text-xs font-medium text-muted-foreground">
+              Anonymous
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              <span className="text-[10px] text-muted-foreground">
+                Online
               </span>
-              <span className="text-xs text-muted-foreground/60">•</span>
-              <span className="text-xs text-primary/80">Ready to connect</span>
             </div>
-
-            <p className="text-foreground font-medium leading-relaxed">
-              "{profile.selfDescription}"
-            </p>
           </div>
         </div>
 
-        {/* Vibe Tags */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        {/* Description */}
+        <p className="text-sm text-foreground leading-relaxed mb-3 line-clamp-2">
+          “{profile.selfDescription}”
+        </p>
+
+        {/* Tags */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
           {profile.vibeTags.map((tag) => (
             <span
               key={tag}
-              className="px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-muted to-muted/80 text-muted-foreground border border-border/50 group-hover:border-primary/20 group-hover:text-foreground transition-colors"
+              className="px-2 py-1 rounded-md text-[11px] font-medium bg-muted text-muted-foreground"
             >
               {tag}
             </span>
           ))}
         </div>
 
-        {/* Conversation Hook */}
-        <div className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 rounded-xl p-4 mb-4 border border-primary/10">
+        {/* Hook */}
+        <div className="bg-primary/5 rounded-lg p-3 mb-3">
           <div className="flex items-start gap-2">
-            <MessageCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-            <div>
-              <span className="text-xs font-medium text-primary uppercase tracking-wider block mb-1">
-                Conversation Starter
-              </span>
-              <p className="text-sm text-foreground/90 italic">
-                "{profile.conversationHook}"
-              </p>
-            </div>
+            <MessageCircle className="w-3.5 h-3.5 text-primary mt-0.5" />
+            <p className="text-xs text-foreground/80 italic line-clamp-2">
+              “{profile.conversationHook}”
+            </p>
           </div>
         </div>
 
-        {/* Button */}
+        {/* CTA */}
         <Button
           onClick={onRequestChat}
-          className="w-full bg-gradient-to-r from-primary to-primary-end hover:opacity-90 text-primary-foreground font-medium py-5 rounded-xl shadow-sm hover:shadow-md transition-all"
+          size="sm"
+          className="w-full bg-gradient-to-r from-primary to-primary-end text-primary-foreground text-xs font-medium"
         >
-          <MessageCircle className="w-4 h-4 mr-2" />
+          <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
           Request Chat
         </Button>
+      </div>
 
-        <p className="text-center text-xs text-muted-foreground/70 mt-3">
-          Identity revealed only after mutual match
+      {/* Footer */}
+      <div className="px-4 py-2 border-t border-border bg-muted/30 rounded-b-xl">
+        <p className="text-[10px] text-center text-muted-foreground">
+          Identity revealed after mutual match
         </p>
       </div>
     </motion.div>
   );
 };
+
 export default AnonymousProfileCard;

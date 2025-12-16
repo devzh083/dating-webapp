@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
-import { Users, Sparkles } from "lucide-react";
+import { Users, Shield, Star } from "lucide-react";
+import { toast } from "sonner";
+
 import TopBar from "@/components/layout/TopBar";
 import ProfileCompletion from "@/components/home/ProfileCompletion";
 import NearbyBanner from "@/components/home/NearbyBanner";
@@ -7,9 +9,8 @@ import PremiumBanner from "@/components/home/PremiumBanner";
 import AnonymousProfileCard from "@/components/home/AnonymousProfileCard";
 import AnonymousReviewsBanner from "@/components/home/AnonymousReviewsBanner";
 import SecurityBanner from "@/components/home/SecurityBanner";
-import { toast } from "sonner";
 
-/* ---------------- MOCK DATA (SAME AS LOVABLE) ---------------- */
+/* ---------------- MOCK DATA ---------------- */
 
 const mockAnonymousProfiles = [
   {
@@ -47,15 +48,9 @@ const mockAnonymousProfiles = [
 
 /* ---------------- PAGE ---------------- */
 
-const HomePage = () => {
-  const userName = "User"; // mock, same as Lovable
-  const profileCompletion = 36; // mock percentage
-
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    window.location.href = "/";
-  };
+const Home = () => {
+  const userName = "User";
+  const profileCompletion = 36;
 
   const handleRequestChat = () => {
     toast.success("Chat request sent!", {
@@ -63,85 +58,116 @@ const HomePage = () => {
     });
   };
 
+  const handleLogout = () => {
+    localStorage.clear();
+    window.location.href = "/";
+  };
+
   return (
-    <div className="min-h-screen">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* TOP BAR */}
       <TopBar userName={userName} onLogout={handleLogout} />
 
-      {/* HERO SECTION */}
-      <section className="py-10">
-        <div className="container mx-auto px-4 max-w-7xl">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-10"
-          >
-            <div className="inline-flex items-center gap-2 mb-4">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-sm font-medium">
-                Anonymous Connections
-              </span>
-            </div>
+      <div className="flex flex-1 overflow-hidden">
+        {/* LEFT SIDEBAR */}
+        <aside className="hidden lg:block w-80 xl:w-96 shrink-0 border-r border-border bg-muted/20">
+          <div className="p-4 space-y-4">
+            <ProfileCompletion percentage={profileCompletion} />
+            <NearbyBanner />
+            <PremiumBanner />
 
-            <h1 className="text-3xl font-bold mb-2">
-              Discover Real Connections
-            </h1>
-
-            <p className="text-muted-foreground max-w-xl mx-auto">
-              No photos, no names — just genuine personalities.
-            </p>
-          </motion.div>
-
-          {/* MAIN GRID */}
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* LEFT COLUMN */}
-            <div className="space-y-6">
-              <ProfileCompletion percentage={profileCompletion} />
-              <NearbyBanner />
-              <PremiumBanner />
-            </div>
-
-            {/* RIGHT COLUMN */}
-            <div className="lg:col-span-2">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <Users className="w-5 h-5" />
-                  <div>
-                    <h2 className="font-bold">Discover People</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Based on vibes, not looks
-                    </p>
-                  </div>
+            {/* Quick stats */}
+            <div className="bg-card rounded-xl p-4 border border-border">
+              <h4 className="text-sm font-semibold mb-3">Your Activity</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="text-center p-3 rounded-lg bg-muted/50">
+                  <span className="block text-xl font-bold text-primary">12</span>
+                  <span className="text-xs text-muted-foreground">
+                    Requests Sent
+                  </span>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-muted/50">
+                  <span className="block text-xl font-bold text-primary">5</span>
+                  <span className="text-xs text-muted-foreground">Matches</span>
                 </div>
               </div>
+            </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                {mockAnonymousProfiles.map((profile, index) => (
-                  <AnonymousProfileCard
-                    key={profile.id}
-                    profile={profile}
-                    index={index}
-                    onRequestChat={handleRequestChat}
-                  />
-                ))}
+            {/* Trust */}
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl p-4 border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">Privacy First</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Your identity stays hidden until both match
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        {/* MAIN CONTENT */}
+        <main className="flex-1 min-w-0 overflow-y-auto">
+          {/* STICKY HEADER */}
+          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 lg:px-6 py-3">
+            <div className="flex items-center gap-3 max-w-4xl">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-primary-end">
+                <Users className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold">Discover</h1>
+                <p className="text-xs text-muted-foreground">
+                  Connect based on vibes, not looks
+                </p>
               </div>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* REVIEWS + SECURITY */}
-      <section className="py-12">
-        <div className="container mx-auto px-4 max-w-7xl">
-          <div className="grid md:grid-cols-2 gap-8">
-            <AnonymousReviewsBanner />
-            <SecurityBanner />
+          {/* PROFILE FEED */}
+          <div className="p-4 lg:p-6">
+            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 max-w-6xl">
+              {mockAnonymousProfiles.map((profile, index) => (
+                <AnonymousProfileCard
+                  key={profile.id}
+                  profile={profile}
+                  index={index}
+                  onRequestChat={handleRequestChat}
+                />
+              ))}
+            </div>
           </div>
+
+          {/* REVIEWS + SECURITY */}
+          <div className="border-t border-border bg-muted/30 px-4 lg:px-6 py-8">
+            <div className="max-w-6xl">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 mb-6"
+              >
+                <Star className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-bold">Why People Love Us</h2>
+              </motion.div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <AnonymousReviewsBanner />
+                <SecurityBanner />
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* MOBILE BOTTOM */}
+      <div className="lg:hidden px-4 pb-4 space-y-4 bg-muted/30 border-t border-border">
+        <ProfileCompletion percentage={profileCompletion} />
+        <div className="grid grid-cols-2 gap-4">
+          <NearbyBanner />
+          <PremiumBanner />
         </div>
-      </section>
+      </div>
     </div>
   );
 };
 
-export default HomePage;
+export default Home;
