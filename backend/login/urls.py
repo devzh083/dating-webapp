@@ -21,4 +21,7 @@ urlpatterns = [
     # OTP login
     path("login/send-otp/", views.SendLoginOTPView.as_view(), name="send-login-otp"),
     path("login/verify-otp/", views.VerifyLoginOTPView.as_view(), name="verify-login-otp"),
+
+    # Match recommendations
+    path("matches/", views.MatchRecommendationsView.as_view(), name="matches"),
 ]

@@ -1,4 +1,4 @@
-// src/components/DatePicker.tsx (or wherever you keep it)
+// src/components/DatePicker.tsx
 import { useState } from "react";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
@@ -20,12 +20,12 @@ export const DatePicker = ({
   placeholder = "Select your birthday",
 }: DatePickerProps) => {
   const [open, setOpen] = useState(false);
-  const thisYear = new Date().getFullYear();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <motion.button
+          type="button"
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
           className={cn(
@@ -51,9 +51,9 @@ export const DatePicker = ({
       <PopoverContent
         align="start"
         className={cn(
-          "w-[360px] p-0",
+          "w-auto p-0",
           "bg-white border border-[#e5e7eb]",
-          "rounded-[16px]",
+          "rounded-[12px]",
           "shadow-[0_18px_45px_rgba(15,23,42,0.18)]"
         )}
       >
@@ -64,24 +64,33 @@ export const DatePicker = ({
             onChange(date);
             setOpen(false);
           }}
-          // key for easy month + year selection
-          captionLayout="dropdown"
-          fromYear={1900}
-          toYear={thisYear}
           disabled={(date) =>
             date > new Date() || date < new Date("1900-01-01")
           }
-          defaultMonth={value || new Date(2000, 0)}
           initialFocus
           className={cn(
-            "p-6",
-            "text-[13px] leading-6",
-            "font-normal text-[#111827]",
-            "[&_th]:text-[#6b7280] [&_th]:font-semibold [&_th]:text-[12px]",
+            "p-4",
+            "text-[13px] leading-6 text-[#111827]",
+            // center month title
+            "[&_caption]:flex [&_caption]:items-center [&_caption]:justify-center",
+            // weekday header row
+            "[&_thead_tr]:h-8",
+            "[&_th]:w-8 [&_th]:text-xs [&_th]:font-medium [&_th]:text-[#6b7280] [&_th]:text-center",
+            // DAYS GRID: 7 equal columns
+            "[&_tbody]:grid [&_tbody]:grid-cols-7 [&_tbody]:gap-y-2",
+            "[&_tbody_tr]:contents", // keep rows from breaking the grid
+            "[&_tbody_td]:flex [&_tbody_td]:items-center [&_tbody_td]:justify-center",
+            // day buttons
             "[&_button]:rounded-full [&_button]:w-8 [&_button]:h-8",
-            "[&_button:hover]:bg-[#e5f7f4]"
+            "[&_button]:text-[12px]",
+            "[&_button:hover]:bg-[#e5f7f4]",
+            // outside days dimmed
+            "[&_button[data-outside='true']]:text-[#d1d5db]",
+            // selected day
+            "[&_button[aria-selected='true']]:bg-black [&_button[aria-selected='true']]:text-white"
           )}
         />
+
       </PopoverContent>
     </Popover>
   );
