@@ -23,44 +23,47 @@ export const Step3Distance = ({
   return (
     <StepLayout
       currentStep={3}
-      totalSteps={9}  // ✅ Changed from 8 to 9
+      totalSteps={8}
       title="How far would you go?"
       subtitle="Set your maximum distance for matches"
       onBack={onBack}
       onNext={onNext}
       onSkip={onSkip}
     >
-      <div className="space-y-8">
-        {/* Visual Icon */}
-        <div className="flex justify-center py-6">
-          <div className="w-24 h-24 rounded-full gradient-primary flex items-center justify-center shadow-lg shadow-primary/30">
-            <MapPin className="w-12 h-12 text-primary-foreground" />
+      <div className="space-y-10">
+        {/* Visual Icon - Solid Teal Circle */}
+        <div className="flex justify-center py-4">
+          <div className="w-24 h-24 rounded-full bg-teal-500 flex items-center justify-center shadow-xl shadow-teal-200">
+            <MapPin className="w-10 h-10 text-white fill-white" />
           </div>
         </div>
 
-        {/* Distance Slider */}
-        <div className="space-y-4">
-          <label className="text-sm font-medium text-foreground">
+        {/* Distance Slider Section */}
+        <div className="space-y-6">
+          <label className="text-base font-semibold text-gray-900 block">
             Maximum distance
           </label>
+          
           <CustomSlider
             value={data.distance}
             min={1}
             max={150}
             step={1}
-            unit=" km"
+            unit="km"
             onChange={(distance) => onChange({ ...data, distance })}
           />
         </div>
 
         {/* Strict Distance Toggle */}
-        <ToggleSwitch
-          label="Only show people within this range"
-          checked={data.strictDistance}
-          onChange={(strictDistance) => onChange({ ...data, strictDistance })}
-        />
+        <div className="pt-2">
+          <ToggleSwitch
+            label="Only show people within this range"
+            checked={data.strictDistance}
+            onChange={(strictDistance) => onChange({ ...data, strictDistance })}
+          />
+        </div>
 
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-xs text-gray-400 text-center pt-4">
           You can always adjust this later in settings
         </p>
       </div>

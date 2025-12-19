@@ -1,7 +1,4 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { cn } from "../../lib/utils";
-
+import { cn } from "@/lib/utils";
 
 interface TextInputProps {
   value: string;
@@ -9,44 +6,43 @@ interface TextInputProps {
   placeholder?: string;
   label?: string;
   icon?: React.ReactNode;
-  className?: string;
 }
 
-export const TextInput = ({
+export function TextInput({
   value,
   onChange,
   placeholder,
   label,
   icon,
-  className,
-}: TextInputProps) => {
-  const [focused, setFocused] = useState(false);
+}: TextInputProps) {
+  const isActive = value.trim().length > 0;
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className="space-y-1">
       {label && (
-        <label className="text-sm font-medium text-foreground">{label}</label>
+        <label className="block text-sm font-medium text-gray-900">
+          {label}
+        </label>
       )}
-      <motion.div
-        animate={{
-          borderColor: focused ? "hsl(var(--primary))" : "hsl(var(--chip-border))",
-        }}
+
+      <div
         className={cn(
-          "flex items-center gap-3 px-4 py-4 rounded-xl border-2 bg-chip transition-all duration-200",
-          focused && "ring-2 ring-primary/20"
+          "flex items-center gap-3 rounded-xl border px-4 py-3 transition-all",
+          "bg-white",
+          isActive
+            ? "border-[#00bcd4] bg-[#eaf9fc]"
+            : "border-gray-300",
+          "focus-within:border-[#00bcd4] focus-within:bg-[#eaf9fc]"
         )}
       >
-        {icon && <span className="text-muted-foreground">{icon}</span>}
+        {icon}
         <input
-          type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          className="flex-1 bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none"
+          className="w-full bg-transparent outline-none text-sm text-gray-900 placeholder:text-gray-400"
         />
-      </motion.div>
+      </div>
     </div>
   );
-};
+}

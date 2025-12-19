@@ -26,10 +26,10 @@ const lifestyleOptions = {
     { label: "Never", emoji: "🛋️" },
     { label: "Sometimes", emoji: "🚶" },
     { label: "Often", emoji: "💪" },
-    { label: "Daily", emoji: "🏋️" },
+    { label: "Daily", emoji: "✨" }, // Updated emoji to match video vibe
   ],
   pets: [
-    { label: "Own pets", emoji: "🐕" },
+    { label: "Own pets", emoji: "🐾" }, // Updated to generic paw or dog
     { label: "Love pets", emoji: "❤️" },
     { label: "Allergic", emoji: "🤧" },
     { label: "None", emoji: "🚫" },
@@ -46,20 +46,20 @@ export const Step4Lifestyle = ({
   return (
     <StepLayout
       currentStep={4}
-      totalSteps={9}  // ✅ Changed from 8 to 9
+      totalSteps={8} // Matched to video "Step 4 of 8"
       title="Your lifestyle"
       subtitle="No judgment here — just finding your vibe"
       onBack={onBack}
       onNext={onNext}
       onSkip={onSkip}
     >
-      <div className="space-y-8">
+      <div className="space-y-10">
         {/* Drinking */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">
+        <div className="space-y-4">
+          <label className="text-base font-semibold text-gray-900 block">
             Drinking
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {lifestyleOptions.drinking.map(({ label, emoji }) => (
               <ChipSelector
                 key={label}
@@ -73,11 +73,11 @@ export const Step4Lifestyle = ({
         </div>
 
         {/* Smoking */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">
+        <div className="space-y-4">
+          <label className="text-base font-semibold text-gray-900 block">
             Smoking
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {lifestyleOptions.smoking.map(({ label, emoji }) => (
               <ChipSelector
                 key={label}
@@ -91,11 +91,11 @@ export const Step4Lifestyle = ({
         </div>
 
         {/* Workout */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">
+        <div className="space-y-4">
+          <label className="text-base font-semibold text-gray-900 block">
             Working out
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {lifestyleOptions.workout.map(({ label, emoji }) => (
               <ChipSelector
                 key={label}
@@ -109,11 +109,11 @@ export const Step4Lifestyle = ({
         </div>
 
         {/* Pets */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">
+        <div className="space-y-4">
+          <label className="text-base font-semibold text-gray-900 block">
             Pets
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {lifestyleOptions.pets.map(({ label, emoji }) => (
               <ChipSelector
                 key={label}

@@ -1,6 +1,5 @@
 // src/pages/ChatsPage.tsx
 
-import "./ChatsPage.css";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TopBar from "@/components/layout/TopBar";

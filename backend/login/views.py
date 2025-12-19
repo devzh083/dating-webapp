@@ -16,6 +16,17 @@ import requests
 import random
 import string
 
+from math import radians, sin, cos, asin, sqrt
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+from config.firebase import db
+from .models import FirebaseProfileManager
+
+
+
 from .models import FirebaseAuthManager, FirebaseProfileManager
 from .models_photos import UserPhoto  # <-- your ImageField model
 
@@ -504,3 +515,217 @@ class VerifyLoginOTPView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+# views.py
+
+
+# ----------------- helpers ----------------- #
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    R = 6371.0
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    c = 2 * asin(sqrt(a))
+    return R * c
+
+
+def list_overlap(a, b):
+    a = a or []
+    b = b or []
+    if not a or not b:
+        return 0.0
+    sa, sb = set(a), set(b)
+    inter = len(sa & sb)
+    union = len(sa | sb)
+    return inter / union
+
+
+def categorical_exact(a, b):
+    return 1.0 if a and b and a == b else 0.0
+
+
+def distance_similarity_km(distance_km, hard_limit_km):
+    if not hard_limit_km or hard_limit_km <= 0:
+        return 0.0
+    return max(0.0, 1.0 - distance_km / hard_limit_km)
+
+
+WEIGHTS = {
+    "sexual_orientation": 0.30,
+    "relationship_goals": 0.25,
+    "communication":      0.15,
+    "lifestyle":          0.15,
+    "interests":          0.10,
+    "distance_soft":      0.05,
+}
+
+
+def normalize_gender(label: str | None) -> str | None:
+    if not label:
+        return None
+    label = label.lower()
+    if label.startswith("man"):
+        return "man"
+    if label.startswith("woman") or label.startswith("female"):
+        return "woman"
+    return label  # fallback
+
+
+def normalize_interested_in(values):
+    # Firestore: ["Men"] / ["Women"]
+    out = []
+    for v in values or []:
+        v = v.lower()
+        if v.startswith("men") or v.startswith("man"):
+            out.append("man")
+        elif v.startswith("women") or v.startswith("woman"):
+            out.append("woman")
+    return out
+
+
+def normalize_profile(raw: dict) -> dict:
+    """Convert Firestore schema -> algorithm schema."""
+    if not raw:
+        return {}
+
+    gender = normalize_gender(raw.get("gender"))
+    interested_in = normalize_interested_in(raw.get("interestedIn", []))
+
+    return {
+        "email": raw.get("email"),
+        "gender": gender,
+        "interested_in_genders": interested_in,
+
+        # arrays
+        "sexual_orientation": raw.get("orientation", []),
+        "preferred_connect": raw.get("communicationStyle", []),
+        "interests": raw.get("interests", []),
+
+        # single string -> list
+        "relationship_goals": [raw["relationshipType"]] if raw.get("relationshipType") else [],
+
+        # lifestyle
+        "drinking": raw.get("drinking"),
+        "smoking": raw.get("smoking"),
+        "workout": raw.get("workout"),
+        "pets": raw.get("pets"),
+
+        # communication pace
+        "response_pace": raw.get("responsePace"),
+
+        # distance - keep numeric if present
+        "max_distance_km": raw.get("distance"),
+        # geo coords (only if you later add them)
+        "lat": raw.get("lat"),
+        "lng": raw.get("lng"),
+    }
+
+
+def profile_similarity(u, v, distance_km, max_dist_km):
+    s_orientation = list_overlap(u.get("sexual_orientation"), v.get("sexual_orientation"))
+    s_goals = list_overlap(u.get("relationship_goals"), v.get("relationship_goals"))
+
+    s_comm_pref = list_overlap(u.get("preferred_connect"), v.get("preferred_connect"))
+    s_comm_pace = categorical_exact(u.get("response_pace"), v.get("response_pace"))
+    s_comm = 0.7 * s_comm_pref + 0.3 * s_comm_pace
+
+    s_lifestyle = (
+        0.25 * categorical_exact(u.get("drinking"), v.get("drinking")) +
+        0.25 * categorical_exact(u.get("smoking"), v.get("smoking")) +
+        0.25 * categorical_exact(u.get("workout"), v.get("workout")) +
+        0.25 * categorical_exact(u.get("pets"), v.get("pets"))
+    )
+
+    s_interests = list_overlap(u.get("interests"), v.get("interests"))
+
+    # if no coords, ignore distance in score
+    if distance_km is None or max_dist_km is None:
+        s_dist = 0.0
+        dist_weight = 0.0
+    else:
+        s_dist = distance_similarity_km(distance_km, max_dist_km)
+        dist_weight = WEIGHTS["distance_soft"]
+
+    base = (
+        WEIGHTS["sexual_orientation"] * s_orientation +
+        WEIGHTS["relationship_goals"] * s_goals +
+        WEIGHTS["communication"]      * s_comm +
+        WEIGHTS["lifestyle"]          * s_lifestyle +
+        WEIGHTS["interests"]          * s_interests
+    )
+    return base + dist_weight * s_dist
+
+
+class MatchRecommendationsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # email may be in email or username depending on your user model
+        email = getattr(request.user, "email", None) or getattr(request.user, "username", None)
+        if not email:
+            return Response({"detail": "Authenticated user has no email associated"}, status=400)
+
+        raw_me = FirebaseProfileManager.get_profile(email)
+        if not raw_me:
+            return Response({"detail": "Profile not found for this email"}, status=404)
+
+        me = normalize_profile(raw_me)
+        my_gender = me.get("gender")
+        my_interested_in = me.get("interested_in_genders")
+
+        if not my_gender or not my_interested_in:
+            return Response({"detail": "Preference data incomplete on your profile"}, status=400)
+
+        # if you don't yet store lat/lng, distance_km will be None below
+        my_lat = me.get("lat")
+        my_lng = me.get("lng")
+        my_max_dist = me.get("max_distance_km")
+
+        # Firestore query: others who are interested in my gender
+        query = db.collection("Profile").where("interestedIn", "array_contains_any", ["Men", "Women"])
+        docs = list(query.stream())
+
+        results = []
+
+        for doc in docs:
+            raw_other = doc.to_dict() or {}
+            other = normalize_profile(raw_other)
+            other_email = other.get("email")
+
+            if not other_email or other_email == email:
+                continue
+
+            # mutual interest: I like their gender & they like mine
+            other_gender = other.get("gender")
+            if not other_gender or other_gender not in my_interested_in:
+                continue
+            if my_gender not in other.get("interested_in_genders", []):
+                continue
+
+            # distance (optional if lat/lng present)
+            lat2, lng2 = other.get("lat"), other.get("lng")
+            if my_lat is not None and my_lng is not None and lat2 is not None and lng2 is not None:
+                d_km = haversine_km(my_lat, my_lng, lat2, lng2)
+                max_dist = min(my_max_dist or d_km, other.get("max_distance_km") or d_km)
+                if my_max_dist and d_km > max_dist:
+                    continue
+            else:
+                d_km = None
+                max_dist = None
+
+            sim = profile_similarity(me, other, d_km, max_dist)
+            # if sim < 0.60:
+            #     continue
+
+            results.append(
+                {
+                    "email": other_email,
+                    "similarity": round(sim * 100, 1),
+                    "distance_km": round(d_km, 1) if d_km is not None else None,
+                    "profile": raw_other,  # return original Firestore shape
+                }
+            )
+
+        results.sort(key=lambda x: x["similarity"], reverse=True)
+        return Response(results)

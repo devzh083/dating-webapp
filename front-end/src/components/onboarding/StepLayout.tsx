@@ -1,8 +1,9 @@
+// src/components/onboarding/StepLayout.tsx
 import { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { cn } from "@/lib/utils";
 import ProgressBar from "./ProgressBar";
+import { cn } from "@/lib/utils";
 
 interface StepLayoutProps {
   children: ReactNode;
@@ -18,7 +19,7 @@ interface StepLayoutProps {
   showBack?: boolean;
 }
 
-export function StepLayout({
+export default function StepLayout({
   children,
   currentStep,
   totalSteps,
@@ -47,9 +48,7 @@ export function StepLayout({
                   <ArrowLeft className="w-5 h-5" />
                   <span className="text-sm font-medium">Back</span>
                 </button>
-              ) : (
-                <div />
-              )}
+              ) : <div />}
 
               <button
                 onClick={onSkip}
@@ -59,10 +58,7 @@ export function StepLayout({
               </button>
             </div>
 
-            <ProgressBar
-              currentStep={currentStep}
-              totalSteps={totalSteps}
-            />
+            <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
 
             <div className="mt-6">
               <h1 className="text-2xl font-semibold text-gray-900">
@@ -110,5 +106,3 @@ export function StepLayout({
     </div>
   );
 }
-
-export default StepLayout;

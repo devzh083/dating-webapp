@@ -4,7 +4,6 @@ import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
-
 import HomePage from "./pages/HomePage";
 import ChatsPage from "./pages/ChatsPage";
 import NotificationsPage from "./pages/NotificationsPage";
@@ -43,7 +42,13 @@ const AppInner: React.FC = () => {
       return profileExists;
     } catch (error) {
       console.error("Profile check failed:", error);
+
+      // 🔴 token invalid or expired → force logout
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      setIsLoggedIn(false);
       setNeedsOnboarding(false);
+
       return false;
     }
   };
@@ -95,7 +100,7 @@ const AppInner: React.FC = () => {
     localStorage.removeItem("refresh_token");
     setIsLoggedIn(false);
     setNeedsOnboarding(false);
-    navigate("/"); // <- go back to landing
+    navigate("/");
   };
 
   if (!profileLoaded) {
@@ -117,19 +122,15 @@ const AppInner: React.FC = () => {
 
   return (
     <Routes>
-      {/* Landing – always at "/" */}
+      {/* Landing */}
       <Route
         path="/"
         element={
-          isLoggedIn ? (
-            <Navigate to="/home" replace />
-          ) : (
-            <Landing />
-          )
+          isLoggedIn ? <Navigate to="/home" replace /> : <Landing />
         }
       />
 
-      {/* Home – main app shell */}
+      {/* Home */}
       <Route
         path="/home"
         element={
@@ -138,11 +139,12 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <HomePage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
+            <HomePage />
           )
         }
       />
 
+      {/* Chats */}
       <Route
         path="/chats"
         element={
@@ -151,11 +153,12 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <ChatsPage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
+            <ChatsPage />
           )
         }
       />
 
+      {/* Notifications */}
       <Route
         path="/notifications"
         element={
@@ -164,14 +167,12 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <NotificationsPage
-              isLoggedIn={isLoggedIn}
-              onLogout={handleLogout}
-            />
+            <NotificationsPage />
           )
         }
       />
 
+      {/* Cafes */}
       <Route
         path="/cafes"
         element={
@@ -180,11 +181,12 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <CafesPage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
+            <CafesPage />
           )
         }
       />
 
+      {/* Login */}
       <Route
         path="/login"
         element={
@@ -195,33 +197,26 @@ const AppInner: React.FC = () => {
               <Navigate to="/home" replace />
             )
           ) : (
-            <LoginPage
-              isLoggedIn={isLoggedIn}
-              onLogout={handleLogout}
-              onLoginSuccess={handleLoginSuccess}
-            />
+            <LoginPage onLoginSuccess={handleLoginSuccess} />
           )
         }
       />
 
+      {/* Profile */}
       <Route
         path="/profile"
         element={
-          isLoggedIn ? (
-            <ProfilePage isLoggedIn={isLoggedIn} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/" replace />
-          )
+          isLoggedIn ? <ProfilePage /> : <Navigate to="/" replace />
         }
       />
 
+      {/* Onboarding */}
       <Route
         path="/onboarding"
         element={
           isLoggedIn ? (
             <OnboardingPage
               onComplete={() => {
-                // when last step finishes, we’re done with onboarding
                 setNeedsOnboarding(false);
               }}
             />

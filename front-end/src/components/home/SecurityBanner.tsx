@@ -6,25 +6,25 @@ const securityFeatures = [
     icon: Shield,
     title: "Profile Verification",
     description: "All profiles are verified for authenticity",
-    color: "from-emerald-400 to-teal-500",
+    color: "bg-emerald-500",
   },
   {
     icon: Lock,
     title: "End-to-End Encryption",
     description: "Your conversations are always private",
-    color: "from-blue-400 to-indigo-500",
+    color: "bg-indigo-500",
   },
   {
     icon: UserCheck,
     title: "ID Verification",
     description: "Optional ID check for extra trust",
-    color: "from-violet-400 to-purple-500",
+    color: "bg-violet-500",
   },
   {
     icon: Eye,
     title: "Privacy Controls",
     description: "You decide who sees your profile",
-    color: "from-pink-400 to-rose-500",
+    color: "bg-rose-500",
   },
 ];
 
@@ -32,51 +32,47 @@ const SecurityBanner = () => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4 }}
-      className="bg-gradient-to-br from-primary/5 via-card to-primary-end/5
-                 rounded-2xl p-6 lg:p-8 border border-primary/10 shadow-sm"
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      className="bg-white rounded-2xl p-6 lg:p-8 border border-gray-100 shadow-sm h-full"
     >
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary to-primary-end">
-          <Shield className="w-5 h-5 text-white" />
+      <div className="flex items-center gap-4 mb-8">
+        <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center shrink-0">
+          <Shield className="w-6 h-6 text-teal-600" />
         </div>
         <div>
-          <h3 className="font-bold text-lg text-foreground">
-            Your safety matters
+          <h3 className="font-bold text-lg text-gray-900">
+            Your Safety Matters
           </h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-gray-500">
             Industry-leading security standards
           </p>
         </div>
       </div>
 
-      {/* Features */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Features Grid */}
+      <div className="grid sm:grid-cols-2 gap-4">
         {securityFeatures.map((feature, index) => (
           <motion.div
             key={index}
             initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 + index * 0.1 }}
-            className="group p-4 rounded-xl bg-background/80
-                       border border-border/50
-                       hover:border-primary/30 hover:shadow-md
-                       transition-all"
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: index * 0.1 }}
+            className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-md transition-all duration-300"
           >
             <div
-              className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color}
-                          flex items-center justify-center mb-3
-                          group-hover:scale-110 transition-transform`}
+              className={`w-10 h-10 rounded-lg ${feature.color}
+                          flex items-center justify-center mb-3 text-white shadow-sm`}
             >
-              <feature.icon className="w-5 h-5 text-white" />
+              <feature.icon className="w-5 h-5" />
             </div>
 
-            <p className="font-semibold text-sm text-foreground mb-1">
+            <p className="font-semibold text-sm text-gray-900 mb-1">
               {feature.title}
             </p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed">
               {feature.description}
             </p>
           </motion.div>
@@ -84,20 +80,18 @@ const SecurityBanner = () => {
       </div>
 
       {/* Footer badges */}
-      <div className="mt-6 pt-5 border-t border-primary/10">
-        <div className="flex flex-wrap items-center gap-3 justify-center">
-          {["GDPR Compliant", "256-bit SSL", "24/7 Monitoring"].map(
-            (badge, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground"
-              >
-                <CheckCircle className="w-3.5 h-3.5 text-primary" />
-                <span>{badge}</span>
-              </div>
-            )
-          )}
-        </div>
+      <div className="mt-8 flex flex-wrap gap-4 pt-6 border-t border-gray-100">
+        {["GDPR Compliant", "256-bit SSL", "24/7 Monitoring"].map(
+          (badge, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-1.5 text-xs font-medium text-gray-500"
+            >
+              <CheckCircle className="w-3.5 h-3.5 text-teal-500" />
+              <span>{badge}</span>
+            </div>
+          )
+        )}
       </div>
     </motion.div>
   );

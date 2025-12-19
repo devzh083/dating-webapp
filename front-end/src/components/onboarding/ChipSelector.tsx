@@ -20,27 +20,25 @@ export const ChipSelector = ({
   return (
     <motion.button
       whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
+      whileTap={{ scale: 0.95 }}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border",
+        "inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 border",
         selected
-          ? "bg-chip-selected border-chip-border-selected text-primary"
-          : "bg-chip border-chip-border text-foreground hover:bg-chip-hover hover:border-primary/30",
+          ? "bg-teal-500 border-teal-500 text-white shadow-md shadow-teal-100" // Selected: Teal Fill
+          : "bg-white border-gray-200 text-gray-700 hover:border-teal-500 hover:text-teal-600", // Unselected
         className
       )}
     >
-      {icon && <span className="text-lg">{icon}</span>}
+      {icon && <span className="text-lg leading-none">{icon}</span>}
       <span>{label}</span>
-      {selected && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 500, damping: 30 }}
-        >
-          <Check className="w-4 h-4 text-primary" />
-        </motion.div>
-      )}
+      
+      <div className={cn(
+        "overflow-hidden transition-all duration-200 ease-out",
+        selected ? "w-4 opacity-100" : "w-0 opacity-0"
+      )}>
+        <Check className="w-4 h-4 text-white stroke-[3]" />
+      </div>
     </motion.button>
   );
 };

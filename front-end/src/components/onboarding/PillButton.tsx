@@ -1,33 +1,32 @@
-import { motion } from "framer-motion";
-import { cn } from "../../lib/utils";
+// src/components/onboarding/PillButton.tsx
+import { cn } from "@/lib/utils";
 
 interface PillButtonProps {
   label: string;
-  selected: boolean;
+  selected?: boolean;
   onClick: () => void;
-  className?: string;
 }
 
 export const PillButton = ({
   label,
-  selected,
+  selected = false,
   onClick,
-  className,
 }: PillButtonProps) => {
   return (
-    <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
+    <button
+      type="button"
       onClick={onClick}
       className={cn(
-        "px-6 py-3 rounded-full text-sm font-medium transition-all duration-200 border-2",
+        "px-5 py-2.5 rounded-full text-sm font-medium transition-all",
+        "border focus:outline-none",
         selected
-          ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
-          : "bg-pill border-pill-border text-foreground hover:border-primary/50 hover:bg-chip-hover",
-        className
+          ? "bg-[#00bcd4] border-[#00bcd4] text-white shadow-sm"
+          : "bg-white border-gray-300 text-gray-900 hover:border-gray-400"
       )}
     >
       {label}
-    </motion.button>
+    </button>
   );
 };
+
+export default PillButton;

@@ -1,12 +1,15 @@
-// src/components/DatePicker.tsx (or wherever you keep it)
 import { useState } from "react";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { motion } from "framer-motion";
 
-import { cn } from "../../lib/utils";
-import { Calendar } from "../../components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface DatePickerProps {
   value: Date | undefined;
@@ -20,42 +23,39 @@ export const DatePicker = ({
   placeholder = "Select your birthday",
 }: DatePickerProps) => {
   const [open, setOpen] = useState(false);
-  const thisYear = new Date().getFullYear();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <motion.button
-          whileHover={{ scale: 1.01 }}
+          type="button"
+          whileHover={{ scale: 1.005 }}
           whileTap={{ scale: 0.99 }}
           className={cn(
-            "w-full flex items-center justify-between px-4 py-3",
-            "rounded-[10px] border border-[#38c3b9]",
-            "bg-[#dcf8f4] shadow-[0_1px_2px_rgba(15,23,42,0.06)]",
-            "text-left transition-[border,box-shadow,background-color] duration-150",
-            open && "border-[#1fb8ad] shadow-[0_0_0_1px_rgba(31,184,173,0.38)]"
+            "w-full flex items-center justify-between px-4 py-4 rounded-xl border-2 text-left transition-all duration-300 ease-in-out outline-none",
+            !value && !open && "bg-white border-gray-100 text-muted-foreground hover:border-gray-200",
+            open && !value && "border-teal-500 ring-4 ring-teal-500/10 bg-white text-muted-foreground",
+            value && "bg-teal-50 border-teal-500 text-gray-900",
+            value && open && "ring-4 ring-teal-500/10"
           )}
         >
-          <span
-            className={cn(
-              "text-[13px] leading-none",
-              value ? "text-[#111827] font-medium" : "text-[#9ca3af]"
-            )}
-          >
+          <span className="text-base font-medium">
             {value ? format(value, "MMMM d, yyyy") : placeholder}
           </span>
-          <CalendarIcon className="w-4 h-4 text-[#6b7280]" />
+
+          <CalendarIcon
+            className={cn(
+              "w-5 h-5 transition-colors duration-200",
+              value || open ? "text-teal-600" : "text-gray-400"
+            )}
+          />
         </motion.button>
       </PopoverTrigger>
 
       <PopoverContent
         align="start"
-        className={cn(
-          "w-[360px] p-0",
-          "bg-white border border-[#e5e7eb]",
-          "rounded-[16px]",
-          "shadow-[0_18px_45px_rgba(15,23,42,0.18)]"
-        )}
+        sideOffset={8}
+        className="z-50 w-auto p-0 bg-white border border-gray-100 rounded-xl shadow-xl"
       >
         <Calendar
           mode="single"
@@ -64,23 +64,57 @@ export const DatePicker = ({
             onChange(date);
             setOpen(false);
           }}
-          // key for easy month + year selection
-          captionLayout="dropdown"
-          fromYear={1900}
-          toYear={thisYear}
           disabled={(date) =>
             date > new Date() || date < new Date("1900-01-01")
           }
           defaultMonth={value || new Date(2000, 0)}
+          captionLayout="dropdown"
+          fromYear={1900}
+          toYear={new Date().getFullYear()}
           initialFocus
-          className={cn(
-            "p-6",
-            "text-[13px] leading-6",
-            "font-normal text-[#111827]",
-            "[&_th]:text-[#6b7280] [&_th]:font-semibold [&_th]:text-[12px]",
-            "[&_button]:rounded-full [&_button]:w-8 [&_button]:h-8",
-            "[&_button:hover]:bg-[#e5f7f4]"
-          )}
+          className="p-3"
+          classNames={{
+            // Header: Relative positioning is required for the absolute buttons to work
+            caption: "flex justify-center pt-1 relative items-center w-full",
+            caption_label: "hidden", // Hide title text since we have dropdowns
+
+            // Navigation Container: Ensure it doesn't block layout, but buttons will break out of it anyway
+            nav: "flex items-center",
+            
+            // Arrows: Force them to absolute positions relative to the 'caption' header
+            nav_button: "h-7 w-7 bg-transparent p-0 opacity-60 hover:opacity-100 transition-opacity absolute top-2 z-10",
+            nav_button_previous: "left-1", // Sticked to far left
+            nav_button_next: "right-1",    // Sticked to far right
+
+            // Dropdowns
+            dropdown: "bg-transparent outline-none border-none text-sm font-medium text-gray-800 hover:bg-gray-50 rounded-md cursor-pointer mx-1",
+            dropdown_month: "mr-2", 
+            dropdown_year: "",
+
+            // Table Grid
+            table: "w-full border-collapse space-y-1",
+            head_row: "flex",
+            head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
+            row: "flex w-full mt-2",
+            
+            // Day Cells
+            cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected])]:bg-transparent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+            
+            // Day Button Styling
+            day: cn(
+              "h-9 w-9 p-0 font-normal aria-selected:opacity-100 rounded-md",
+              "hover:bg-teal-50 hover:text-teal-700 transition-colors" // Light hover
+            ),
+
+            // Selected State: Thick Teal background, White text
+            day_selected:
+              "bg-teal-500 text-white hover:bg-teal-500 hover:text-white focus:bg-teal-500 focus:text-white shadow-sm",
+            
+            day_today: "bg-gray-100 text-gray-900",
+            day_outside: "text-gray-300 opacity-50",
+            day_disabled: "text-gray-300 opacity-50",
+            day_hidden: "invisible",
+          }}
         />
       </PopoverContent>
     </Popover>

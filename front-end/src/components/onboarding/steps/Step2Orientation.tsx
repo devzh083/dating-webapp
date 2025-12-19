@@ -54,22 +54,27 @@ export const Step2Orientation = ({
   return (
     <StepLayout
       currentStep={2}
-      totalSteps={9}
+      totalSteps={8}
       title="Your identity & intentions"
       subtitle="Help us understand what you're looking for"
       onBack={onBack}
       onNext={onNext}
       onSkip={onSkip}
+      canProceed={data.orientation.length > 0 && !!data.relationshipType}
     >
-      <div className="space-y-8">
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">
-            Sexual orientation
-          </label>
-          <p className="text-xs text-muted-foreground">
-            Select all that apply
-          </p>
-          <div className="flex flex-wrap gap-2">
+      <div className="space-y-10">
+        {/* Sexual Orientation Section */}
+        <div className="space-y-4">
+          <div>
+            <label className="text-base font-semibold text-gray-900">
+              Sexual orientation
+            </label>
+            <p className="text-sm text-gray-500 mt-1">
+              Select all that apply
+            </p>
+          </div>
+          
+          <div className="flex flex-wrap gap-3">
             {orientationOptions.map((orientation) => (
               <ChipSelector
                 key={orientation}
@@ -79,18 +84,22 @@ export const Step2Orientation = ({
               />
             ))}
           </div>
-          <CheckboxField
-            label="Show orientation on my profile"
-            checked={data.showOrientation}
-            onChange={(showOrientation) => onChange({ ...data, showOrientation })}
-          />
+
+          <div className="pt-2">
+            <CheckboxField
+              label="Show orientation on my profile"
+              checked={data.showOrientation}
+              onChange={(showOrientation) => onChange({ ...data, showOrientation })}
+            />
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">
+        {/* Relationship Intent Section */}
+        <div className="space-y-4">
+          <label className="text-base font-semibold text-gray-900 block">
             What are you looking for?
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {relationshipOptions.map(({ label, emoji }) => (
               <ChipSelector
                 key={label}

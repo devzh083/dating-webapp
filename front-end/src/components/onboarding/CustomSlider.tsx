@@ -20,52 +20,65 @@ export const CustomSlider = ({
   const percentage = ((value - min) / (max - min)) * 100;
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <span className="text-sm text-muted-foreground">{min}{unit}</span>
+    <div className="space-y-6">
+      {/* Large Centered Value Display */}
+      <div className="flex justify-center">
         <motion.span
           key={value}
-          initial={{ scale: 1.2 }}
+          initial={{ scale: 1.1 }}
           animate={{ scale: 1 }}
-          className="text-2xl font-bold gradient-text"
+          className="text-4xl font-bold text-teal-500"
         >
-          {value}{unit}
+          {value}
+          <span className="text-2xl ml-1 font-semibold">{unit}</span>
         </motion.span>
-        <span className="text-sm text-muted-foreground">{max}{unit}</span>
       </div>
 
-      <div className="relative h-3">
-        {/* Track background */}
-        <div className="absolute inset-0 rounded-full bg-slider-track" />
-        
-        {/* Filled track */}
-        <motion.div
-          className="absolute left-0 top-0 h-full rounded-full gradient-primary"
-          style={{ width: `${percentage}%` }}
-          initial={false}
-          animate={{ width: `${percentage}%` }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        />
+      <div className="flex items-center gap-4">
+        {/* Min Label */}
+        <span className="text-xs font-medium text-gray-400 w-12 text-right">
+          {min} {unit}
+        </span>
 
-        {/* Input */}
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
+        {/* Slider Track */}
+        <div className="relative flex-1 h-2">
+          {/* Background Track */}
+          <div className="absolute inset-0 rounded-full bg-gray-200" />
 
-        {/* Thumb */}
-        <motion.div
-          className="absolute top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slider-thumb border-4 border-primary shadow-lg pointer-events-none"
-          style={{ left: `calc(${percentage}% - 12px)` }}
-          initial={false}
-          animate={{ left: `calc(${percentage}% - 12px)` }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        />
+          {/* Active Fill Track */}
+          <motion.div
+            className="absolute left-0 top-0 h-full rounded-full bg-teal-500"
+            style={{ width: `${percentage}%` }}
+            initial={false}
+            animate={{ width: `${percentage}%` }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          />
+
+          {/* Invisible Input for Accessibility/Interaction */}
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+          />
+
+          {/* Thumb (Knob) */}
+          <motion.div
+            className="absolute top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white border-[5px] border-teal-500 shadow-lg pointer-events-none z-20"
+            style={{ left: `calc(${percentage}% - 14px)` }}
+            initial={false}
+            animate={{ left: `calc(${percentage}% - 14px)` }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          />
+        </div>
+
+        {/* Max Label */}
+        <span className="text-xs font-medium text-gray-400 w-12">
+          {max} {unit}
+        </span>
       </div>
     </div>
   );

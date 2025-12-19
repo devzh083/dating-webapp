@@ -8,8 +8,11 @@ import { User } from "lucide-react";
 import { OnboardingData } from "../OnboardingFlow";
 
 interface Step1Props {
-  data: Pick<OnboardingData, 'firstName' | 'dateOfBirth' | 'gender' | 'showGender' | 'interestedIn'>;
-  onChange: (data: Step1Props['data']) => void;
+  data: Pick<
+    OnboardingData,
+    "firstName" | "dateOfBirth" | "gender" | "showGender" | "interestedIn"
+  >;
+  onChange: (data: Step1Props["data"]) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -18,20 +21,21 @@ interface Step1Props {
 const genderOptions = ["Man", "Woman", "Beyond Binary", "Other"];
 const interestOptions = ["Men", "Women", "Everyone", "Beyond Binary"];
 
-export const Step1BasicInfo = ({
+export default function Step1BasicInfo({
   data,
   onChange,
   onNext,
   onBack,
   onSkip,
-}: Step1Props) => {
+}: Step1Props) {
   const toggleInterest = (interest: string) => {
     const current = data.interestedIn;
-    if (current.includes(interest)) {
-      onChange({ ...data, interestedIn: current.filter((i) => i !== interest) });
-    } else {
-      onChange({ ...data, interestedIn: [...current, interest] });
-    }
+    onChange({
+      ...data,
+      interestedIn: current.includes(interest)
+        ? current.filter((i) => i !== interest)
+        : [...current, interest],
+    });
   };
 
   const canProceed =
@@ -64,7 +68,9 @@ export const Step1BasicInfo = ({
           </label>
           <DatePicker
             value={data.dateOfBirth}
-            onChange={(dateOfBirth) => onChange({ ...data, dateOfBirth })}
+            onChange={(dateOfBirth) =>
+              onChange({ ...data, dateOfBirth })
+            }
           />
           <p className="text-xs text-gray-500 mt-1">
             Your age will be shown on your profile, but not your birthday
@@ -85,10 +91,13 @@ export const Step1BasicInfo = ({
               />
             ))}
           </div>
+
           <CheckboxField
             label="Show my gender on profile"
             checked={data.showGender}
-            onChange={(showGender) => onChange({ ...data, showGender })}
+            onChange={(showGender) =>
+              onChange({ ...data, showGender })
+            }
           />
         </div>
 
@@ -110,6 +119,4 @@ export const Step1BasicInfo = ({
       </div>
     </StepLayout>
   );
-};
-
-export default Step1BasicInfo;
+}

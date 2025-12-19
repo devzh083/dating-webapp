@@ -19,30 +19,32 @@ export const CheckboxField = ({
     <button
       onClick={() => onChange(!checked)}
       className={cn(
-        "flex items-center gap-3 w-full py-3 text-left",
+        "flex items-center gap-3 w-full py-2 text-left group",
         className
       )}
     >
-      <motion.div
-        whileTap={{ scale: 0.9 }}
+      <div
         className={cn(
-          "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-200",
+          "w-6 h-6 flex items-center justify-center transition-all duration-200 border-2 rounded-full", // rounded-full makes it a circle
           checked
-            ? "bg-primary border-primary"
-            : "border-chip-border hover:border-primary/50"
+            ? "bg-teal-500 border-teal-500"
+            : "border-gray-300 bg-white group-hover:border-teal-400"
         )}
       >
-        {checked && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          >
-            <Check className="w-4 h-4 text-primary-foreground" />
-          </motion.div>
-        )}
-      </motion.div>
-      <span className="text-sm text-foreground">{label}</span>
+        <motion.div
+          initial={false}
+          animate={{ scale: checked ? 1 : 0 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        >
+          <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
+        </motion.div>
+      </div>
+      <span className={cn(
+        "text-sm transition-colors",
+        checked ? "text-gray-900 font-medium" : "text-gray-600"
+      )}>
+        {label}
+      </span>
     </button>
   );
 };
