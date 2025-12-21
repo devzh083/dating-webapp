@@ -6,10 +6,11 @@ interface AnonymousProfile {
   selfDescription: string;
   vibeTags: string[];
   conversationHook: string;
+  firstName?: string; // Added for API integration
 }
 
 interface AnonymousProfileCardProps {
-  profile?: AnonymousProfile; // Marked as optional to prevent TS errors
+  profile?: AnonymousProfile;
 }
 
 /* ---------- ANIMATED AVATAR ---------- */
@@ -61,7 +62,8 @@ const AnonymousProfileCard = ({ profile }: AnonymousProfileCardProps) => {
     id = "0", 
     selfDescription = "No description available.", 
     vibeTags = [], 
-    conversationHook = "..." 
+    conversationHook = "...",
+    firstName = "Anonymous" // Fallback to "Anonymous" if no firstName
   } = profile;
 
   const colorIndex = id.length;
@@ -78,7 +80,7 @@ const AnonymousProfileCard = ({ profile }: AnonymousProfileCardProps) => {
           </div>
           <div className="text-center">
             <h3 className="text-3xl font-black text-gray-900 tracking-tight">
-              Anonymous
+              {firstName} {/* Displays real names from API like "Virat Kohli" */}
             </h3>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">
               Based on vibes
@@ -94,7 +96,7 @@ const AnonymousProfileCard = ({ profile }: AnonymousProfileCardProps) => {
             <div className="relative pl-6 mb-6">
               <Quote className="absolute -top-2 left-0 w-6 h-6 text-gray-200 transform -scale-x-100" />
               <p className="text-gray-700 text-lg font-medium leading-relaxed italic line-clamp-3">
-                {selfDescription}
+                {selfDescription} {/* Displays profile.tagline from API */}
               </p>
             </div>
 
@@ -105,7 +107,7 @@ const AnonymousProfileCard = ({ profile }: AnonymousProfileCardProps) => {
                   key={tag}
                   className="px-4 py-2 rounded-xl bg-gray-50 border border-gray-100 text-gray-600 text-xs font-bold uppercase tracking-wide"
                 >
-                  {tag}
+                  {tag} {/* Displays 3 random interests from API */}
                 </span>
               ))}
             </div>
@@ -121,7 +123,7 @@ const AnonymousProfileCard = ({ profile }: AnonymousProfileCardProps) => {
                 Conversation Starter
               </span>
               <p className="text-teal-900 text-sm font-bold leading-snug truncate">
-                "{conversationHook}"
+                "{conversationHook}" {/* Displays profile.starter from API */}
               </p>
             </div>
           </div>
