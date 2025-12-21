@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
@@ -44,11 +43,7 @@ const AppInner: React.FC = () => {
       console.error("Profile check failed:", error);
 
       // 🔴 token invalid or expired → force logout
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      setIsLoggedIn(false);
-      setNeedsOnboarding(false);
-
+      handleLogout(); // Use the centralized logout function
       return false;
     }
   };
@@ -96,10 +91,16 @@ const AppInner: React.FC = () => {
   };
 
   const handleLogout = () => {
+    // 1. Clear Storage
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    localStorage.removeItem("onboardingData");
+    
+    // 2. Update Global State (Crucial to prevent redirect loop)
     setIsLoggedIn(false);
     setNeedsOnboarding(false);
+    
+    // 3. Navigate
     navigate("/");
   };
 
@@ -139,7 +140,8 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <HomePage />
+            // ✅ Passed onLogout
+            <HomePage onLogout={handleLogout} /> 
           )
         }
       />
@@ -153,7 +155,8 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <ChatsPage />
+            // ✅ Passed onLogout
+            <ChatsPage onLogout={handleLogout} />
           )
         }
       />
@@ -167,7 +170,8 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <NotificationsPage />
+            // ✅ Passed onLogout
+            <NotificationsPage onLogout={handleLogout} />
           )
         }
       />
@@ -181,7 +185,8 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <CafesPage />
+            // ✅ Passed onLogout
+            <CafesPage onLogout={handleLogout} />
           )
         }
       />
@@ -206,7 +211,7 @@ const AppInner: React.FC = () => {
       <Route
         path="/profile"
         element={
-          isLoggedIn ? <ProfilePage /> : <Navigate to="/" replace />
+          isLoggedIn ? <ProfilePage onLogout={handleLogout} /> : <Navigate to="/" replace />
         }
       />
 

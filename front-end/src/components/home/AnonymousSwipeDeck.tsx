@@ -1,11 +1,14 @@
-import { useState } from "react";
-import { motion, PanInfo, useMotionValue, useTransform } from "framer-motion";
+import { useState, useEffect } from "react";
+import { 
+  motion, 
+  useMotionValue, 
+  useTransform, 
+  animate, 
+  PanInfo, 
+  AnimatePresence 
+} from "framer-motion";
 import { X, Heart, RotateCcw } from "lucide-react";
 import AnonymousProfileCard from "./AnonymousProfileCard";
-
-const SWIPE_THRESHOLD = 150;
-// Increased duration for a slower, smoother slide
-const ANIMATION_DURATION = 0.8; 
 
 interface Props {
   profiles: any[];
@@ -13,65 +16,127 @@ interface Props {
   onDislike: (profileId: string) => void;
 }
 
+const SWIPE_THRESHOLD = 100;
+const SWIPE_DURATION = 0.8; // ✅ Increased for slower slide (0.8 seconds)
+
+/* --- Floating Hearts Animation --- */
+const FloatingHearts = () => {
+  const [hearts] = useState(() => Array.from({ length: 15 }, (_, i) => i));
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none z-[60] overflow-visible flex items-center justify-center">
+      {hearts.map((id) => (
+        <motion.div
+          key={id}
+          initial={{ opacity: 1, y: 50, x: 0, scale: 0 }}
+          animate={{
+            opacity: 0,
+            y: -200 - Math.random() * 100,
+            x: (Math.random() - 0.5) * 400,
+            scale: 1 + Math.random(),
+          }}
+          transition={{
+            duration: 1.5 + Math.random(), // Slower float up
+            ease: "easeOut",
+          }}
+          className="absolute"
+        >
+          <Heart className="w-10 h-10 fill-teal-500 text-teal-500 drop-shadow-sm" />
+        </motion.div>
+      ))}
+    </div>
+  );
+};
+
 export default function AnonymousSwipeDeck({
-  profiles,
+  profiles = [],
   onLike,
   onDislike,
 }: Props) {
   const [index, setIndex] = useState(0);
-  const [exitX, setExitX] = useState<number | null>(null);
+  const [showHearts, setShowHearts] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const activeProfile = profiles[index];
   const nextProfile = profiles[index + 1];
 
+  // Motion Values
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-10, 10]); // Reduced rotation slightly for smoother feel
-  const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0, 1, 1, 1, 0]);
+  const rotate = useTransform(x, [-200, 200], [-5, 5]);
+  const opacity = useTransform(x, [-400, -200, 0, 200, 400], [0, 1, 1, 1, 0]);
 
-  // Background color indicators opacity
-  const likeOpacity = useTransform(x, [0, 100], [0, 1]);
-  const nopeOpacity = useTransform(x, [0, -100], [0, 1]);
+  // Background Card Animation
+  const bgScale = useTransform(x, [-200, 0, 200], [1, 0.95, 1]);
+  const bgOpacity = useTransform(x, [-200, 0, 200], [1, 0.5, 1]);
+  const bgOverlayOpacity = useTransform(x, [-200, 0, 200], [0, 0.4, 0]);
 
-  const handleDragEnd = (_: any, info: PanInfo) => {
-    if (info.offset.x > SWIPE_THRESHOLD) {
+  useEffect(() => {
+    if (showHearts) {
+      // Keep hearts visible a bit longer
+      const timer = setTimeout(() => setShowHearts(false), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [showHearts]);
+
+  // --- LOGIC ---
+
+  const completeSwipe = (direction: "left" | "right") => {
+    if (!activeProfile) return;
+
+    if (direction === "right") {
+      setShowHearts(true);
+      onLike(activeProfile.id);
+    } else {
+      onDislike(activeProfile.id);
+    }
+
+    setIndex((prev) => prev + 1);
+    x.set(0);
+  };
+
+  const triggerSwipe = async (direction: "left" | "right") => {
+    if (!activeProfile) return;
+
+    // 1. Animate card off screen slowly
+    const destinationX = direction === "right" ? 800 : -800;
+    
+    await animate(x, destinationX, { 
+      duration: SWIPE_DURATION, // ✅ Using the slower duration
+      ease: "easeInOut"         // ✅ Smooth start and end
+    }).finished;
+
+    // 2. Update state logic
+    completeSwipe(direction);
+  };
+
+  const onDragEnd = (_: any, info: PanInfo) => {
+    setIsDragging(false);
+    const offset = info.offset.x;
+    const velocity = info.velocity.x;
+
+    if (offset > SWIPE_THRESHOLD || velocity > 500) {
       triggerSwipe("right");
-    } else if (info.offset.x < -SWIPE_THRESHOLD) {
+    } else if (offset < -SWIPE_THRESHOLD || velocity < -500) {
       triggerSwipe("left");
+    } else {
+      animate(x, 0, { type: "spring", stiffness: 300, damping: 20 });
     }
   };
 
-  const triggerSwipe = (direction: "left" | "right") => {
-    if (!activeProfile) return;
-    
-    // Set exit target
-    setExitX(direction === "right" ? 1000 : -1000);
-    
-    // Wait for the longer animation to finish
-    setTimeout(() => {
-      if (direction === "right") {
-        onLike(activeProfile.id);
-      } else {
-        onDislike(activeProfile.id);
-      }
-      setIndex((i) => i + 1);
-      setExitX(null);
-      x.set(0);
-    }, ANIMATION_DURATION * 1000); 
-  };
-
+  /* --- EMPTY STATE --- */
   if (!activeProfile) {
     return (
-      <div className="flex flex-col items-center justify-center h-[520px] text-center p-8 bg-white rounded-[32px] border border-gray-100 shadow-sm">
-        <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mb-6">
+      <div className="flex flex-col items-center justify-center h-[400px] text-center p-8 bg-white rounded-[40px] border border-gray-100 shadow-xl shadow-gray-200/50 w-full">
+        <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mb-4 animate-pulse">
           <RotateCcw className="w-8 h-8 text-teal-500" />
         </div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-3">You've caught up!</h3>
-        <p className="text-gray-500 max-w-xs mx-auto mb-8">
-          That's everyone in your area for now. Check back later for more connections.
+        <h3 className="text-xl font-black text-gray-900 mb-2">You've caught up!</h3>
+        <p className="text-gray-500 max-w-xs mx-auto mb-6 text-base">
+          Check back later for more vibes.
         </p>
         <button 
-          onClick={() => setIndex(0)}
-          className="px-8 py-3 bg-teal-500 text-white rounded-full font-bold shadow-lg shadow-teal-200 hover:bg-teal-600 hover:shadow-xl transition-all"
+          onClick={() => { setIndex(0); x.set(0); }}
+          className="px-6 py-3 bg-teal-500 text-white rounded-full font-bold text-sm shadow-xl shadow-teal-200 hover:bg-teal-600 hover:scale-105 transition-all"
         >
           Start Over
         </button>
@@ -79,13 +144,15 @@ export default function AnonymousSwipeDeck({
     );
   }
 
+  /* --- ACTIVE STATE --- */
   return (
-    <div className="relative w-full max-w-[400px] mx-auto">
-      {/* Deck Header */}
-      <div className="flex items-center justify-between mb-6 px-1">
+    <div className="relative w-full mx-auto">
+      
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 px-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-gray-900">Discover</h2>
-          <p className="text-xs font-medium text-gray-500 mt-0.5">Swipe to connect</p>
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Discover</h2>
+          <p className="text-xs font-medium text-gray-400 mt-0.5">Connect based on vibes</p>
         </div>
         <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
            <span className="relative flex h-2.5 w-2.5">
@@ -96,58 +163,64 @@ export default function AnonymousSwipeDeck({
         </div>
       </div>
 
-      <div className="relative h-[560px]">
-        {/* Next Card (Background) */}
+      {/* Card Stack Container */}
+      <div className="relative h-[400px] w-full">
+        
+        {/* 1. NEXT PROFILE (Background) */}
         {nextProfile && (
-          <div className="absolute inset-0 top-4 scale-[0.93] opacity-60 pointer-events-none z-0">
+          <motion.div 
+            key={nextProfile.id}
+            style={{ 
+              scale: bgScale, 
+              opacity: bgOpacity 
+            }}
+            className="absolute inset-0 top-0 left-0 w-full h-full z-0"
+          >
              <AnonymousProfileCard profile={nextProfile} />
-          </div>
+             {/* Dimming Overlay */}
+             <motion.div 
+                style={{ opacity: bgOverlayOpacity }}
+                className="absolute inset-0 bg-white/50 rounded-[40px] pointer-events-none" 
+             />
+          </motion.div>
         )}
 
-        {/* Active Card (Foreground) */}
+        {/* 2. ACTIVE PROFILE (Foreground) */}
         <motion.div
           key={activeProfile.id}
           style={{ x, rotate, opacity }}
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
-          onDragEnd={handleDragEnd}
-          animate={exitX !== null ? { x: exitX, opacity: 0 } : { x: 0, opacity: 1 }}
-          transition={{ duration: ANIMATION_DURATION, ease: "easeIn" }} // Slower duration applied here
-          className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing"
+          dragElastic={0.6}
+          onDragStart={() => setIsDragging(true)}
+          onDragEnd={onDragEnd}
+          className="absolute inset-0 z-10 w-full h-full cursor-grab active:cursor-grabbing"
         >
-          {/* Swipe Indicators */}
-          <motion.div style={{ opacity: likeOpacity }} className="absolute top-10 left-8 z-20 border-[5px] border-emerald-500 rounded-xl px-4 py-1 bg-white/30 backdrop-blur-md -rotate-12 shadow-sm">
-            <span className="text-4xl font-black text-emerald-500 tracking-widest uppercase">LIKE</span>
-          </motion.div>
-          <motion.div style={{ opacity: nopeOpacity }} className="absolute top-10 right-8 z-20 border-[5px] border-rose-500 rounded-xl px-4 py-1 bg-white/30 backdrop-blur-md rotate-12 shadow-sm">
-            <span className="text-4xl font-black text-rose-500 tracking-widest uppercase">NOPE</span>
-          </motion.div>
-          
           <AnonymousProfileCard profile={activeProfile} />
         </motion.div>
+
+        {/* Hearts */}
+        <AnimatePresence>
+            {showHearts && <FloatingHearts />}
+        </AnimatePresence>
       </div>
 
       {/* Controls */}
-      <div className="mt-6 flex items-center justify-center gap-8">
-        {/* Reject Button */}
+      <div className="mt-4 flex items-center justify-center gap-8">
         <button
           onClick={() => triggerSwipe("left")}
-          className="w-14 h-14 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 hover:scale-110 shadow-sm transition-all duration-200"
+          disabled={isDragging}
+          className="w-14 h-14 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 hover:scale-110 shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <X className="w-6 h-6" strokeWidth={3} />
         </button>
 
-        {/* Counter Pill */}
-        <span className="px-4 py-1.5 bg-gray-100 rounded-full text-xs font-bold text-gray-400 tracking-wide">
-           {index + 1} / {profiles.length}
-        </span>
-
-        {/* Like Button */}
         <button
           onClick={() => triggerSwipe("right")}
-          className="w-14 h-14 flex items-center justify-center rounded-full bg-teal-500 text-white shadow-lg shadow-teal-200 hover:bg-teal-600 hover:scale-110 transition-all duration-200"
+          disabled={isDragging}
+          className="w-16 h-16 flex items-center justify-center rounded-full bg-gradient-to-r from-teal-400 to-teal-500 text-white shadow-2xl shadow-teal-200 hover:scale-110 hover:shadow-teal-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Heart className="w-6 h-6 fill-current" strokeWidth={3} />
+          <Heart className="w-7 h-7 fill-current" strokeWidth={3} />
         </button>
       </div>
     </div>

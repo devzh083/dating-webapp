@@ -1,13 +1,13 @@
-// src/components/onboarding/steps/Step9Review.tsx
+// src/components/onboarding/steps/Step10Review.tsx
 import React from "react";
 import { motion } from "framer-motion";
 import { differenceInYears } from "date-fns";
 import StepLayout from "../StepLayout";
-import { MapPin, Heart, Sparkles, Zap, User } from "lucide-react";
+import { MapPin, Heart, Sparkles, Zap, User, MessageCircle, Quote } from "lucide-react";
 import { OnboardingData } from "../OnboardingFlow";
 import { cn } from "@/lib/utils";
 
-interface Step9Props {
+interface Step10Props {
   data: OnboardingData;
   onNext: () => void;
   onBack: () => void;
@@ -25,7 +25,7 @@ const getEmoji = (category: string, value: string) => {
   return map[category]?.[value] || "✨";
 };
 
-const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => {
+const Step10Review: React.FC<Step10Props> = ({ data, onNext, onBack, onSkip }) => {
   const age = data.dateOfBirth ? differenceInYears(new Date(), data.dateOfBirth) : null;
   const safeFirst = data.firstName || "User";
   const firstInitial = (safeFirst.charAt(0) || "U").toUpperCase();
@@ -41,8 +41,8 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
 
   return (
     <StepLayout
-      currentStep={9}
-      totalSteps={9}
+      currentStep={10}
+      totalSteps={10}
       title="Looking good! ✨"
       subtitle="Here's your profile preview"
       onBack={onBack}
@@ -57,7 +57,7 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
           className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm overflow-hidden"
         >
           {/* Header Section: Avatar + Name */}
-          <div className="flex items-start gap-5 mb-8">
+          <div className="flex items-start gap-5 mb-6">
             {/* Avatar - Image or Initial */}
             <div className="shrink-0">
               {mainPhoto ? (
@@ -82,14 +82,40 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
             </div>
           </div>
 
+          {/* New Bio Section */}
+          {data.bio && (
+            <div className="mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100 relative">
+               <Quote className="absolute top-2 left-2 w-4 h-4 text-gray-300 transform scale-x-[-1]" />
+               <p className="text-gray-700 text-sm italic leading-relaxed text-center px-4">
+                  {data.bio}
+               </p>
+               <Quote className="absolute bottom-2 right-2 w-4 h-4 text-gray-300" />
+            </div>
+          )}
+
+          {/* New Conversation Starter Section */}
+          {data.conversationStarter && (
+            <div className="mb-8">
+              <div className="bg-teal-50 rounded-xl p-4 border border-teal-100">
+                <h3 className="flex items-center gap-2 text-[10px] font-bold text-teal-600 uppercase tracking-wider mb-1.5">
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  Conversation Starter
+                </h3>
+                <p className="text-teal-900 text-sm font-semibold leading-snug">
+                  "{data.conversationStarter}"
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Details List */}
-          <div className="space-y-4 mb-8">
+          <div className="space-y-3 mb-6 px-1">
             {/* Location */}
             <div className="flex items-center gap-3 text-sm text-gray-600">
-              <MapPin className="w-5 h-5 text-teal-500 shrink-0" />
+              <MapPin className="w-4 h-4 text-teal-500 shrink-0" />
               <span>
                 {data.useCurrentLocation ? "Using current location" : data.location || "Location not set"} 
-                <span className="text-gray-400 mx-1">•</span> 
+                <span className="text-gray-300 mx-2">|</span> 
                 {data.distance} km away max
               </span>
             </div>
@@ -97,7 +123,7 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
             {/* Relationship Intent */}
             {data.relationshipType && (
               <div className="flex items-center gap-3 text-sm text-gray-600">
-                <Heart className="w-5 h-5 text-teal-500 shrink-0" />
+                <Heart className="w-4 h-4 text-teal-500 shrink-0" />
                 <span>Looking for: <span className="font-medium text-gray-900">{data.relationshipType}</span></span>
               </div>
             )}
@@ -105,29 +131,21 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
             {/* Orientation */}
             {data.showOrientation && data.orientation.length > 0 && (
               <div className="flex items-center gap-3 text-sm text-gray-600">
-                <Sparkles className="w-5 h-5 text-teal-500 shrink-0" />
+                <Sparkles className="w-4 h-4 text-teal-500 shrink-0" />
                 <span>{data.orientation.join(", ")}</span>
-              </div>
-            )}
-
-            {/* Response Pace */}
-            {data.responsePace && (
-              <div className="flex items-center gap-3 text-sm text-gray-600">
-                <Zap className="w-5 h-5 text-teal-500 shrink-0" />
-                <span>{data.responsePace}</span>
               </div>
             )}
           </div>
 
           {/* Lifestyle Section */}
           {lifestyleTags.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Lifestyle</h3>
+            <div className="mb-6 pt-4 border-t border-gray-50">
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Lifestyle</h3>
               <div className="flex flex-wrap gap-2">
                 {lifestyleTags.map((tag, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 text-sm font-medium"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-50 text-gray-600 text-xs font-semibold border border-gray-100"
                   >
                     <span>{tag.emoji}</span>
                     <span>{tag.label}</span>
@@ -140,12 +158,12 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
           {/* Interests Section */}
           {data.interests.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Interests</h3>
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Interests</h3>
               <div className="flex flex-wrap gap-2">
                 {data.interests.map((interest) => (
                   <span
                     key={interest}
-                    className="px-3 py-1.5 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-sm font-medium"
+                    className="px-3 py-1.5 rounded-full bg-teal-50/50 border border-teal-100 text-teal-700 text-xs font-bold"
                   >
                     {interest}
                   </span>
@@ -164,4 +182,4 @@ const Step9Review: React.FC<Step9Props> = ({ data, onNext, onBack, onSkip }) => 
   );
 };
 
-export default Step9Review;
+export default Step10Review;

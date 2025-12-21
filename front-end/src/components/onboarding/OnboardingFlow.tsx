@@ -15,7 +15,8 @@ import Step5Communication from "./steps/Step5Communication";
 import Step6Interests from "./steps/Step6Interests";
 import Step7Location from "./steps/Step7Location";
 import Step8Photos from "./steps/Step8Photos";
-import Step9Review from "./steps/Step9Review";
+import Step9Bio from "./steps/Step9Bio";   // ✅ Imported New Step
+import Step10Review from "./steps/Step10Review"; // ✅ Updated Import
 
 export type OnboardingData = {
   firstName: string;
@@ -38,9 +39,11 @@ export type OnboardingData = {
   location: string;
   useCurrentLocation: boolean;
   photos?: string[];
+  bio: string;                 // ✅ New Field
+  conversationStarter: string; // ✅ New Field
 };
 
-const TOTAL_STEPS = 9;
+const TOTAL_STEPS = 10; // ✅ Increased to 10
 
 const initialData: OnboardingData = {
   firstName: "",
@@ -63,6 +66,8 @@ const initialData: OnboardingData = {
   location: "",
   useCurrentLocation: false,
   photos: [],
+  bio: "",                  // ✅ Init
+  conversationStarter: "",  // ✅ Init
 };
 
 interface OnboardingFlowProps {
@@ -83,6 +88,10 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         parsed.dateOfBirth = parsed.dateOfBirth
           ? new Date(parsed.dateOfBirth)
           : undefined;
+        // Ensure new fields exist if loading old data
+        if (!parsed.bio) parsed.bio = "";
+        if (!parsed.conversationStarter) parsed.conversationStarter = "";
+        
         setData(parsed);
       } catch (error) {
         console.error("Failed to load onboarding data:", error);
@@ -166,6 +175,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       !!data.location?.trim(),
       (data.photos || []).length > 0,
       !!data.relationshipType?.trim(),
+      !!data.bio?.trim(), // ✅ Include Bio check
     ];
     const satisfied = checks.filter(Boolean).length;
     return Math.round((satisfied / checks.length) * 100);
@@ -282,10 +292,23 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
             onSkip={handleSkip}
           />
         );
-      case 9:
+      case 9: // ✅ New Case for Bio Step
+        return (
+          <Step9Bio
+            data={{ 
+              bio: data.bio, 
+              conversationStarter: data.conversationStarter 
+            }}
+            onChange={(p) => setStepData(p)}
+            onNext={goNext}
+            onBack={goBack}
+            onSkip={handleSkip}
+          />
+        );
+      case 10: // ✅ Moved Review to Step 10
       default:
         return (
-          <Step9Review
+          <Step10Review
             data={data}
             onNext={goNext}
             onBack={goBack}
