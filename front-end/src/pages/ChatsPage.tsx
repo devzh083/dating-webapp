@@ -1,6 +1,6 @@
 import { useState } from "react";
 import TopBar from "@/components/layout/TopBar";
-import { Search, MessageCircle, UserPlus, ArrowUpRight, MoreVertical, Send, Phone, Video, Smile } from "lucide-react";
+import { Search, MessageCircle, UserPlus, ArrowUpRight, MoreVertical, Send, Phone, Video, Smile, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -18,7 +18,8 @@ const requestedConnections = [
 const activeConnections = [
   { id: "c1", name: "Sarah", lastMessage: "Hey! How are you doing?", time: "2m ago", unread: 2, avatar: "S", bg: "bg-teal-100 text-teal-600", online: true },
   { id: "c2", name: "Emma", lastMessage: "That sounds great! Let's meet up", time: "1h ago", unread: 0, avatar: "E", bg: "bg-blue-100 text-blue-600", online: false },
-  { id: "c3", name: "Maya", lastMessage: "I love that movie too!", time: "3h ago", unread: 1, avatar: "M", bg: "bg-emerald-100 text-emerald-600", online: true },
+  { id: "c3", name: "Maya", lastMessage: "I love that movie too!", time: "3h ago", unread: 0, avatar: "M", bg: "bg-emerald-100 text-emerald-600", online: true },
+  { id: "c4", name: "Rohan", lastMessage: "Sent a photo", time: "1d ago", unread: 0, avatar: "R", bg: "bg-gray-100 text-gray-600", online: false },
 ];
 
 const mockMessages = [
@@ -40,17 +41,21 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pt-20 pb-6 px-4 lg:px-8">
-      {/* ✅ Pass onLogout to TopBar */}
+      {/* New TopBar with Centered Nav */}
       <TopBar onLogout={onLogout} />
 
       <main className="container mx-auto max-w-7xl h-[calc(100vh-120px)]">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
           
           {/* ---------------- LEFT PANEL ---------------- */}
-          <div className="lg:col-span-4 flex flex-col gap-4 h-full">
+          {/* Hidden on mobile if a chat is selected */}
+          <div className={cn(
+            "lg:col-span-4 flex flex-col gap-4 h-full",
+            selectedChat ? "hidden lg:flex" : "flex"
+          )}>
             
-            <div className="flex flex-col gap-4">
-               <h1 className="text-2xl font-bold text-gray-900 px-1">Messages</h1>
+            <div className="flex flex-col gap-4 px-1">
+               <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
                
                {/* Search */}
                <div className="relative">
@@ -82,7 +87,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                     <tab.icon className="w-3.5 h-3.5" />
                     {tab.label}
                     {tab.count ? (
-                      <span className="ml-1 px-1.5 py-0.5 bg-rose-500 text-white text-[10px] rounded-full">
+                      <span className="ml-1 px-1.5 py-0.5 bg-rose-500 text-white text-[10px] rounded-full min-w-[18px] text-center">
                         {tab.count}
                       </span>
                     ) : null}
@@ -103,7 +108,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                       initial={{ opacity: 0, x: -10 }} 
                       animate={{ opacity: 1, x: 0 }} 
                       exit={{ opacity: 0, x: 10 }}
-                      className="space-y-2"
+                      className="space-y-1"
                     >
                       {activeConnections.map((chat) => (
                         <button
@@ -149,7 +154,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
                   {/* 2. REQUESTS */}
                   {activeTab === "requests" && (
-                    <motion.div key="requests" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+                    <motion.div key="requests" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3 p-1">
                       {connectionRequests.map((req) => (
                         <div key={req.id} className="p-4 rounded-2xl border border-gray-100 bg-white shadow-sm">
                           <div className="flex items-center gap-3 mb-3">
@@ -172,7 +177,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
                   {/* 3. REQUESTED */}
                   {activeTab === "requested" && (
-                     <motion.div key="requested" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+                     <motion.div key="requested" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2 p-1">
                       {requestedConnections.map((req) => (
                         <div key={req.id} className="flex items-center gap-3 p-3 rounded-2xl border border-gray-50 bg-gray-50/50">
                            <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold opacity-70", req.bg)}>
@@ -196,33 +201,44 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
           </div>
 
           {/* ---------------- RIGHT PANEL (Chat Interface) ---------------- */}
-          <div className="hidden lg:col-span-8 lg:flex flex-col bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden h-full">
+          {/* Visible on mobile only when chat selected */}
+          <div className={cn(
+            "lg:col-span-8 flex flex-col bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden h-full",
+            selectedChat ? "flex fixed inset-0 z-50 lg:static lg:z-auto" : "hidden lg:flex"
+          )}>
             {selectedChat && activeChatData ? (
               <>
                 {/* Chat Header */}
-                <div className="h-20 border-b border-gray-50 flex items-center justify-between px-8 bg-white/80 backdrop-blur-md sticky top-0 z-10">
+                <div className="h-20 border-b border-gray-50 flex items-center justify-between px-6 bg-white sticky top-0 z-10">
                   <div className="flex items-center gap-4">
+                    {/* Mobile Back Button */}
+                    <button onClick={() => setSelectedChat(null)} className="lg:hidden p-2 -ml-2 text-gray-500">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+
                     <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shadow-sm", activeChatData.bg)}>
                        {activeChatData.avatar}
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900">{activeChatData.name}</h3>
+                      <h3 className="font-bold text-gray-900 text-base">{activeChatData.name}</h3>
                       <div className="flex items-center gap-2">
                         {activeChatData.online ? (
-                          <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">
+                          <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             Online
                           </span>
                         ) : (
                            <span className="text-xs text-gray-400">Offline</span>
                         )}
-                        <span className="text-xs text-gray-300">•</span>
-                        <span className="text-xs text-gray-500">85% Match</span>
+                        <span className="text-gray-300 mx-1">•</span>
+                        <span className="text-xs text-teal-600 font-medium bg-teal-50 px-2 py-0.5 rounded-full">
+                           85% Match
+                        </span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                      <button className="p-2.5 text-gray-400 hover:bg-gray-50 hover:text-teal-600 rounded-full transition-colors">
                         <Phone className="w-5 h-5" />
                      </button>
@@ -236,13 +252,13 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                 </div>
 
                 {/* Messages Area */}
-                <div className="flex-1 bg-[#FDFDFD] p-8 overflow-y-auto space-y-6">
+                <div className="flex-1 bg-[#F9FAFB] p-6 overflow-y-auto space-y-6">
                    <div className="flex justify-center">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">Today</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-100 px-3 py-1 rounded-full">Today</span>
                    </div>
 
                    {mockMessages.map((msg) => (
-                     <div key={msg.id} className={cn("flex gap-4 max-w-[75%]", msg.sender === "me" ? "ml-auto flex-row-reverse" : "")}>
+                     <div key={msg.id} className={cn("flex gap-3 max-w-[85%] lg:max-w-[70%]", msg.sender === "me" ? "ml-auto flex-row-reverse" : "")}>
                         
                         {msg.sender === "them" && (
                            <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-auto shadow-sm", activeChatData.bg)}>
@@ -257,21 +273,22 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                               : "bg-white border border-gray-100 text-gray-700 rounded-bl-none"
                         )}>
                            {msg.text}
-                           <span className={cn(
-                              "text-[10px] absolute -bottom-5 min-w-[60px]",
-                              msg.sender === "me" ? "right-0 text-right text-gray-300" : "left-0 text-gray-300"
+                           <div className={cn(
+                              "flex items-center gap-1 text-[10px] mt-1 opacity-70",
+                              msg.sender === "me" ? "justify-end text-teal-100" : "text-gray-400"
                            )}>
-                              {msg.time}
-                           </span>
+                              <span>{msg.time}</span>
+                              {msg.sender === "me" && <CheckCheck className="w-3 h-3" />}
+                           </div>
                         </div>
                      </div>
                    ))}
                 </div>
 
                 {/* Input Area */}
-                <div className="p-6 bg-white border-t border-gray-50">
-                  <div className="relative flex items-center gap-3">
-                    <button className="p-2.5 text-gray-400 hover:bg-gray-50 rounded-full transition-colors">
+                <div className="p-4 bg-white border-t border-gray-50">
+                  <div className="relative flex items-center gap-2">
+                    <button className="p-3 text-gray-400 hover:bg-gray-50 rounded-full transition-colors">
                         <Smile className="w-6 h-6" />
                     </button>
                     <input 
@@ -293,19 +310,17 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                 </div>
               </>
             ) : (
-              // Empty State
+              // Empty State (No Chat Selected)
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-gray-50/30">
                  <div className="relative">
                     <div className="w-24 h-24 bg-teal-50 rounded-full flex items-center justify-center mb-6 animate-pulse">
                         <MessageCircle className="w-10 h-10 text-teal-500" />
                     </div>
-                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center text-lg animate-bounce delay-100">👋</div>
-                    <div className="absolute bottom-0 -left-4 w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center text-lg animate-bounce delay-700">💖</div>
                  </div>
                  
                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Select a conversation</h3>
                  <p className="text-gray-500 max-w-xs leading-relaxed">
-                   Choose a connection from the left to start chatting or check your new requests.
+                   Choose a connection from the left or check your new requests.
                  </p>
               </div>
             )}

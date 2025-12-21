@@ -1,4 +1,3 @@
-// src/components/onboarding/OnboardingFlow.tsx
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -15,8 +14,8 @@ import Step5Communication from "./steps/Step5Communication";
 import Step6Interests from "./steps/Step6Interests";
 import Step7Location from "./steps/Step7Location";
 import Step8Photos from "./steps/Step8Photos";
-import Step9Bio from "./steps/Step9Bio";   // ✅ Imported New Step
-import Step10Review from "./steps/Step10Review"; // ✅ Updated Import
+import Step9Bio from "./steps/Step9Bio";
+import Step10Review from "./steps/Step10Review";
 
 export type OnboardingData = {
   firstName: string;
@@ -39,11 +38,11 @@ export type OnboardingData = {
   location: string;
   useCurrentLocation: boolean;
   photos?: string[];
-  bio: string;                 // ✅ New Field
-  conversationStarter: string; // ✅ New Field
+  bio: string;
+  conversationStarter: string;
 };
 
-const TOTAL_STEPS = 10; // ✅ Increased to 10
+const TOTAL_STEPS = 10;
 
 const initialData: OnboardingData = {
   firstName: "",
@@ -66,8 +65,8 @@ const initialData: OnboardingData = {
   location: "",
   useCurrentLocation: false,
   photos: [],
-  bio: "",                  // ✅ Init
-  conversationStarter: "",  // ✅ Init
+  bio: "",
+  conversationStarter: "",
 };
 
 interface OnboardingFlowProps {
@@ -79,30 +78,45 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const [data, setData] = useState<OnboardingData>(initialData);
   const navigate = useNavigate();
 
-  // load from localStorage
+  // 1. Load Data & Step from LocalStorage on Mount
   useEffect(() => {
-    const saved = localStorage.getItem("onboardingData");
-    if (saved) {
+    // A. Load Data
+    const savedData = localStorage.getItem("onboardingData");
+    if (savedData) {
       try {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(savedData);
         parsed.dateOfBirth = parsed.dateOfBirth
           ? new Date(parsed.dateOfBirth)
           : undefined;
-        // Ensure new fields exist if loading old data
+        // Ensure new fields exist for backward compatibility
         if (!parsed.bio) parsed.bio = "";
         if (!parsed.conversationStarter) parsed.conversationStarter = "";
-        
         setData(parsed);
       } catch (error) {
         console.error("Failed to load onboarding data:", error);
       }
     }
+
+    // B. Load Saved Step (Critical for Resume functionality)
+    const savedStep = localStorage.getItem("onboardingStep");
+    if (savedStep) {
+      const stepNum = parseInt(savedStep, 10);
+      if (!isNaN(stepNum) && stepNum >= 1 && stepNum <= TOTAL_STEPS) {
+        setStep(stepNum);
+      }
+    } else {
+      setStep(1);
+    }
   }, []);
 
-  // persist to localStorage
+  // 2. Persist Data & Step whenever they change
   useEffect(() => {
     localStorage.setItem("onboardingData", JSON.stringify(data));
   }, [data]);
+
+  useEffect(() => {
+    localStorage.setItem("onboardingStep", step.toString());
+  }, [step]);
 
   const setStepData = (patch: Partial<OnboardingData>) => {
     setData((d) => ({ ...d, ...patch }));
@@ -143,8 +157,11 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       return;
     }
 
+    // Final Step
     await saveProfile();
-
+    // Clear temporary step, maybe keep data for caching or clear it
+    localStorage.removeItem("onboardingStep");
+    
     if (onComplete) {
       onComplete();
     } else {
@@ -161,6 +178,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       setStep((s) => s + 1);
     } else {
       await saveProfile();
+      localStorage.removeItem("onboardingStep");
       if (onComplete) onComplete();
       else navigate("/home");
     }
@@ -175,7 +193,8 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       !!data.location?.trim(),
       (data.photos || []).length > 0,
       !!data.relationshipType?.trim(),
-      !!data.bio?.trim(), // ✅ Include Bio check
+      !!data.bio?.trim(),
+      // Add more checks if needed for the internal bar (though ProfileCompletion handles its own logic)
     ];
     const satisfied = checks.filter(Boolean).length;
     return Math.round((satisfied / checks.length) * 100);
@@ -292,7 +311,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
             onSkip={handleSkip}
           />
         );
-      case 9: // ✅ New Case for Bio Step
+      case 9:
         return (
           <Step9Bio
             data={{ 
@@ -305,7 +324,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
             onSkip={handleSkip}
           />
         );
-      case 10: // ✅ Moved Review to Step 10
+      case 10:
       default:
         return (
           <Step10Review

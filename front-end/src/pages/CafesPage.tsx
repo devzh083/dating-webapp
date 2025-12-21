@@ -79,6 +79,40 @@ const mockCafes = [
     location: "Kondapur",
     hasTableBooking: false,
   },
+  // --- NEW ADDITIONS ---
+  {
+    id: "7",
+    name: "The Glass House",
+    image: "https://images.unsplash.com/photo-1505275350441-83dcda8eeef5?w=600",
+    cuisine: "Modern Indian • Cocktails",
+    rating: 4.6,
+    priceForTwo: "₹2000 for two",
+    distance: "2.1 km",
+    location: "Jubilee Hills",
+    hasTableBooking: true,
+  },
+  {
+    id: "8",
+    name: "Bean & Leaf",
+    image: "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=600",
+    cuisine: "Specialty Coffee • Vegan",
+    rating: 4.8,
+    priceForTwo: "₹900 for two",
+    distance: "6.0 km",
+    location: "Financial District",
+    hasTableBooking: false,
+  },
+  {
+    id: "9",
+    name: "Sky High Deck",
+    image: "https://images.unsplash.com/photo-1560624052-449f5ddf0c31?w=600",
+    cuisine: "Mediterranean • Rooftop",
+    rating: 4.1,
+    priceForTwo: "₹1800 for two",
+    distance: "3.5 km",
+    location: "Hitech City",
+    hasTableBooking: true,
+  },
 ];
 
 interface CafesPageProps {
@@ -99,7 +133,6 @@ export default function CafesPage({ onLogout }: CafesPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50/50 pt-20 pb-10">
-      {/* ✅ Pass onLogout to TopBar */}
       <TopBar onLogout={onLogout} />
 
       <main className="container mx-auto max-w-6xl px-4">

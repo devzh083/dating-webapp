@@ -1,415 +1,290 @@
-// src/pages/Landing.tsx
 import { motion } from "framer-motion";
 import {
   Heart,
   MessageCircle,
   Shield,
   Sparkles,
-  Users,
-  MapPin,
+  Coffee,
+  Store,
+  Eye,
+  Lock,
+  ArrowRight,
+  CheckCircle2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 
-const profiles = [
-  {
-    name: "Maya",
-    age: 26,
-    image:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=500&fit=crop",
-  },
-  {
-    name: "Alex",
-    age: 29,
-    image:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop",
-  },
-  {
-    name: "Priya",
-    age: 24,
-    image:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=500&fit=crop",
-  },
-];
+// Shared Gradient
+const PRIMARY_GRADIENT = "bg-gradient-to-r from-[#0095E0] via-[#00B4D8] to-[#00C98B]";
+const TEXT_GRADIENT = "bg-gradient-to-r from-[#0095E0] via-[#00B4D8] to-[#00C98B] bg-clip-text text-transparent";
 
-const features = [
+const steps = [
+  {
+    icon: Lock,
+    title: "1. The Vibe Check",
+    description: "Profiles are anonymous. No photos, no names. Just interests, bios, and conversation starters.",
+  },
   {
     icon: Heart,
-    title: "Meaningful Connections",
-    description:
-      "Find people who share your values and interests for lasting relationships.",
+    title: "2. The Mutual Match",
+    description: "Like their vibe? If they like you back, it's a match! Only then do photos and details unlock.",
   },
   {
-    icon: Shield,
-    title: "Safe & Secure",
-    description:
-      "Your privacy matters. We verify profiles and protect your personal data.",
-  },
-  {
-    icon: MessageCircle,
-    title: "Real Conversations",
-    description:
-      "Break the ice with thoughtful prompts that spark genuine dialogue.",
-  },
-  {
-    icon: Users,
-    title: "Your Community",
-    description:
-      "Connect with like-minded individuals in your area and beyond.",
+    icon: Coffee,
+    title: "3. The Perfect Date",
+    description: "Skip the awkward planning. We suggest top-rated cafés for your first meet-up based on location.",
   },
 ];
-
-// shared gradient class
-const PRIMARY_GRADIENT =
-  "bg-[linear-gradient(to_right,#0095E0,#00B4D8,#00C98B)]";
 
 const Landing = () => {
   const navigate = useNavigate();
   const goToAuth = () => navigate("/login");
+  const goToPartner = () => navigate("/cafe-partner"); // Assuming you have this route or similar
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      {/* NAVBAR */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+    <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-[#0095E0] selection:text-white">
+      
+      {/* --- NAVBAR --- */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 transition-all">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-3"
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
-            <div
-              className={`w-10 h-10 rounded-xl ${PRIMARY_GRADIENT} flex items-center justify-center shadow-md`}
-            >
+            <div className={`w-10 h-10 rounded-xl ${PRIMARY_GRADIENT} flex items-center justify-center shadow-lg shadow-blue-200`}>
               <Heart className="w-5 h-5 text-white fill-white" />
             </div>
-            <span className="text-lg font-bold text-gray-900">
-              The dating app
-            </span>
+            <span className="text-lg font-bold text-gray-900 tracking-tight">The Dating App</span>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="hidden md:flex items-center gap-10 text-sm"
-          >
-            <a
-              href="#features"
-              className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
-            >
-              Features
-            </a>
-            <a
-              href="#stories"
-              className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
-            >
-              Stories
-            </a>
-            <a
-              href="#safety"
-              className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
-            >
-              Safety
-            </a>
-          </motion.div>
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
+            <a href="#how-it-works" className="hover:text-[#0095E0] transition-colors">How it Works</a>
+            <a href="#for-cafes" className="hover:text-[#0095E0] transition-colors">For Cafés</a>
+            <a href="#safety" className="hover:text-[#0095E0] transition-colors">Safety</a>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-4"
-          >
-            <Button
-              variant="ghost"
-              className="hidden sm:inline-flex text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-              onClick={goToAuth}
-            >
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={goToAuth} className="hidden sm:inline-flex text-gray-600 hover:text-[#0095E0]">
               Sign in
             </Button>
-            <Button
-              className={`${PRIMARY_GRADIENT} text-white shadow-md hover:brightness-110 transition-all font-medium px-6 border-none`}
-              onClick={goToAuth}
-            >
+            <Button onClick={goToAuth} className={`${PRIMARY_GRADIENT} text-white border-0 shadow-md hover:shadow-lg hover:scale-105 transition-all`}>
               Get Started
             </Button>
-          </motion.div>
+          </div>
         </div>
       </nav>
 
-      {/* HERO */}
-      <section className="relative pt-32 pb-20 overflow-hidden bg-gradient-to-b from-gray-50 to-white">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* LEFT */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="text-center lg:text-left"
-            >
-              <h1 className="text-6xl md:text-7xl lg:text-8xl font-black leading-tight mb-8 text-gray-900">
-                Find your{" "}
-                <span className="bg-[linear-gradient(to_right,#0095E0,#00B4D8,#00C98B)] bg-clip-text text-transparent">
-                  perfect
-                </span>{" "}
-                match
-              </h1>
-              <p className="text-xl text-gray-600 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-                We exist to bring people closer to love. Find meaningful
-                connections that ignite confidence and joy.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Button
-                  size="lg"
-                  className={`${PRIMARY_GRADIENT} text-white text-lg px-8 py-7 shadow-lg hover:brightness-110 transition-all font-semibold border-none`}
-                  onClick={goToAuth}
-                >
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  Start Matching
-                </Button>
-                <Button
-                  size="lg"
-                  className="text-gray-900 border-2 border-gray-900 hover:bg-gray-900 hover:text-white text-lg px-8 py-7 font-semibold transition-all"
-                  variant="outline"
-                >
-                  Learn More
-                </Button>
-              </div>
+      {/* --- HERO SECTION --- */}
+      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+        {/* Background Blobs */}
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[#0095E0]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-[#00C98B]/5 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none" />
 
-              {/* STATS */}
-              <div className="flex gap-12 mt-16 justify-center lg:justify-start flex-wrap">
-                <div>
-                  <div className="text-4xl font-black text-gray-900">
-                    50M+
-                  </div>
-                  <div className="text-gray-600 text-sm font-medium mt-1">
-                    Active Users
-                  </div>
-                </div>
-                <div className="w-px bg-gray-300" />
-                <div>
-                  <div className="text-4xl font-black text-gray-900">
-                    10M+
-                  </div>
-                  <div className="text-gray-600 text-sm font-medium mt-1">
-                    Matches Made
-                  </div>
-                </div>
-                <div className="w-px bg-gray-300" />
-                <div>
-                  <div className="text-4xl font-black text-gray-900">
-                    150+
-                  </div>
-                  <div className="text-gray-600 text-sm font-medium mt-1">
-                    Countries
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-           {/* RIGHT: PROFILE CARDS */}
-                    {/* RIGHT: PROFILE CARDS */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="relative h-[500px] hidden lg:flex items-center justify-center perspective-1000"
+        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center relative z-10">
+          
+          {/* Left: Text */}
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ duration: 0.6 }}
           >
-            {profiles.map((profile, index) => {
-              // Logic to determine position based on index
-              // 0: Left, 1: Center (Top), 2: Right
-              const isCenter = index === 1;
-              const isLeft = index === 0;
-              const isRight = index === 2;
-
-              return (
-                <motion.div
-                  key={profile.name}
-                  initial={{ 
-                    opacity: 0, 
-                    x: "-50%", 
-                    y: "-50%", 
-                    rotate: 0, 
-                    scale: 0.8 
-                  }}
-                  animate={{ 
-                    opacity: 1, 
-                    // Base position is center (50%, 50%). We adjust x/y from there.
-                    x: isCenter ? "-50%" : isLeft ? "-140%" : "40%", 
-                    y: isCenter ? "-60%" : "-45%", 
-                    rotate: isCenter ? 0 : isLeft ? -12 : 12,
-                    scale: isCenter ? 1.1 : 0.95,
-                    zIndex: isCenter ? 20 : 10
-                  }}
-                  transition={{
-                    duration: 0.8,
-                    delay: 0.4 + index * 0.1,
-                    type: "spring",
-                    stiffness: 100,
-                    damping: 20
-                  }}
-                  className="absolute left-1/2 top-1/2 w-72 h-96 rounded-[2rem] overflow-hidden shadow-2xl border-[6px] border-white/40 backdrop-blur-sm"
-                  style={{
-                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
-                  }}
-                >
-                  <img
-                    src={profile.image}
-                    alt={profile.name}
-                    className="w-full h-full object-cover" 
-                  />
-                  
-                  {/* Gradient Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-90" />
-                  
-                  {/* Card Content */}
-                  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-2xl font-bold">
-                        {profile.name}, {profile.age}
-                      </h3>
-                      {isCenter && (
-                        <div className="bg-green-500 w-3 h-3 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2 text-white/90 text-sm font-medium backdrop-blur-md bg-white/10 w-fit px-3 py-1.5 rounded-full">
-                      <MapPin className="w-3.5 h-3.5" />
-                      <span>2 km away</span>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold uppercase tracking-wider mb-6">
+              <Sparkles className="w-3 h-3" />
+              <span>Dating Reimagined</span>
+            </div>
+            
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-gray-900 leading-[1.1] mb-6">
+              Connect by Vibe.<br />
+              Reveal by <span className={TEXT_GRADIENT}>Choice.</span>
+            </h1>
+            
+            <p className="text-xl text-gray-600 mb-8 leading-relaxed max-w-lg">
+              Tired of judging books by their covers? We keep profiles anonymous until you match. 
+              Once you connect, we help you meet at the best cafés in town.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button onClick={goToAuth} size="lg" className={`${PRIMARY_GRADIENT} text-white px-8 h-14 rounded-full text-base font-bold shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all border-0`}>
+                Find Your Match
+              </Button>
+              <Button onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth'})} variant="outline" size="lg" className="h-14 rounded-full px-8 text-base font-bold border-2 hover:bg-gray-50">
+                How it works
+              </Button>
+            </div>
           </motion.div>
 
-          </div>
-        </div>
+          {/* Right: Visual (Anonymous vs Real) */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }} 
+            animate={{ opacity: 1, scale: 1 }} 
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="relative h-[600px] flex items-center justify-center"
+          >
+            {/* The "Anonymous" Card (Back) */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-[60%] -translate-y-[60%] w-72 h-96 bg-white rounded-[2rem] shadow-2xl border border-gray-100 p-6 flex flex-col items-center justify-center rotate-[-6deg] z-10">
+               <div className={`w-24 h-24 rounded-full ${PRIMARY_GRADIENT} mb-4 animate-pulse opacity-80`} />
+               <div className="h-4 w-32 bg-gray-100 rounded-full mb-2" />
+               <div className="h-3 w-48 bg-gray-50 rounded-full mb-8" />
+               <div className="flex gap-2">
+                 <div className="h-8 w-16 bg-blue-50 rounded-lg" />
+                 <div className="h-8 w-16 bg-blue-50 rounded-lg" />
+               </div>
+               <div className="mt-auto px-3 py-1 bg-gray-900 text-white text-xs rounded-full font-bold">
+                 Hidden
+               </div>
+            </div>
 
-        {/* Subtle blur blobs */}
-        <div className="absolute top-1/3 right-0 w-96 h-96 bg-cyan-200/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 left-1/4 w-80 h-80 bg-cyan-100/30 rounded-full blur-3xl pointer-events-none" />
+            {/* The "Real" Card (Front) */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-[40%] -translate-y-[40%] w-72 h-96 bg-white rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] p-2 rotate-[6deg] z-20 border-[4px] border-white ring-1 ring-gray-100">
+               <img 
+                 src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&h=700&fit=crop" 
+                 alt="Real Profile" 
+                 className="w-full h-full object-cover rounded-[1.5rem]"
+               />
+               <div className="absolute bottom-6 left-6 text-white drop-shadow-md">
+                 <div className="text-2xl font-bold">Maya, 24</div>
+                 <div className="text-sm font-medium opacity-90">Matched!</div>
+               </div>
+               <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md p-2 rounded-full">
+                 <Eye className="w-5 h-5 text-white" />
+               </div>
+            </div>
+          </motion.div>
+        </div>
       </section>
 
-      {/* FEATURES */}
-      <section id="features" className="py-32 bg-white">
+      {/* --- HOW IT WORKS --- */}
+      <section id="how-it-works" className="py-24 bg-gray-50/50">
         <div className="max-w-7xl mx-auto px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-20"
-          >
-            <h2 className="text-5xl md:text-6xl font-black mb-6 text-gray-900">
-              Why choose us?
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
-              We're building a dating experience that prioritizes authenticity
-              and genuine connection.
-            </p>
-          </motion.div>
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-black text-gray-900 mb-4">Dating, De-influenced.</h2>
+            <p className="text-xl text-gray-500">How we bring focus back to what matters.</p>
+          </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 30 }}
+          <div className="grid md:grid-cols-3 gap-8">
+            {steps.map((step, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="group p-8 rounded-2xl bg-gray-50 border border-gray-200 hover:border-cyan-300 hover:shadow-xl hover:shadow-cyan-100/50 transition-all duration-300 hover:-translate-y-1"
+                transition={{ delay: i * 0.2 }}
+                className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
               >
-                <div className="w-16 h-16 rounded-2xl bg-cyan-100/60 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-cyan-200 transition-all">
-                  <feature.icon className="w-8 h-8 text-cyan-600" />
+                <div className={`w-14 h-14 rounded-2xl ${PRIMARY_GRADIENT} flex items-center justify-center mb-6 shadow-md`}>
+                  <step.icon className="w-7 h-7 text-white" />
                 </div>
-                <h3 className="text-lg font-bold mb-3 text-gray-900">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed text-sm">
-                  {feature.description}
-                </p>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">{step.title}</h3>
+                <p className="text-gray-600 leading-relaxed">{step.description}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section
-        className={`py-32 ${PRIMARY_GRADIENT} relative overflow-hidden`}
-      >
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00eiIvPjwvZz48L2c+PC9zdmc+')]"></div>
-        </div>
-
-        <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-5xl md:text-6xl font-black text-white mb-8">
-              Ready to find your person?
-            </h2>
-            <p className="text-2xl text-white/90 mb-12 max-w-2xl mx-auto leading-relaxed font-medium">
-              Join millions of people who have found meaningful connections.
-              Your story could be next.
-            </p>
-            <Button
-              size="lg"
-              className="bg-white text-[#0095E0] hover:bg-gray-100 text-lg px-12 py-7 shadow-xl hover:shadow-2xl font-bold transition-all"
-              onClick={goToAuth}
-            >
-              Get Started Free
-            </Button>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="py-12 bg-gray-900 border-t border-gray-800">
+      {/* --- B2B SECTION (FOR CAFES) --- */}
+      <section id="for-cafes" className="py-24 bg-white overflow-hidden relative">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-9 h-9 rounded-lg ${PRIMARY_GRADIENT} flex items-center justify-center shadow-md`}
-              >
-                <Heart className="w-5 h-5 text-white fill-white" />
+          <div className="bg-gray-900 rounded-[3rem] p-10 md:p-20 relative overflow-hidden text-center md:text-left">
+            
+            {/* Background Decor */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0095E0] rounded-full blur-[100px] opacity-20 translate-x-1/2 -translate-y-1/2" />
+            
+            <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 text-[#00C98B] font-bold uppercase tracking-widest text-xs mb-4">
+                  <Store className="w-4 h-4" />
+                  For Business
+                </div>
+                <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
+                  Own a Café? <br/>
+                  <span className="text-gray-400">Become a Date Spot.</span>
+                </h2>
+                <p className="text-lg text-gray-300 mb-8 leading-relaxed">
+                  Join our partner network. We recommend your café to matched couples looking for the perfect first date location. Increase footfall and become part of their story.
+                </p>
+                
+                <ul className="space-y-3 mb-8 text-gray-300">
+                  <li className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-[#00C98B]" />
+                    <span>Get listed in our "Top Picks"</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-[#00C98B]" />
+                    <span>Receive table bookings directly</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-[#00C98B]" />
+                    <span>Attract new local customers</span>
+                  </li>
+                </ul>
+
+                <Button 
+                  onClick={goToPartner}
+                  size="lg" 
+                  className="bg-white text-gray-900 hover:bg-gray-100 font-bold px-8 h-12 rounded-full"
+                >
+                  Partner with us
+                </Button>
               </div>
-              <span className="font-bold text-white">The dating app</span>
-            </div>
 
-            <div className="flex gap-8 text-sm text-gray-400">
-              <a
-                href="#"
-                className="hover:text-white transition-colors font-medium"
-              >
-                Privacy
-              </a>
-              <a
-                href="#"
-                className="hover:text-white transition-colors font-medium"
-              >
-                Terms
-              </a>
-              <a
-                href="#"
-                className="hover:text-white transition-colors font-medium"
-              >
-                Safety
-              </a>
-              <a
-                href="#"
-                className="hover:text-white transition-colors font-medium"
-              >
-                Support
-              </a>
-            </div>
-
-            <div className="text-sm text-gray-500">
-              © {new Date().getFullYear()} The dating app. All rights reserved.
+              {/* Visual for Cafes */}
+              <div className="relative h-80 rounded-2xl overflow-hidden shadow-2xl border border-gray-700 group">
+                <img 
+                  src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800&q=80" 
+                  alt="Cafe Interior" 
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-6">
+                   <div className="bg-[#00C98B] w-fit px-3 py-1 rounded-full text-xs font-bold text-white mb-2">
+                     Recommended Spot
+                   </div>
+                   <h3 className="text-white text-xl font-bold">The Coffee House</h3>
+                   <p className="text-gray-300 text-sm">4.8 ★ • 1.2km away</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </section>
+
+      {/* --- SAFETY/TRUST --- */}
+      <section id="safety" className="py-20 border-b border-gray-100">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <Shield className="w-12 h-12 text-[#0095E0] mx-auto mb-6" />
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Safety is our priority</h2>
+          <p className="text-gray-600 leading-relaxed">
+            We use advanced verification to ensure every profile is real. 
+            Plus, our anonymity phase protects your privacy until you feel comfortable sharing more.
+          </p>
+        </div>
+      </section>
+
+      {/* --- FOOTER --- */}
+      <footer className="py-12 bg-white">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-lg ${PRIMARY_GRADIENT} flex items-center justify-center`}>
+              <Heart className="w-4 h-4 text-white fill-white" />
+            </div>
+            <span className="font-bold text-gray-900">The Dating App</span>
+          </div>
+
+          <div className="flex gap-8 text-sm font-medium text-gray-500">
+            <a href="#" className="hover:text-[#0095E0]">Privacy Policy</a>
+            <a href="#" className="hover:text-[#0095E0]">Terms of Service</a>
+            <a href="#" className="hover:text-[#0095E0]">Café Guidelines</a>
+          </div>
+
+          <div className="text-sm text-gray-400">
+            © {new Date().getFullYear()} All rights reserved.
+          </div>
+        </div>
       </footer>
+
     </div>
   );
 };
