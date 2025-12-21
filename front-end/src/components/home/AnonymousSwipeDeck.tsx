@@ -17,7 +17,7 @@ interface Props {
 }
 
 const SWIPE_THRESHOLD = 100;
-const SWIPE_DURATION = 0.8; // ✅ Increased for slower slide (0.8 seconds)
+const SWIPE_DURATION = 0.8;
 
 /* --- Floating Hearts Animation --- */
 const FloatingHearts = () => {
@@ -36,7 +36,7 @@ const FloatingHearts = () => {
             scale: 1 + Math.random(),
           }}
           transition={{
-            duration: 1.5 + Math.random(), // Slower float up
+            duration: 1.5 + Math.random(),
             ease: "easeOut",
           }}
           className="absolute"
@@ -72,7 +72,6 @@ export default function AnonymousSwipeDeck({
 
   useEffect(() => {
     if (showHearts) {
-      // Keep hearts visible a bit longer
       const timer = setTimeout(() => setShowHearts(false), 2500);
       return () => clearTimeout(timer);
     }
@@ -83,8 +82,8 @@ export default function AnonymousSwipeDeck({
   const completeSwipe = (direction: "left" | "right") => {
     if (!activeProfile) return;
 
+    // Data updates happen AFTER animation to prevent visual glitches
     if (direction === "right") {
-      setShowHearts(true);
       onLike(activeProfile.id);
     } else {
       onDislike(activeProfile.id);
@@ -97,15 +96,20 @@ export default function AnonymousSwipeDeck({
   const triggerSwipe = async (direction: "left" | "right") => {
     if (!activeProfile) return;
 
+    // ✅ FIX: Trigger Visuals IMMEDIATELY (Before animation starts)
+    if (direction === "right") {
+      setShowHearts(true);
+    }
+
     // 1. Animate card off screen slowly
     const destinationX = direction === "right" ? 800 : -800;
     
     await animate(x, destinationX, { 
-      duration: SWIPE_DURATION, // ✅ Using the slower duration
-      ease: "easeInOut"         // ✅ Smooth start and end
+      duration: SWIPE_DURATION,
+      ease: "easeInOut"
     }).finished;
 
-    // 2. Update state logic
+    // 2. Update state logic (switch profile)
     completeSwipe(direction);
   };
 
@@ -199,7 +203,7 @@ export default function AnonymousSwipeDeck({
           <AnonymousProfileCard profile={activeProfile} />
         </motion.div>
 
-        {/* Hearts */}
+        {/* Hearts - Rendered on top of everything */}
         <AnimatePresence>
             {showHearts && <FloatingHearts />}
         </AnimatePresence>
