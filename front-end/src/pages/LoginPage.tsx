@@ -11,8 +11,8 @@ import OtpVerification from "@/components/auth/OtpVerification";
 type AuthView = "login" | "signup" | "otp";
 
 type LoginPageProps = {
-  isLoggedIn: boolean;
-  onLogout: () => void;
+  isLoggedIn?: boolean;
+  onLogout?: () => void;
   onLoginSuccess: () => void;
 };
 
@@ -182,9 +182,11 @@ export default function LoginPage({
   /* ---------------- UI ---------------- */
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f3fbff] to-[#f9fdfc]">
-      {/* Top navigation */}
+      
+      {/* ✅ RESTORED TOP BAR (Without Navigation Links) */}
       <nav className="w-full bg-white">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-10 py-3.5">
+          {/* 1. Left: Branding */}
           <Link to="/" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#02b2f6] flex items-center justify-center shadow-sm">
               <Heart className="w-4 h-4 text-white fill-white" />
@@ -194,24 +196,9 @@ export default function LoginPage({
             </span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-9 text-[13px]">
-            <Link to="/home" className="text-[#8a8f9c] hover:text-[#222222]">
-              Home
-            </Link>
-            <Link to="/chats" className="text-[#8a8f9c] hover:text-[#222222]">
-              Chats
-            </Link>
-            <Link
-              to="/notifications"
-              className="text-[#8a8f9c] hover:text-[#222222]"
-            >
-              Notifications
-            </Link>
-            <Link to="/cafes" className="text-[#8a8f9c] hover:text-[#222222]">
-              Cafés
-            </Link>
-          </div>
+          {/* 2. Middle: Navigation Links REMOVED as requested */}
 
+          {/* 3. Right: Action Button */}
           <Button
             className="rounded-full px-6 py-2 text-[12px] font-semibold text-white bg-gradient-to-r from-[#02b2f6] to-[#09cf8b] hover:opacity-90 shadow-sm"
             onClick={() => navigate("/login")}
@@ -221,14 +208,14 @@ export default function LoginPage({
         </div>
       </nav>
 
-      {/* Centered auth / OTP card */}
+      {/* Main Content Area */}
       <div className="pt-24 pb-20 flex items-start justify-center px-4">
         <AnimatePresence mode="wait">
           {view === "otp" ? (
             <OtpVerification
               key="otp"
-              email={email} // username (email) passed here
-              apiBaseUrl = { API_BASE_URL }
+              email={email}
+              apiBaseUrl={API_BASE_URL}
               onSuccess={() => {
                 onLoginSuccess();
                 navigate("/home");
