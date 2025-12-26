@@ -12,14 +12,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from datetime import timedelta
 from pathlib import Path
-from dotenv import load_dotenv
 from decouple import Config, RepositoryEnv
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-env_path = os.path.join(BASE_DIR, "..", ".env")
+env_path = os.path.join(BASE_DIR, ".env")
 env_config = Config(RepositoryEnv(env_path))
 
 # Quick-start development settings - unsuitable for production
@@ -39,6 +38,9 @@ X_FRAME_OPTIONS = 'ALLOWALL'
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 
 # Application definition
 
@@ -53,6 +55,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    'cafe',
 ]
 
 MIDDLEWARE = [

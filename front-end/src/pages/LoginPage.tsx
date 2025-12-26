@@ -199,12 +199,23 @@ export default function LoginPage({
           {/* 2. Middle: Navigation Links REMOVED as requested */}
 
           {/* 3. Right: Action Button */}
-          <Button
-            className="rounded-full px-6 py-2 text-[12px] font-semibold text-white bg-gradient-to-r from-[#02b2f6] to-[#09cf8b] hover:opacity-90 shadow-sm"
-            onClick={() => navigate("/login")}
-          >
-            Login/SignUp
-          </Button>
+<div className="flex items-center gap-3">
+  <Button
+    variant="ghost"
+    className="text-[12px] font-semibold"
+    onClick={() => navigate("/cafe-partner/login")}
+  >
+    Café Partner
+  </Button>
+
+  <Button
+    className="rounded-full px-6 py-2 text-[12px] font-semibold text-white bg-gradient-to-r from-[#02b2f6] to-[#09cf8b] hover:opacity-90 shadow-sm"
+    onClick={() => navigate("/login")}
+  >
+    Login / Sign Up
+  </Button>
+</div>
+
         </div>
       </nav>
 
@@ -501,7 +512,7 @@ export default function LoginPage({
                   </button>
                   <p className="text-[11px] text-[#b0b5c0]">
                     <Link
-                      to="/cafe-partner"
+                      to="/cafe-partner/login"
                       className="hover:text-[#6b7280] underline-offset-2 hover:underline"
                     >
                       Café Partner Login

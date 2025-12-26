@@ -1,128 +1,61 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TopBar from "@/components/layout/TopBar";
-import { Search, SlidersHorizontal, Star, MapPin, CalendarCheck } from "lucide-react";
+import {
+  Search,
+  SlidersHorizontal,
+  Star,
+  MapPin,
+  CalendarCheck,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/* ------------------ TYPES ------------------ */
+interface Cafe {
+  id: number;
+  name: string;
+  cuisine: string;
+  rating: number;
+  price_for_two: number;
+  area: string;
+  image: string;
+  has_table_booking: boolean;
+  pure_veg: boolean;
+  serves_alcohol: boolean;
+  rooftop: boolean;
+}
+
+interface CafesPageProps {
+  onLogout?: () => void;
+}
+
+/* ------------------ FILTERS ------------------ */
 const filters = [
   "Book a table",
-  "Within 5km",
   "Rating 4+",
   "Pure Veg",
   "Serves Alcohol",
   "Rooftop",
 ];
 
-const mockCafes = [
-  {
-    id: "1",
-    name: "The Coffee House",
-    image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=600",
-    cuisine: "Cafe • Continental",
-    rating: 4.5,
-    priceForTwo: "₹800 for two",
-    distance: "1.2 km",
-    location: "Banjara Hills",
-    hasTableBooking: true,
-  },
-  {
-    id: "2",
-    name: "Romantic Rooftop",
-    image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600",
-    cuisine: "Italian • Pizza",
-    rating: 4.3,
-    priceForTwo: "₹1200 for two",
-    distance: "2.5 km",
-    location: "Jubilee Hills",
-    hasTableBooking: true,
-  },
-  {
-    id: "3",
-    name: "Garden Bistro",
-    image: "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=600",
-    cuisine: "Multi-cuisine • Bar",
-    rating: 4.0,
-    priceForTwo: "₹1500 for two",
-    distance: "3.8 km",
-    location: "Gachibowli",
-    hasTableBooking: false,
-  },
-  {
-    id: "4",
-    name: "Cozy Corner Cafe",
-    image: "https://images.unsplash.com/photo-1559925393-8be0ec4767c8?w=600",
-    cuisine: "Cafe • Bakery",
-    rating: 4.7,
-    priceForTwo: "₹600 for two",
-    distance: "0.8 km",
-    location: "Hitech City",
-    hasTableBooking: true,
-  },
-  {
-    id: "5",
-    name: "Sunset Lounge",
-    image: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600",
-    cuisine: "Asian • Fusion",
-    rating: 4.4,
-    priceForTwo: "₹1200 for two",
-    distance: "4.2 km",
-    location: "Madhapur",
-    hasTableBooking: true,
-  },
-  {
-    id: "6",
-    name: "Bookworm Cafe",
-    image: "https://images.unsplash.com/photo-1521017432531-fbd92d768814?w=600",
-    cuisine: "Cafe • Desserts",
-    rating: 4.2,
-    priceForTwo: "₹500 for two",
-    distance: "5.5 km",
-    location: "Kondapur",
-    hasTableBooking: false,
-  },
-  // --- NEW ADDITIONS ---
-  {
-    id: "7",
-    name: "The Glass House",
-    image: "https://images.unsplash.com/photo-1505275350441-83dcda8eeef5?w=600",
-    cuisine: "Modern Indian • Cocktails",
-    rating: 4.6,
-    priceForTwo: "₹2000 for two",
-    distance: "2.1 km",
-    location: "Jubilee Hills",
-    hasTableBooking: true,
-  },
-  {
-    id: "8",
-    name: "Bean & Leaf",
-    image: "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=600",
-    cuisine: "Specialty Coffee • Vegan",
-    rating: 4.8,
-    priceForTwo: "₹900 for two",
-    distance: "6.0 km",
-    location: "Financial District",
-    hasTableBooking: false,
-  },
-  {
-    id: "9",
-    name: "Sky High Deck",
-    image: "https://images.unsplash.com/photo-1560624052-449f5ddf0c31?w=600",
-    cuisine: "Mediterranean • Rooftop",
-    rating: 4.1,
-    priceForTwo: "₹1800 for two",
-    distance: "3.5 km",
-    location: "Hitech City",
-    hasTableBooking: true,
-  },
-];
-
-interface CafesPageProps {
-  onLogout?: () => void;
-}
-
+/* ------------------ COMPONENT ------------------ */
 export default function CafesPage({ onLogout }: CafesPageProps) {
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const navigate = useNavigate(); // ✅ NEW
+  const [cafes, setCafes] = useState<Cafe[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
+  /* ------------------ FETCH CAFES ------------------ */
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/api/cafes/")
+      .then((res) => res.json())
+      .then((data) => setCafes(data))
+      .catch((err) => console.error("Failed to load cafes", err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  /* ------------------ FILTER TOGGLE ------------------ */
   const toggleFilter = (filter: string) => {
     setActiveFilters((prev) =>
       prev.includes(filter)
@@ -131,130 +64,149 @@ export default function CafesPage({ onLogout }: CafesPageProps) {
     );
   };
 
+  /* ------------------ FILTER LOGIC ------------------ */
+  const filteredCafes = useMemo(() => {
+    let result = cafes;
+
+    if (searchQuery) {
+      result = result.filter((cafe) =>
+        cafe.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    if (activeFilters.includes("Book a table")) {
+      result = result.filter((cafe) => cafe.has_table_booking);
+    }
+
+    if (activeFilters.includes("Rating 4+")) {
+      result = result.filter((cafe) => cafe.rating >= 4);
+    }
+
+    if (activeFilters.includes("Pure Veg")) {
+      result = result.filter((cafe) => cafe.pure_veg);
+    }
+
+    if (activeFilters.includes("Serves Alcohol")) {
+      result = result.filter((cafe) => cafe.serves_alcohol);
+    }
+
+    if (activeFilters.includes("Rooftop")) {
+      result = result.filter((cafe) => cafe.rooftop);
+    }
+
+    return result;
+  }, [cafes, searchQuery, activeFilters]);
+
+  /* ------------------ UI ------------------ */
   return (
     <div className="min-h-screen bg-gray-50/50 pt-20 pb-10">
       <TopBar onLogout={onLogout} />
 
       <main className="container mx-auto max-w-6xl px-4">
-        
-        {/* Hero Section */}
-        <div className="relative mb-8 overflow-hidden rounded-[32px] shadow-sm group">
-          <div className="absolute inset-0 bg-black/40 z-10 transition-opacity group-hover:bg-black/30" />
+        {/* Hero */}
+        <div className="relative mb-8 overflow-hidden rounded-[32px]">
+          <div className="absolute inset-0 bg-black/40 z-10" />
           <img
             src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200"
-            alt="Date Spots"
-            className="h-64 w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            className="h-64 w-full object-cover"
           />
-          <div className="absolute inset-0 flex flex-col justify-center p-8 z-20">
-            <h1 className="mb-2 text-4xl font-bold text-white tracking-tight">
+          <div className="absolute inset-0 z-20 flex flex-col justify-center p-8">
+            <h1 className="text-4xl font-bold text-white">
               Explore Top Date Spots
             </h1>
-            <p className="text-lg text-white/90 font-medium">
+            <p className="text-white/90 text-lg">
               Perfect places to take your match
             </p>
           </div>
         </div>
 
-        {/* Search Bar */}
+        {/* Search */}
         <div className="relative mb-8 max-w-2xl">
-          <Search className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search for restaurants and cafes"
-            className="w-full rounded-full border border-gray-200 bg-white py-4 pl-14 pr-6 shadow-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+            placeholder="Search cafes"
+            className="w-full rounded-full border bg-white py-4 pl-14 pr-6 shadow-sm focus:ring-2 focus:ring-teal-500/20"
           />
         </div>
 
         {/* Filters */}
-        <div className="mb-8 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          <button className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+        <div className="mb-8 flex gap-3 overflow-x-auto pb-2">
+          <button className="flex items-center gap-2 rounded-full border bg-white px-5 py-2.5 text-sm font-semibold">
             <SlidersHorizontal className="h-4 w-4" />
             Filter
           </button>
 
-          {filters.map((filter) => {
-            const isActive = activeFilters.includes(filter);
-            return (
-              <button
-                key={filter}
-                onClick={() => toggleFilter(filter)}
-                className={cn(
-                  "whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-200 border",
-                  isActive
-                    ? "bg-teal-500 border-teal-500 text-white shadow-md shadow-teal-200"
-                    : "bg-white border-gray-200 text-gray-600 hover:border-teal-200 hover:text-teal-600"
-                )}
-              >
-                {filter}
-              </button>
-            );
-          })}
+          {filters.map((filter) => (
+            <button
+              key={filter}
+              onClick={() => toggleFilter(filter)}
+              className={cn(
+                "rounded-full px-5 py-2.5 text-sm font-semibold border transition",
+                activeFilters.includes(filter)
+                  ? "bg-teal-500 text-white border-teal-500"
+                  : "bg-white text-gray-600 border-gray-200"
+              )}
+            >
+              {filter}
+            </button>
+          ))}
         </div>
 
         {/* Cafe Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {mockCafes.map((cafe) => (
-            <div
-              key={cafe.id}
-              className="group cursor-pointer overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
-            >
-              <div className="relative aspect-[4/3] overflow-hidden">
-                <img
-                  src={cafe.image}
-                  alt={cafe.name}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-                
-                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 to-transparent" />
-
-                <div className="absolute bottom-4 left-4 z-10">
-                  <h3 className="text-xl font-bold text-white drop-shadow-sm tracking-wide">
-                    {cafe.name}
-                  </h3>
+        {loading ? (
+          <p className="text-center text-gray-500">Loading cafes...</p>
+        ) : filteredCafes.length === 0 ? (
+          <p className="text-center text-gray-500">No cafes found</p>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filteredCafes.map((cafe) => (
+              <div
+                key={cafe.id}
+                onClick={() => navigate(`/cafes/${cafe.id}/book`)} // ✅ NAVIGATION
+                className="cursor-pointer overflow-hidden rounded-3xl bg-white shadow-sm hover:shadow-xl transition"
+              >
+                <div className="relative aspect-[4/3]">
+                  <img
+                    src={`http://127.0.0.1:8000${cafe.image}`}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute bottom-4 right-4 bg-emerald-500 px-2 py-1 rounded text-xs text-white font-bold flex items-center gap-1">
+                    {cafe.rating}
+                    <Star className="h-3 w-3 fill-white" />
+                  </div>
                 </div>
 
-                <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-lg bg-emerald-500 px-2 py-1 text-xs font-bold text-white shadow-sm">
-                  {cafe.rating} <Star className="h-3 w-3 fill-white" />
-                </div>
-              </div>
+                <div className="p-5">
+                  <h3 className="text-lg font-bold">{cafe.name}</h3>
+                  <p className="text-sm text-gray-500">{cafe.cuisine}</p>
 
-              <div className="p-5">
-                <div className="flex justify-between items-start mb-2">
-                    <p className="text-sm font-medium text-gray-500">
-                      {cafe.cuisine}
-                    </p>
-                    <span className="text-xs font-medium px-2 py-1 bg-gray-100 rounded-md text-gray-600">
-                        {cafe.priceForTwo}
+                  <div className="flex justify-between mt-3 text-sm">
+                    <div className="flex items-center gap-1 text-gray-500">
+                      <MapPin className="h-4 w-4" />
+                      {cafe.area}
+                    </div>
+                    <span className="font-semibold">
+                      ₹{cafe.price_for_two} for two
                     </span>
-                </div>
+                  </div>
 
-                <div className="flex items-center justify-between mt-3 pb-3 border-b border-gray-50">
-                   <div className="flex items-center gap-1 text-sm text-gray-500">
-                       <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                       {cafe.location}
-                   </div>
-                   <div className="text-sm font-semibold text-gray-900">
-                       {cafe.distance}
-                   </div>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between">
-                   {cafe.hasTableBooking ? (
-                     <div className="flex items-center gap-1.5 text-xs font-bold text-teal-600">
-                       <CalendarCheck className="h-3.5 w-3.5" />
-                       Table booking available
-                     </div>
-                   ) : (
-                     <div className="text-xs text-gray-400">
-                        Walk-in only
-                     </div>
-                   )}
+                  <div className="mt-3">
+                    {cafe.has_table_booking ? (
+                      <span className="text-xs font-bold text-teal-600 flex items-center gap-1">
+                        <CalendarCheck className="h-4 w-4" />
+                        Tap to book table
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">Walk-in only</span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
