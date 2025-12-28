@@ -7,6 +7,7 @@ import AnonymousSwipeDeck from "@/components/home/AnonymousSwipeDeck";
 import AnonymousReviewsBanner from "@/components/home/AnonymousReviewsBanner";
 import SecurityBanner from "@/components/home/SecurityBanner";
 import ProfileCompletion from "@/components/home/ProfileCompletion";
+import { profileService } from "@/services/profileService";
 
 // API Response Interface
 interface MatchApiResponse {
@@ -61,6 +62,24 @@ const HomePage = ({ onLogout }: HomePageProps) => {
   const [profiles, setProfiles] = useState<SwipeProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("User");
+
+  // Fetch user's profile for the name
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const result = await profileService.getProfile();
+        if (result.exists && result.data?.firstName) {
+          setUserName(result.data.firstName);
+        }
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
+        // Keep default "User" if fetch fails
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   useEffect(() => {
     const fetchMatches = async () => {
@@ -118,7 +137,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pt-16">
-      <TopBar userName="User" onLogout={onLogout} />
+      <TopBar userName={userName} onLogout={onLogout} />
 
       <div className="flex">
         {/* Main Content Area */}

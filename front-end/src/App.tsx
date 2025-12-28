@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
@@ -11,22 +11,16 @@ import BookingPage from "./pages/BookingPage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import OnboardingPage from "./pages/OnboardingPage";
-
-/* 🟠 Cafe Partner Pages */
-import CafePartnerLoginPage from "./pages/cafe-partner/CafePartnerLoginPage";
-import CafeDashboard from "./pages/cafe-partner/CafeDashboard";
-import CafeOnboardingPage from "./pages/cafe-partner/CafeOnboardingPage";
-import CafeRegisterPage from "./pages/cafe-partner/CafeRegisterPage";
-import CafePartnerSignupPage from "./pages/cafe-partner/CafePartnerSignupPage";
+import OnboardingFlow from './components/onboarding/OnboardingFlow';
 
 
 
 const AppInner: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = loading
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   /* ---------------- CHECK USER PROFILE ---------------- */
   const checkProfile = async (accessToken: string) => {
@@ -49,42 +43,44 @@ const AppInner: React.FC = () => {
       return profileExists;
     } catch (error) {
       console.error("Profile check failed:", error);
-      handleLogout();
+      // Don't call handleLogout here to avoid recursion
+      localStorage.clear();
+      setIsLoggedIn(false);
+      setNeedsOnboarding(false);
       return false;
     }
   };
 
   /* ---------------- APP STARTUP ---------------- */
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const accessFromQuery = params.get("access_token");
-    const refreshFromQuery = params.get("refresh_token");
+    const initAuth = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const accessFromQuery = params.get("access_token");
+      const refreshFromQuery = params.get("refresh_token");
 
-    if (accessFromQuery) {
-      localStorage.setItem("access_token", accessFromQuery);
-      if (refreshFromQuery) {
-        localStorage.setItem("refresh_token", refreshFromQuery);
+      if (accessFromQuery) {
+        localStorage.setItem("access_token", accessFromQuery);
+        if (refreshFromQuery) {
+          localStorage.setItem("refresh_token", refreshFromQuery);
+        }
+
+        window.history.replaceState({}, "", window.location.pathname);
+        
+        await checkProfile(accessFromQuery);
+        setIsLoggedIn(true);
+        return;
       }
 
-      window.history.replaceState({}, "", window.location.pathname);
-      setIsLoggedIn(true);
+      const storedAccess = localStorage.getItem("access_token");
+      if (storedAccess) {
+        await checkProfile(storedAccess);
+        setIsLoggedIn(true);
+      } else {
+        setIsLoggedIn(false);
+      }
+    };
 
-      checkProfile(accessFromQuery).finally(() => {
-        setProfileLoaded(true);
-      });
-      return;
-    }
-
-    const storedAccess = localStorage.getItem("access_token");
-    if (storedAccess) {
-      setIsLoggedIn(true);
-      checkProfile(storedAccess).finally(() => {
-        setProfileLoaded(true);
-      });
-    } else {
-      setIsLoggedIn(false);
-      setProfileLoaded(true);
-    }
+    initAuth();
   }, []);
 
   const handleLoginSuccess = async () => {
@@ -96,29 +92,77 @@ const AppInner: React.FC = () => {
   };
 
   const handleLogout = () => {
+    console.log("🚪 Logging out from App.tsx...");
+    
+    // Clear everything
     localStorage.clear();
     setIsLoggedIn(false);
     setNeedsOnboarding(false);
-    navigate("/");
+    
+    // Navigate to root
+    navigate("/", { replace: true });
   };
 
-  if (!profileLoaded) {
+  // Show loading only on initial load
+  if (isLoggedIn === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Loading…
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500"></div>
+          <p className="text-gray-600 font-medium">Loading...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <Routes>
-      {/* ---------------- USER APP ---------------- */}
-
+      {/* ---------------- PUBLIC ROUTES ---------------- */}
       <Route
         path="/"
-        element={isLoggedIn ? <Navigate to="/home" replace /> : <Landing />}
+        element={
+          isLoggedIn ? (
+            needsOnboarding ? (
+              <Navigate to="/onboarding" replace />
+            ) : (
+              <Navigate to="/home" replace />
+            )
+          ) : (
+            <Landing />
+          )
+        }
       />
 
+      <Route
+        path="/login"
+        element={
+          isLoggedIn ? (
+            needsOnboarding ? (
+              <Navigate to="/onboarding" replace />
+            ) : (
+              <Navigate to="/home" replace />
+            )
+          ) : (
+            <LoginPage onLoginSuccess={handleLoginSuccess} />
+          )
+        }
+      />
+
+      {/* ---------------- ONBOARDING ROUTE ---------------- */}
+      <Route
+        path="/onboarding"
+        element={
+          isLoggedIn ? (
+            <OnboardingPage
+              onComplete={() => setNeedsOnboarding(false)}
+            />
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+
+      {/* ---------------- PROTECTED ROUTES (REQUIRE LOGIN) ---------------- */}
       <Route
         path="/home"
         element={
@@ -158,6 +202,22 @@ const AppInner: React.FC = () => {
         }
       />
 
+      {/* ---------------- PROFILE ROUTE ---------------- */}
+      <Route
+        path="/profile"
+        element={
+          !isLoggedIn ? (
+            <Navigate to="/" replace />
+          ) : needsOnboarding ? (
+            <Navigate to="/onboarding" replace />
+          ) : (
+            <ProfilePage />
+          )
+        }
+      />
+
+      {/* ---------------- CAFES ROUTES ---------------- */}
+      
       <Route
         path="/cafes"
         element={
@@ -183,82 +243,8 @@ const AppInner: React.FC = () => {
           )
         }
       />
-      <Route
-       path="/cafe-partner/register"
-        element={<CafeRegisterPage />}
-       />
 
-       <Route
-       path="/cafe-partner/signup"
-       element={<CafePartnerSignupPage />}
-       />
-
-      <Route
-        path="/login"
-        element={
-          isLoggedIn ? (
-            needsOnboarding ? (
-              <Navigate to="/onboarding" replace />
-            ) : (
-              <Navigate to="/home" replace />
-            )
-          ) : (
-            <LoginPage onLoginSuccess={handleLoginSuccess} />
-          )
-        }
-      />
-
-      <Route
-        path="/profile"
-        element={
-          isLoggedIn ? (
-            <ProfilePage onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-
-      <Route
-        path="/onboarding"
-        element={
-          isLoggedIn ? (
-            <OnboardingPage
-              onComplete={() => setNeedsOnboarding(false)}
-            />
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-
-      {/* ---------------- CAFE PARTNER APP ---------------- */}
-
-      <Route path="/cafe-partner/login" element={<CafePartnerLoginPage />} />
-
-      <Route
-        path="/cafe-partner/dashboard"
-        element={
-          localStorage.getItem("access_token") ? (
-            <CafeDashboard />
-          ) : (
-            <Navigate to="/cafe-partner/login" replace />
-          )
-        }
-      />
-
-      <Route
-        path="/cafe-partner/onboarding"
-        element={
-          localStorage.getItem("access_token") ? (
-            <CafeOnboardingPage />
-          ) : (
-            <Navigate to="/cafe-partner/login" replace />
-          )
-        }
-      />
-
-      {/* 404 */}
+      {/* ---------------- 404 NOT FOUND ---------------- */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

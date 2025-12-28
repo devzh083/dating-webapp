@@ -3,36 +3,31 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.parsers import MultiPartParser, FormParser
 
 from django.contrib.auth import authenticate, get_user_model
 from django.conf import settings
 from django.shortcuts import redirect
 from django.core.mail import send_mail
 from django.core.cache import cache
+from django.db.models import Q
 
 import urllib.parse
 import requests
 import random
 import string
+from datetime import date
 
-from math import radians, sin, cos, asin, sqrt
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-
-from config.firebase import db
-from .models import FirebaseProfileManager
-
-
-
-from .models import FirebaseAuthManager, FirebaseProfileManager
-from .models_photos import UserPhoto  # <-- your ImageField model
+from .models import FirebaseAuthManager
+from profiles.models import UserProfile
+from profiles.serializers import UserProfileSerializer
 
 User = get_user_model()
 
-# ---------- OTP helpers ----------
+
+# ============================================
+# OTP HELPERS
+# ============================================
+
 def generate_otp(length=6):
     digits = string.digits
     return "".join(random.choice(digits) for _ in range(length))
@@ -46,8 +41,49 @@ def send_otp_email(email, otp):
     cache.set(f"login_otp_{email}", otp, timeout=300)
 
 
-# ---------- Auth / Profile Views ----------
+# ============================================
+# AUTH STATUS VIEW
+# ============================================
 
+class AuthStatusView(APIView):
+    """
+    Returns whether the authenticated user already has a profile.
+    Uses Django models instead of Firebase.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        email = request.user.username
+        firebase_user = FirebaseAuthManager.get_user_by_email(email)
+        
+        # Check Django database for profile
+        try:
+            profile = UserProfile.objects.get(user=request.user)
+            profile_exists = True
+            profile_complete = profile.is_complete
+            profile_data = UserProfileSerializer(profile).data
+        except UserProfile.DoesNotExist:
+            profile_exists = False
+            profile_complete = False
+            profile_data = None
+
+        return Response(
+            {
+                "email": email,
+                "profile_exists": profile_exists,
+                "has_profile": profile_exists,
+                "profile_complete": profile_complete,
+                "is_verified": firebase_user.get("is_verified", False) if firebase_user else False,
+                "firebase_user": firebase_user or {},
+                "profile": profile_data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================
+# REGISTRATION & LOGIN
+# ============================================
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -92,7 +128,6 @@ class LoginView(APIView):
     """
     Normal username+password login (no OTP).
     """
-
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -115,7 +150,13 @@ class LoginView(APIView):
         refresh = RefreshToken.for_user(user)
         email = user.username
         firebase_user = FirebaseAuthManager.get_user_by_email(email)
-        profile = FirebaseProfileManager.get_profile(email)
+        
+        # Get Django profile instead of Firebase
+        try:
+            profile = UserProfile.objects.get(user=user)
+            profile_data = UserProfileSerializer(profile).data
+        except UserProfile.DoesNotExist:
+            profile_data = {}
 
         is_verified = firebase_user.get("is_verified", False) if firebase_user else False
 
@@ -128,61 +169,16 @@ class LoginView(APIView):
                     "email": email,
                     "is_verified": is_verified,
                     "firebase_user": firebase_user or {},
-                    "profile": profile or {},
+                    "profile": profile_data,
                 },
             },
             status=status.HTTP_200_OK,
         )
 
 
-class ProfileView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        email = request.user.username
-        profile = FirebaseProfileManager.get_profile(email)
-        return Response(
-            {
-                "email": email,
-                "profile": profile or {},
-            },
-            status=status.HTTP_200_OK,
-        )
-
-    def post(self, request):
-        """
-        Save full onboarding profile payload (including photos as URL list).
-        """
-        email = request.user.username
-        data = dict(request.data)
-
-        # Normalize photos to list[str] if present
-        photos = data.get("photos")
-        if photos is not None:
-            if isinstance(photos, str):
-                data["photos"] = [photos]
-            elif isinstance(photos, list):
-                data["photos"] = [str(p) for p in photos]
-
-        FirebaseProfileManager.create_profile(email, **data)
-        return Response(
-            {"message": "Profile saved", "data": data},
-            status=status.HTTP_200_OK,
-        )
-
-
-class ProfileDetailView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, email):
-        profile = FirebaseProfileManager.get_profile(email)
-        if profile:
-            return Response(profile, status=status.HTTP_200_OK)
-        return Response(
-            {"error": "Profile not found"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
+# ============================================
+# GOOGLE OAUTH
+# ============================================
 
 class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
@@ -203,10 +199,9 @@ class GoogleLoginView(APIView):
 
 class GoogleCallbackView(APIView):
     """
-    Handles Google OAuth callback, updates Firestore user,
+    Handles Google OAuth callback, updates Firebase user,
     and redirects to frontend with JWT tokens.
     """
-
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -226,9 +221,7 @@ class GoogleCallbackView(APIView):
         token_json = token_res.json()
         google_access_token = token_json.get("access_token")
         if not google_access_token:
-            return redirect(
-                f"{settings.FRONTEND_URL}/login?error=oauth_no_tokens"
-            )
+            return redirect(f"{settings.FRONTEND_URL}/login?error=oauth_no_tokens")
 
         userinfo_res = requests.get(
             "https://www.googleapis.com/oauth2/v3/userinfo",
@@ -240,9 +233,7 @@ class GoogleCallbackView(APIView):
         google_user_id = userinfo.get("sub")
 
         if not email:
-            return redirect(
-                f"{settings.FRONTEND_URL}/login?error=oauth_no_email"
-            )
+            return redirect(f"{settings.FRONTEND_URL}/login?error=oauth_no_email")
 
         user, created = User.objects.get_or_create(
             username=email,
@@ -278,77 +269,14 @@ class GoogleCallbackView(APIView):
         return redirect(redirect_url)
 
 
-class AuthStatusView(APIView):
-    """
-    Returns whether the authenticated user already has a profile document.
-    """
-
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        email = request.user.username
-        profile = FirebaseProfileManager.get_profile(email)
-        firebase_user = FirebaseAuthManager.get_user_by_email(email)
-
-        return Response(
-            {
-                "email": email,
-                "profile_exists": bool(profile),
-                "has_profile": bool(profile),
-                "is_verified": firebase_user.get("is_verified", False)
-                if firebase_user
-                else False,
-                "firebase_user": firebase_user or {},
-                "profile": profile or {},
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-# ---------- Photo Upload View (media + URL stored in Firestore) ----------
-
-
-class PhotoUploadView(APIView):
-    """
-    Accepts a multipart image file, stores it in MEDIA_ROOT/uploads/,
-    and appends the public URL to the Firestore Profile.photos array.
-    """
-
-    permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
-
-    def post(self, request):
-        file_obj = request.FILES.get("file")
-        if not file_obj:
-            return Response(
-                {"detail": "No file uploaded"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        photo = UserPhoto.objects.create(user=request.user, image=file_obj)
-
-        # Build absolute URL to serve in frontend: http://host/media/uploads/...
-        url = request.build_absolute_uri(photo.url)
-
-        # Append to Firestore profile photos[]
-        email = request.user.username
-        profile = FirebaseProfileManager.get_profile(email) or {}
-        photos = profile.get("photos", [])
-        photos.append(url)
-        FirebaseProfileManager.create_profile(email, photos=photos)
-
-        return Response({"url": url}, status=status.HTTP_201_CREATED)
-
-
-# ---------- OTP Email Verification Endpoints ----------
-
+# ============================================
+# OTP EMAIL VERIFICATION
+# ============================================
 
 class SendLoginOTPView(APIView):
     """
-    Step 1: client sends { "username": "<email>" }
-    Sends OTP to email if user exists and not verified.
+    Step 1: Send OTP to email if user exists and not verified.
     """
-
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -387,7 +315,6 @@ class VerifyEmailOTPView(APIView):
     """
     Verify email after registration - marks user as verified
     """
-
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -443,10 +370,8 @@ class VerifyEmailOTPView(APIView):
 
 class VerifyLoginOTPView(APIView):
     """
-    Step 2: client sends { "username": "<email>", "otp": "123456" }
-    If OTP matches, returns JWT tokens and user data (for unverified users).
+    Step 2: Verify OTP and return JWT tokens (for unverified users).
     """
-
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -498,8 +423,13 @@ class VerifyLoginOTPView(APIView):
         )
 
         refresh = RefreshToken.for_user(user)
-        email = user.username
-        profile = FirebaseProfileManager.get_profile(email)
+        
+        # Get Django profile instead of Firebase
+        try:
+            profile = UserProfile.objects.get(user=user)
+            profile_data = UserProfileSerializer(profile).data
+        except UserProfile.DoesNotExist:
+            profile_data = {}
 
         return Response(
             {
@@ -507,225 +437,166 @@ class VerifyLoginOTPView(APIView):
                 "refresh": str(refresh),
                 "user": {
                     "id": user.id,
-                    "email": email,
+                    "email": username,
                     "is_verified": True,
                     "firebase_user": firebase_user or {},
-                    "profile": profile or {},
+                    "profile": profile_data,
                 },
             },
             status=status.HTTP_200_OK,
         )
 
-# views.py
 
-
-# ----------------- helpers ----------------- #
-
-def haversine_km(lat1, lon1, lat2, lon2):
-    R = 6371.0
-    dlat = radians(lat2 - lat1)
-    dlon = radians(lon2 - lon1)
-    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
-    c = 2 * asin(sqrt(a))
-    return R * c
-
-
-def list_overlap(a, b):
-    a = a or []
-    b = b or []
-    if not a or not b:
-        return 0.0
-    sa, sb = set(a), set(b)
-    inter = len(sa & sb)
-    union = len(sa | sb)
-    return inter / union
-
-
-def categorical_exact(a, b):
-    return 1.0 if a and b and a == b else 0.0
-
-
-def distance_similarity_km(distance_km, hard_limit_km):
-    if not hard_limit_km or hard_limit_km <= 0:
-        return 0.0
-    return max(0.0, 1.0 - distance_km / hard_limit_km)
-
-
-WEIGHTS = {
-    "sexual_orientation": 0.30,
-    "relationship_goals": 0.25,
-    "communication":      0.15,
-    "lifestyle":          0.15,
-    "interests":          0.10,
-    "distance_soft":      0.05,
-}
-
-
-def normalize_gender(label: str | None) -> str | None:
-    if not label:
-        return None
-    label = label.lower()
-    if label.startswith("man"):
-        return "man"
-    if label.startswith("woman") or label.startswith("female"):
-        return "woman"
-    return label  # fallback
-
-
-def normalize_interested_in(values):
-    # Firestore: ["Men"] / ["Women"]
-    out = []
-    for v in values or []:
-        v = v.lower()
-        if v.startswith("men") or v.startswith("man"):
-            out.append("man")
-        elif v.startswith("women") or v.startswith("woman"):
-            out.append("woman")
-    return out
-
-
-def normalize_profile(raw: dict) -> dict:
-    """Convert Firestore schema -> algorithm schema."""
-    if not raw:
-        return {}
-
-    gender = normalize_gender(raw.get("gender"))
-    interested_in = normalize_interested_in(raw.get("interestedIn", []))
-
-    return {
-        "email": raw.get("email"),
-        "gender": gender,
-        "interested_in_genders": interested_in,
-
-        # arrays
-        "sexual_orientation": raw.get("orientation", []),
-        "preferred_connect": raw.get("communicationStyle", []),
-        "interests": raw.get("interests", []),
-
-        # single string -> list
-        "relationship_goals": [raw["relationshipType"]] if raw.get("relationshipType") else [],
-
-        # lifestyle
-        "drinking": raw.get("drinking"),
-        "smoking": raw.get("smoking"),
-        "workout": raw.get("workout"),
-        "pets": raw.get("pets"),
-
-        # communication pace
-        "response_pace": raw.get("responsePace"),
-
-        # distance - keep numeric if present
-        "max_distance_km": raw.get("distance"),
-        # geo coords (only if you later add them)
-        "lat": raw.get("lat"),
-        "lng": raw.get("lng"),
-    }
-
-
-def profile_similarity(u, v, distance_km, max_dist_km):
-    s_orientation = list_overlap(u.get("sexual_orientation"), v.get("sexual_orientation"))
-    s_goals = list_overlap(u.get("relationship_goals"), v.get("relationship_goals"))
-
-    s_comm_pref = list_overlap(u.get("preferred_connect"), v.get("preferred_connect"))
-    s_comm_pace = categorical_exact(u.get("response_pace"), v.get("response_pace"))
-    s_comm = 0.7 * s_comm_pref + 0.3 * s_comm_pace
-
-    s_lifestyle = (
-        0.25 * categorical_exact(u.get("drinking"), v.get("drinking")) +
-        0.25 * categorical_exact(u.get("smoking"), v.get("smoking")) +
-        0.25 * categorical_exact(u.get("workout"), v.get("workout")) +
-        0.25 * categorical_exact(u.get("pets"), v.get("pets"))
-    )
-
-    s_interests = list_overlap(u.get("interests"), v.get("interests"))
-
-    # if no coords, ignore distance in score
-    if distance_km is None or max_dist_km is None:
-        s_dist = 0.0
-        dist_weight = 0.0
-    else:
-        s_dist = distance_similarity_km(distance_km, max_dist_km)
-        dist_weight = WEIGHTS["distance_soft"]
-
-    base = (
-        WEIGHTS["sexual_orientation"] * s_orientation +
-        WEIGHTS["relationship_goals"] * s_goals +
-        WEIGHTS["communication"]      * s_comm +
-        WEIGHTS["lifestyle"]          * s_lifestyle +
-        WEIGHTS["interests"]          * s_interests
-    )
-    return base + dist_weight * s_dist
-
+# ============================================
+# MATCHING ALGORITHM
+# ============================================
 
 class MatchRecommendationsView(APIView):
+    """
+    Returns potential matches based on user preferences and compatibility.
+    Uses Django database instead of Firebase.
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        # email may be in email or username depending on your user model
-        email = getattr(request.user, "email", None) or getattr(request.user, "username", None)
-        if not email:
-            return Response({"detail": "Authenticated user has no email associated"}, status=400)
-
-        raw_me = FirebaseProfileManager.get_profile(email)
-        if not raw_me:
-            return Response({"detail": "Profile not found for this email"}, status=404)
-
-        me = normalize_profile(raw_me)
-        my_gender = me.get("gender")
-        my_interested_in = me.get("interested_in_genders")
-
-        if not my_gender or not my_interested_in:
-            return Response({"detail": "Preference data incomplete on your profile"}, status=400)
-
-        # if you don't yet store lat/lng, distance_km will be None below
-        my_lat = me.get("lat")
-        my_lng = me.get("lng")
-        my_max_dist = me.get("max_distance_km")
-
-        # Firestore query: others who are interested in my gender
-        query = db.collection("Profile").where("interestedIn", "array_contains_any", ["Men", "Women"])
-        docs = list(query.stream())
-
-        results = []
-
-        for doc in docs:
-            raw_other = doc.to_dict() or {}
-            other = normalize_profile(raw_other)
-            other_email = other.get("email")
-
-            if not other_email or other_email == email:
-                continue
-
-            # mutual interest: I like their gender & they like mine
-            other_gender = other.get("gender")
-            if not other_gender or other_gender not in my_interested_in:
-                continue
-            if my_gender not in other.get("interested_in_genders", []):
-                continue
-
-            # distance (optional if lat/lng present)
-            lat2, lng2 = other.get("lat"), other.get("lng")
-            if my_lat is not None and my_lng is not None and lat2 is not None and lng2 is not None:
-                d_km = haversine_km(my_lat, my_lng, lat2, lng2)
-                max_dist = min(my_max_dist or d_km, other.get("max_distance_km") or d_km)
-                if my_max_dist and d_km > max_dist:
-                    continue
-            else:
-                d_km = None
-                max_dist = None
-
-            sim = profile_similarity(me, other, d_km, max_dist)
-            # if sim < 0.60:
-            #     continue
-
-            results.append(
-                {
-                    "email": other_email,
-                    "similarity": round(sim * 100, 1),
-                    "distance_km": round(d_km, 1) if d_km is not None else None,
-                    "profile": raw_other,  # return original Firestore shape
-                }
+        # Get current user's profile from Django database
+        try:
+            my_profile = UserProfile.objects.get(user=request.user)
+        except UserProfile.DoesNotExist:
+            return Response(
+                {"detail": "Profile not found. Please complete your profile."},
+                status=status.HTTP_404_NOT_FOUND
             )
 
+        # Get my preferences
+        my_gender = my_profile.gender
+        my_interested_in = my_profile.interested_in  # List of genders I'm interested in
+        
+        if not my_gender or not my_interested_in:
+            return Response(
+                {"detail": "Please complete your gender and preference settings"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Query for potential matches from Django database
+        # Find profiles where their gender is in my interested_in list
+        potential_matches = UserProfile.objects.exclude(
+            user=request.user
+        ).filter(
+            gender__in=my_interested_in
+        )
+
+        results = []
+        
+        for other_profile in potential_matches:
+            # Check mutual interest: do they want my gender?
+            if my_gender not in other_profile.interested_in:
+                continue
+            
+            # Calculate similarity score
+            sim = self.calculate_similarity(my_profile, other_profile)
+            
+            # Get user email
+            other_email = other_profile.user.email or other_profile.user.username
+            
+            # Build response data
+            results.append({
+                "email": other_email,
+                "similarity": round(sim * 100, 1),
+                "distance_km": None,  # Can add distance calculation later
+                "profile": {
+                    "firstName": other_profile.first_name,
+                    "tagline": other_profile.bio[:100] if other_profile.bio else "",
+                    "starter": other_profile.conversation_starter,
+                    "interests": other_profile.interests,
+                    "photos": other_profile.photos,
+                    "age": self.calculate_age(other_profile.date_of_birth) if other_profile.date_of_birth else None,
+                }
+            })
+        
+        # Sort by similarity score (highest first)
         results.sort(key=lambda x: x["similarity"], reverse=True)
-        return Response(results)
+        
+        return Response(results, status=status.HTTP_200_OK)
+
+    def calculate_similarity(self, profile1, profile2):
+        """Calculate similarity score between two profiles (0.0 to 1.0)"""
+        score = 0.0
+        weights = {
+            "orientation": 0.30,
+            "relationship": 0.25,
+            "communication": 0.15,
+            "lifestyle": 0.15,
+            "interests": 0.10,
+            "other": 0.05,
+        }
+        
+        # 1. Orientation similarity
+        orientation_overlap = self.list_overlap(
+            profile1.orientation,
+            profile2.orientation
+        )
+        score += weights["orientation"] * orientation_overlap
+        
+        # 2. Relationship type similarity
+        relationship_match = 1.0 if profile1.relationship_type == profile2.relationship_type else 0.0
+        score += weights["relationship"] * relationship_match
+        
+        # 3. Communication style similarity
+        comm_overlap = self.list_overlap(
+            profile1.communication_style,
+            profile2.communication_style
+        )
+        response_match = 1.0 if profile1.response_pace == profile2.response_pace else 0.0
+        comm_score = 0.7 * comm_overlap + 0.3 * response_match
+        score += weights["communication"] * comm_score
+        
+        # 4. Lifestyle similarity
+        lifestyle_score = (
+            (1.0 if profile1.drinking == profile2.drinking else 0.0) * 0.25 +
+            (1.0 if profile1.smoking == profile2.smoking else 0.0) * 0.25 +
+            (1.0 if profile1.workout == profile2.workout else 0.0) * 0.25 +
+            (1.0 if profile1.pets == profile2.pets else 0.0) * 0.25
+        )
+        score += weights["lifestyle"] * lifestyle_score
+        
+        # 5. Interests overlap
+        interests_overlap = self.list_overlap(
+            profile1.interests,
+            profile2.interests
+        )
+        score += weights["interests"] * interests_overlap
+        
+        return min(score, 1.0)  # Cap at 1.0
+
+    def list_overlap(self, list1, list2):
+        """Calculate Jaccard similarity between two lists"""
+        if not list1 or not list2:
+            return 0.0
+        
+        set1 = set(list1)
+        set2 = set(list2)
+        
+        intersection = len(set1 & set2)
+        union = len(set1 | set2)
+        
+        if union == 0:
+            return 0.0
+        
+        return intersection / union
+    
+    def calculate_age(self, date_of_birth):
+        """Calculate age from date of birth"""
+        if not date_of_birth:
+            return None
+        
+        today = date.today()
+        age = today.year - date_of_birth.year
+        
+        # Adjust if birthday hasn't occurred this year
+        if today.month < date_of_birth.month or (
+            today.month == date_of_birth.month and today.day < date_of_birth.day
+        ):
+            age -= 1
+        
+        return age
