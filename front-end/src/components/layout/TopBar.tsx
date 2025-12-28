@@ -80,7 +80,7 @@ export default function TopBar({ userName = "User", onLogout }: TopBarProps) {
           <span>Get Plus</span>
         </button>
 
-        {/* Profile Dropdown */}
+        {/* Profile Dropdown - Pass userName prop */}
         <div className="pl-1">
           <ProfileDropdown userName={userName} onLogout={onLogout} />
         </div>

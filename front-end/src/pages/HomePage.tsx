@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import MatchModal from "@/components/match/MatchModal";
 
 /* ---------------- TYPES ---------------- */
+import { profileService } from "@/services/profileService";
 
 interface MatchApiResponse {
   email: string;
@@ -66,6 +67,24 @@ const HomePage = ({ onLogout }: HomePageProps) => {
   const [profiles, setProfiles] = useState<SwipeProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("User");
+
+  // Fetch user's profile for the name
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const result = await profileService.getProfile();
+        if (result.exists && result.data?.firstName) {
+          setUserName(result.data.firstName);
+        }
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
+        // Keep default "User" if fetch fails
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchProfile, setMatchProfile] = useState<SwipeProfile | null>(null);
@@ -246,7 +265,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pt-16">
-      <TopBar userName="User" onLogout={onLogout} />
+      <TopBar userName={userName} onLogout={onLogout} />
 
       {/* ✅ This is the part that caused the error - now the variables exist! */}
       {showMatchModal && matchProfile && matchChatId && (

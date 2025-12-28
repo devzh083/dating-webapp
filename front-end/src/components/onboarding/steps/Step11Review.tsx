@@ -1,13 +1,12 @@
-// src/components/onboarding/steps/Step10Review.tsx
+// src/components/onboarding/steps/Step11Review.tsx
 import React from "react";
 import { motion } from "framer-motion";
 import { differenceInYears } from "date-fns";
 import StepLayout from "../StepLayout";
-import { MapPin, Heart, Sparkles, Zap, User, MessageCircle, Quote } from "lucide-react";
+import { MapPin, Heart, Sparkles, MessageCircle, Quote } from "lucide-react";
 import { OnboardingData } from "../OnboardingFlow";
-import { cn } from "@/lib/utils";
 
-interface Step10Props {
+interface Step11Props {
   data: OnboardingData;
   onNext: () => void;
   onBack: () => void;
@@ -25,7 +24,7 @@ const getEmoji = (category: string, value: string) => {
   return map[category]?.[value] || "✨";
 };
 
-const Step10Review: React.FC<Step10Props> = ({ data, onNext, onBack, onSkip }) => {
+const Step11Review: React.FC<Step11Props> = ({ data, onNext, onBack, onSkip }) => {
   const age = data.dateOfBirth ? differenceInYears(new Date(), data.dateOfBirth) : null;
   const safeFirst = data.firstName || "User";
   const firstInitial = (safeFirst.charAt(0) || "U").toUpperCase();
@@ -41,8 +40,8 @@ const Step10Review: React.FC<Step10Props> = ({ data, onNext, onBack, onSkip }) =
 
   return (
     <StepLayout
-      currentStep={10}
-      totalSteps={10}
+      currentStep={11}
+      totalSteps={11}
       title="Looking good! ✨"
       subtitle="Here's your profile preview"
       onBack={onBack}
@@ -182,4 +181,4 @@ const Step10Review: React.FC<Step10Props> = ({ data, onNext, onBack, onSkip }) =
   );
 };
 
-export default Step10Review;
+export default Step11Review;
