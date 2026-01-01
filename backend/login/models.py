@@ -2,7 +2,6 @@ from config.firebase import db
 from firebase_admin import firestore
 from typing import Dict, Any, Optional, List
 
-
 class FirebaseAuthManager:
     """Firestore `users` collection: one doc per email, auth state only."""
 
@@ -53,30 +52,36 @@ class FirebaseAuthManager:
             )
             return doc_ref.id
 
-
 class FirebaseProfileManager:
     """
     Firestore `Profile` collection: personal details only, keyed by email.
-
-    This can store arbitrary key/value pairs, including:
-    - primitive fields (strings, numbers, booleans)
-    - arrays (e.g. `photos: List[str]` with media URLs)
+    Supports multi-step onboarding with completion tracking.
     """
+
+    TOTAL_ONBOARDING_STEPS = 10  # Configurable total steps
 
     @staticmethod
     def create_profile(email: str, **profile_data) -> str:
         """
-        Store arbitrary key-value pairs for profile.
-        Document ID = email (1 profile per email).
-
-        Expected example shape (not enforced):
-        {
-            "firstName": "Alice",
-            "gender": "Woman",
-            "photos": ["http://localhost:8000/media/uploads/abc.jpg", ...],
-            ...
-        }
+        Store arbitrary key-value pairs for profile (merge=True supports partial updates).
+        Automatically handles step tracking and completion % for multi-step onboarding.
         """
+        # Handle step and compute completion percentage
+        step = profile_data.get("onboarding_step")
+        if step is not None:
+            try:
+                step = int(step)
+                step = max(0, min(FirebaseProfileManager.TOTAL_ONBOARDING_STEPS, step))
+                completion_pct = round((step / FirebaseProfileManager.TOTAL_ONBOARDING_STEPS) * 100, 1)
+                
+                # Store both step and computed percentage
+                profile_data["onboarding_step"] = step
+                profile_data["completion_percentage"] = completion_pct
+            except (TypeError, ValueError):
+                # Invalid step: clear step tracking
+                profile_data.pop("onboarding_step", None)
+                profile_data.pop("completion_percentage", None)
+
         # Optional normalization: ensure photos is stored as a list of strings
         photos = profile_data.get("photos")
         if photos is not None:
@@ -92,7 +97,7 @@ class FirebaseProfileManager:
                 "updated_at": firestore.SERVER_TIMESTAMP,
                 **profile_data,
             },
-            merge=True,
+            merge=True,  # Supports multi-step partial updates
         )
         return profile_ref.id
 
@@ -111,6 +116,26 @@ class FirebaseProfileManager:
 
         return data
 
+    @staticmethod
+    def get_completion_status(email: str) -> Dict[str, Any]:
+        """
+        Get just the onboarding completion status.
+        Returns: {"step": 3, "completion_percentage": 30.0, "is_complete": False}
+        """
+        profile = FirebaseProfileManager.get_profile(email)
+        if not profile:
+            return {"step": 0, "completion_percentage": 0.0, "is_complete": False}
+        
+        step = profile.get("onboarding_step", 0)
+        pct = profile.get("completion_percentage", 0.0)
+        is_complete = step >= FirebaseProfileManager.TOTAL_ONBOARDING_STEPS
+        
+        return {
+            "step": step,
+            "completion_percentage": pct,
+            "is_complete": is_complete,
+            "total_steps": FirebaseProfileManager.TOTAL_ONBOARDING_STEPS,
+        }
 
 class FirebaseUserManager:
     """Main manager - orchestrates auth + profile operations"""
@@ -131,15 +156,16 @@ class FirebaseUserManager:
 
     @staticmethod
     def get_user_full_data(email: str) -> Dict[str, Any]:
-        """Get complete user data: auth + profile"""
+        """Get complete user data: auth + profile + completion status"""
         auth_data = FirebaseAuthManager.get_user_by_email(email)
         profile_data = FirebaseProfileManager.get_profile(email)
+        completion = FirebaseProfileManager.get_completion_status(email)
 
         return {
             "firebase_user": auth_data or {},
             "profile": profile_data or {},
+            "onboarding": completion,  # New: step + completion info
         }
-
 
 # Backward compatibility - keep original class
 class LegacyFirebaseUserManager(FirebaseUserManager):

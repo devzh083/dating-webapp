@@ -1,3 +1,4 @@
+// src/components/onboarding/OnboardingFlow.tsx
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -74,13 +75,13 @@ interface OnboardingFlowProps {
 }
 
 export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(1);                 // current page number
   const [data, setData] = useState<OnboardingData>(initialData);
+  const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
 
-  // 1. Load Data & Step from LocalStorage on Mount
+  // ---- load from localStorage on mount ----
   useEffect(() => {
-    // A. Load Data
     const savedData = localStorage.getItem("onboardingData");
     if (savedData) {
       try {
@@ -88,16 +89,14 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         parsed.dateOfBirth = parsed.dateOfBirth
           ? new Date(parsed.dateOfBirth)
           : undefined;
-        // Ensure new fields exist for backward compatibility
         if (!parsed.bio) parsed.bio = "";
         if (!parsed.conversationStarter) parsed.conversationStarter = "";
         setData(parsed);
-      } catch (error) {
-        console.error("Failed to load onboarding data:", error);
+      } catch (err) {
+        console.error("Failed to parse onboardingData:", err);
       }
     }
 
-    // B. Load Saved Step (Critical for Resume functionality)
     const savedStep = localStorage.getItem("onboardingStep");
     if (savedStep) {
       const stepNum = parseInt(savedStep, 10);
@@ -109,7 +108,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     }
   }, []);
 
-  // 2. Persist Data & Step whenever they change
+  // ---- persist data & step to localStorage ----
   useEffect(() => {
     localStorage.setItem("onboardingData", JSON.stringify(data));
   }, [data]);
@@ -119,14 +118,19 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   }, [step]);
 
   const setStepData = (patch: Partial<OnboardingData>) => {
-    setData((d) => ({ ...d, ...patch }));
+    setData((prev) => ({ ...prev, ...patch }));
   };
 
-  // ---- API: save profile ----
-  const saveProfile = async () => {
+  // ---- save profile to backend, including page number ----
+  const saveProfile = async (currentStep: number) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    setIsSaving(true);
     try {
       const payload = {
         ...data,
+        onboarding_step: currentStep, // page number sent to backend
         dateOfBirth: data.dateOfBirth
           ? data.dateOfBirth.toISOString()
           : null,
@@ -136,37 +140,38 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${
-            localStorage.getItem("access_token") || ""
-          }`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         console.error("Failed to save profile", await res.text());
+      } else {
+        const json = await res.json();
+        // json.completion has step & completion_percentage if you need it
+        // console.log("saved profile", json);
       }
     } catch (err) {
       console.error("Error saving profile", err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const goNext = async () => {
+    await saveProfile(step); // save current page
+
     if (step < TOTAL_STEPS) {
       setStep((s) => s + 1);
       return;
     }
 
-    // Final Step
-    await saveProfile();
-    // Clear temporary step, maybe keep data for caching or clear it
+    // final step
+    await saveProfile(TOTAL_STEPS);
     localStorage.removeItem("onboardingStep");
-    
-    if (onComplete) {
-      onComplete();
-    } else {
-      navigate("/home");
-    }
+    if (onComplete) onComplete();
+    else navigate("/home");
   };
 
   const goBack = () => {
@@ -174,31 +179,22 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   };
 
   const handleSkip = async () => {
+    await saveProfile(step);
+
     if (step < TOTAL_STEPS) {
       setStep((s) => s + 1);
     } else {
-      await saveProfile();
+      await saveProfile(TOTAL_STEPS);
       localStorage.removeItem("onboardingStep");
       if (onComplete) onComplete();
       else navigate("/home");
     }
   };
 
+  // simple local completion for label
   const completionPercent = useMemo(() => {
-    const checks = [
-      !!data.firstName?.trim(),
-      !!data.dateOfBirth,
-      !!data.gender?.trim(),
-      (data.interests || []).length > 0,
-      !!data.location?.trim(),
-      (data.photos || []).length > 0,
-      !!data.relationshipType?.trim(),
-      !!data.bio?.trim(),
-      // Add more checks if needed for the internal bar (though ProfileCompletion handles its own logic)
-    ];
-    const satisfied = checks.filter(Boolean).length;
-    return Math.round((satisfied / checks.length) * 100);
-  }, [data]);
+    return Math.round((step / TOTAL_STEPS) * 100);
+  }, [step]);
 
   const completionLabel =
     completionPercent === 0
@@ -217,7 +213,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
               showGender: data.showGender,
               interestedIn: data.interestedIn,
             }}
-            onChange={(p) => setStepData(p)}
+            onChange={setStepData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -231,7 +227,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
               showOrientation: data.showOrientation,
               relationshipType: data.relationshipType,
             }}
-            onChange={(p) => setStepData(p)}
+            onChange={setStepData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -244,7 +240,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
               distance: data.distance,
               strictDistance: data.strictDistance,
             }}
-            onChange={(p) => setStepData(p)}
+            onChange={setStepData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -259,7 +255,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
               workout: data.workout,
               pets: data.pets,
             }}
-            onChange={(p) => setStepData(p)}
+            onChange={setStepData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -272,7 +268,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
               communicationStyle: data.communicationStyle,
               responsePace: data.responsePace,
             }}
-            onChange={(p) => setStepData(p)}
+            onChange={setStepData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -282,7 +278,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         return (
           <Step6Interests
             data={{ interests: data.interests }}
-            onChange={(p) => setStepData(p)}
+            onChange={setStepData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -295,7 +291,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
               location: data.location,
               useCurrentLocation: data.useCurrentLocation,
             }}
-            onChange={(p) => setStepData(p)}
+            onChange={setStepData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -305,7 +301,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         return (
           <Step8Photos
             data={{ photos: data.photos || [] }}
-            onChange={(p) => setStepData(p)}
+            onChange={setStepData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -314,11 +310,11 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       case 9:
         return (
           <Step9Bio
-            data={{ 
-              bio: data.bio, 
-              conversationStarter: data.conversationStarter 
+            data={{
+              bio: data.bio,
+              conversationStarter: data.conversationStarter,
             }}
-            onChange={(p) => setStepData(p)}
+            onChange={setStepData}
             onNext={goNext}
             onBack={goBack}
             onSkip={handleSkip}
@@ -344,10 +340,15 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       <TopBar userName={displayName} />
       <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-4">
         <div className="flex-1">
-          <ProgressBar currentStep={step} totalSteps={TOTAL_STEPS} />
+          <ProgressBar
+            currentStep={step}
+            totalSteps={TOTAL_STEPS}
+            isSaving={isSaving}
+          />
         </div>
         <div className="ml-4 text-sm font-medium text-muted-foreground">
           {completionLabel}
+          {isSaving && " Saving..."}
         </div>
       </div>
 

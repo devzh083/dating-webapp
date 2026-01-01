@@ -1,3 +1,4 @@
+// src/components/layout/TopBar.tsx
 import { Home, MessageCircle, Bell, Coffee, Heart, Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -9,7 +10,8 @@ interface TopBarProps {
 }
 
 // Matching Landing Page Gradient
-const PRIMARY_GRADIENT = "bg-gradient-to-r from-[#0095E0] via-[#00B4D8] to-[#00C98B]";
+const PRIMARY_GRADIENT =
+  "bg-gradient-to-r from-[#0095E0] via-[#00B4D8] to-[#00C98B]";
 
 export default function TopBar({ userName = "User", onLogout }: TopBarProps) {
   const location = useLocation();
@@ -23,11 +25,15 @@ export default function TopBar({ userName = "User", onLogout }: TopBarProps) {
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-4 lg:px-8 z-50">
-      
       {/* 1. LEFT: Logo & Brand */}
       <div className="flex items-center gap-3 w-[200px]">
-        <Link to="/home" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-          <div className={`w-9 h-9 rounded-xl ${PRIMARY_GRADIENT} flex items-center justify-center shadow-md`}>
+        <Link
+          to="/home"
+          className="flex items-center gap-3 hover:opacity-90 transition-opacity"
+        >
+          <div
+            className={`w-9 h-9 rounded-xl ${PRIMARY_GRADIENT} flex items-center justify-center shadow-md`}
+          >
             <Heart className="w-4 h-4 text-white fill-white" />
           </div>
           <span className="font-bold text-[15px] tracking-tight text-gray-900 hidden sm:block">
@@ -51,7 +57,7 @@ export default function TopBar({ userName = "User", onLogout }: TopBarProps) {
                 className={cn(
                   "p-2.5 rounded-full transition-all duration-300 flex items-center justify-center",
                   isActive
-                    ? "bg-white text-[#0095E0] shadow-sm" // Active: Primary Blue
+                    ? "bg-white text-[#0095E0] shadow-sm"
                     : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                 )}
               >
@@ -67,9 +73,10 @@ export default function TopBar({ userName = "User", onLogout }: TopBarProps) {
 
       {/* 3. RIGHT: Actions & Profile */}
       <div className="flex items-center justify-end gap-3 w-[200px]">
-        
-        {/* "Get Plus" Button with Landing Gradient */}
-        <button className={`hidden md:flex items-center gap-1.5 px-4 py-1.5 rounded-full ${PRIMARY_GRADIENT} text-white text-xs font-bold shadow-md hover:shadow-lg hover:brightness-110 transition-all`}>
+        {/* "Get Plus" Button */}
+        <button
+          className={`hidden md:flex items-center gap-1.5 px-4 py-1.5 rounded-full ${PRIMARY_GRADIENT} text-white text-xs font-bold shadow-md hover:shadow-lg hover:brightness-110 transition-all`}
+        >
           <Sparkles className="w-3 h-3 fill-white" />
           <span>Get Plus</span>
         </button>
@@ -79,7 +86,6 @@ export default function TopBar({ userName = "User", onLogout }: TopBarProps) {
           <ProfileDropdown userName={userName} onLogout={onLogout} />
         </div>
       </div>
-
     </header>
   );
 }
