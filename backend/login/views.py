@@ -138,25 +138,34 @@ class LoginView(APIView):
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        email = request.user.username
-        profile = FirebaseProfileManager.get_profile(email)
-        return Response(
-            {
-                "email": email,
-                "profile": profile or {},
-            },
-            status=status.HTTP_200_OK,
-        )
-
     def post(self, request):
         """
-        Save full onboarding profile payload (including photos as URL list).
+        Save/update onboarding profile payload.
+        Expects:
+          - onboarding_step (int): current step number (1..10)
+          - other profile fields
         """
         email = request.user.username
         data = dict(request.data)
 
-        # Normalize photos to list[str] if present
+        # --- get step from payload ---
+        try:
+            step = int(data.get("onboarding_step", 0))
+        except (TypeError, ValueError):
+            step = 0
+
+        TOTAL_STEPS = 10
+        if step < 0:
+            step = 0
+        if step > TOTAL_STEPS:
+            step = TOTAL_STEPS
+
+        # --- compute completion percentage ---
+        completion_percentage = 0
+        if TOTAL_STEPS > 0 and step > 0:
+            completion_percentage = round(step / TOTAL_STEPS * 100, 1)
+
+        # --- normalize photos to list[str] ---
         photos = data.get("photos")
         if photos is not None:
             if isinstance(photos, str):
@@ -164,11 +173,23 @@ class ProfileView(APIView):
             elif isinstance(photos, list):
                 data["photos"] = [str(p) for p in photos]
 
+        # Store step + completion in profile
+        data["onboarding_step"] = step
+        data["completion_percentage"] = completion_percentage
+
         FirebaseProfileManager.create_profile(email, **data)
+        updated_profile = FirebaseProfileManager.get_profile(email) or {}
+
         return Response(
-            {"message": "Profile saved", "data": data},
+            {
+                "message": "Profile saved",
+                "step": step,
+                "completion_percentage": completion_percentage,
+                "profile": updated_profile,
+            },
             status=status.HTTP_200_OK,
         )
+
 
 
 class ProfileDetailView(APIView):
