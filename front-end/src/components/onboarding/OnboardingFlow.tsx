@@ -2,16 +2,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Step1BasicInfo from "./steps/Step1BasicInfo";
-import Step2Orientation from "./steps/Step2Orientation";
-import Step3Distance from "./steps/Step3Distance";
-import Step4Lifestyle from "./steps/Step4Lifestyle";
-import Step5Communication from "./steps/Step5Communication";
-import Step6Interests from "./steps/Step6Interests";
-import Step7Location from "./steps/Step7Location";
-import Step8Photos from "./steps/Step8Photos";
-import Step9Bio from "./steps/Step9Bio";
-import Step10Social from "./steps/Step10Social";
-import Step11Review from "./steps/Step11Review";
+import Step2Distance from "./steps/Step2Distance";
+import Step3Lifestyle from "./steps/Step3Lifestyle";
+import Step4Communication from "./steps/Step4Communication";
+import Step5Interests from "./steps/Step5Interests";
+import Step6Location from "./steps/Step6Location";
+import Step7Photos from "./steps/Step7Photos";
+import Step8Bio from "./steps/Step8Bio";
+import Step9Social from "./steps/Step9Social";
+import Step10Review from "./steps/Step10Review";
 import { profileService } from "../../services/profileService";
 
 
@@ -21,9 +20,6 @@ export interface OnboardingData {
   gender: string;
   showGender: boolean;
   interestedIn: string[];
-  orientation: string[];
-  showOrientation: boolean;
-  relationshipType: string;
   distance: number;
   strictDistance: boolean;
   drinking: string;
@@ -53,9 +49,6 @@ const initialData: OnboardingData = {
   gender: "",
   showGender: true,
   interestedIn: [],
-  orientation: [],
-  showOrientation: true,
-  relationshipType: "",
   distance: 25,
   strictDistance: false,
   drinking: "",
@@ -120,7 +113,7 @@ export default function OnboardingFlow() {
   };
 
   const handleNext = () => {
-    if (currentStep < 11) {
+    if (currentStep < 10) {
       setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -190,7 +183,7 @@ export default function OnboardingFlow() {
       onBack={handleBack}
       onSkip={handleSkip}
     />,
-    <Step2Orientation
+    <Step2Distance
       key="step2"
       data={data}
       onChange={(d) => updateData(d)}
@@ -198,7 +191,7 @@ export default function OnboardingFlow() {
       onBack={handleBack}
       onSkip={handleSkip}
     />,
-    <Step3Distance
+    <Step3Lifestyle
       key="step3"
       data={data}
       onChange={(d) => updateData(d)}
@@ -206,7 +199,7 @@ export default function OnboardingFlow() {
       onBack={handleBack}
       onSkip={handleSkip}
     />,
-    <Step4Lifestyle
+    <Step4Communication
       key="step4"
       data={data}
       onChange={(d) => updateData(d)}
@@ -214,7 +207,7 @@ export default function OnboardingFlow() {
       onBack={handleBack}
       onSkip={handleSkip}
     />,
-    <Step5Communication
+    <Step5Interests
       key="step5"
       data={data}
       onChange={(d) => updateData(d)}
@@ -222,7 +215,7 @@ export default function OnboardingFlow() {
       onBack={handleBack}
       onSkip={handleSkip}
     />,
-    <Step6Interests
+    <Step6Location
       key="step6"
       data={data}
       onChange={(d) => updateData(d)}
@@ -230,7 +223,7 @@ export default function OnboardingFlow() {
       onBack={handleBack}
       onSkip={handleSkip}
     />,
-    <Step7Location
+    <Step7Photos
       key="step7"
       data={data}
       onChange={(d) => updateData(d)}
@@ -238,7 +231,7 @@ export default function OnboardingFlow() {
       onBack={handleBack}
       onSkip={handleSkip}
     />,
-    <Step8Photos
+    <Step8Bio
       key="step8"
       data={data}
       onChange={(d) => updateData(d)}
@@ -246,7 +239,7 @@ export default function OnboardingFlow() {
       onBack={handleBack}
       onSkip={handleSkip}
     />,
-    <Step9Bio
+    <Step9Social
       key="step9"
       data={data}
       onChange={(d) => updateData(d)}
@@ -254,16 +247,8 @@ export default function OnboardingFlow() {
       onBack={handleBack}
       onSkip={handleSkip}
     />,
-    <Step10Social
+    <Step10Review
       key="step10"
-      data={data}
-      onChange={(d) => updateData(d)}
-      onNext={handleNext}
-      onBack={handleBack}
-      onSkip={handleSkip}
-    />,
-    <Step11Review
-      key="step11"
       data={data}
       onNext={handleFinish}
       onBack={handleBack}

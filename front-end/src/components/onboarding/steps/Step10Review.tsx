@@ -1,12 +1,12 @@
-// src/components/onboarding/steps/Step11Review.tsx
+// src/components/onboarding/steps/Step10Review.tsx
 import React from "react";
 import { motion } from "framer-motion";
 import { differenceInYears } from "date-fns";
 import StepLayout from "../StepLayout";
-import { MapPin, Heart, Sparkles, MessageCircle, Quote } from "lucide-react";
+import { MapPin, Sparkles, MessageCircle, Quote } from "lucide-react";
 import { OnboardingData } from "../OnboardingFlow";
 
-interface Step11Props {
+interface Step10Props {
   data: OnboardingData;
   onNext: () => void;
   onBack: () => void;
@@ -18,13 +18,13 @@ const getEmoji = (category: string, value: string) => {
   const map: Record<string, Record<string, string>> = {
     drinking: { "Never": "🚫", "Socially": "🍷", "Regularly": "🍻" },
     smoking: { "Never": "🚭", "Sometimes": "💨", "Regularly": "🚬" },
-    workout: { "Never": "🛋️", "Sometimes": "🚶", "Often": "💪", "Daily": "🏋️" },
-    pets: { "Own pets": "🐕", "Love pets": "❤️", "Allergic": "🤧", "None": "🚫" }
+    workout: { "Never": "🛋️", "Sometimes": "🚶", "Often": "💪", "Daily": "✨" },
+    pets: { "Own pets": "🐾", "Love pets": "❤️", "Allergic": "🤧", "None": "🚫" }
   };
   return map[category]?.[value] || "✨";
 };
 
-const Step11Review: React.FC<Step11Props> = ({ data, onNext, onBack, onSkip }) => {
+const Step10Review: React.FC<Step10Props> = ({ data, onNext, onBack, onSkip }) => {
   const age = data.dateOfBirth ? differenceInYears(new Date(), data.dateOfBirth) : null;
   const safeFirst = data.firstName || "User";
   const firstInitial = (safeFirst.charAt(0) || "U").toUpperCase();
@@ -40,8 +40,8 @@ const Step11Review: React.FC<Step11Props> = ({ data, onNext, onBack, onSkip }) =
 
   return (
     <StepLayout
-      currentStep={11}
-      totalSteps={11}
+      currentStep={10}
+      totalSteps={10}
       title="Looking good! ✨"
       subtitle="Here's your profile preview"
       onBack={onBack}
@@ -81,7 +81,7 @@ const Step11Review: React.FC<Step11Props> = ({ data, onNext, onBack, onSkip }) =
             </div>
           </div>
 
-          {/* New Bio Section */}
+          {/* Bio Section */}
           {data.bio && (
             <div className="mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100 relative">
                <Quote className="absolute top-2 left-2 w-4 h-4 text-gray-300 transform scale-x-[-1]" />
@@ -92,7 +92,7 @@ const Step11Review: React.FC<Step11Props> = ({ data, onNext, onBack, onSkip }) =
             </div>
           )}
 
-          {/* New Conversation Starter Section */}
+          {/* Conversation Starter Section */}
           {data.conversationStarter && (
             <div className="mb-8">
               <div className="bg-teal-50 rounded-xl p-4 border border-teal-100">
@@ -119,19 +119,11 @@ const Step11Review: React.FC<Step11Props> = ({ data, onNext, onBack, onSkip }) =
               </span>
             </div>
 
-            {/* Relationship Intent */}
-            {data.relationshipType && (
-              <div className="flex items-center gap-3 text-sm text-gray-600">
-                <Heart className="w-4 h-4 text-teal-500 shrink-0" />
-                <span>Looking for: <span className="font-medium text-gray-900">{data.relationshipType}</span></span>
-              </div>
-            )}
-
-            {/* Orientation */}
-            {data.showOrientation && data.orientation.length > 0 && (
+            {/* Interested In */}
+            {data.interestedIn.length > 0 && (
               <div className="flex items-center gap-3 text-sm text-gray-600">
                 <Sparkles className="w-4 h-4 text-teal-500 shrink-0" />
-                <span>{data.orientation.join(", ")}</span>
+                <span>Looking for: <span className="font-medium text-gray-900">{data.interestedIn.join(", ")}</span></span>
               </div>
             )}
           </div>
@@ -181,4 +173,4 @@ const Step11Review: React.FC<Step11Props> = ({ data, onNext, onBack, onSkip }) =
   );
 };
 
-export default Step11Review;
+export default Step10Review;

@@ -18,8 +18,8 @@ interface Step1Props {
   onSkip: () => void;
 }
 
-const genderOptions = ["Man", "Woman", "Beyond Binary", "Other"];
-const interestOptions = ["Men", "Women", "Everyone", "Beyond Binary"];
+const genderOptions = ["Man", "Woman"];
+const interestOptions = ["Men", "Women", "Everyone"];
 
 export default function Step1BasicInfo({
   data,
@@ -44,7 +44,7 @@ export default function Step1BasicInfo({
   return (
     <StepLayout
       currentStep={1}
-      totalSteps={9}
+      totalSteps={10}
       title="Let's start with the basics"
       subtitle="Tell us a bit about yourself"
       onBack={onBack}
@@ -67,9 +67,9 @@ export default function Step1BasicInfo({
             Date of birth
           </label>
           <DatePicker
-            value={data.dateOfBirth}
+            value={data.dateOfBirth ?? undefined}
             onChange={(dateOfBirth) =>
-              onChange({ ...data, dateOfBirth })
+              onChange({ ...data, dateOfBirth: dateOfBirth ?? null })
             }
           />
           <p className="text-xs text-gray-500 mt-1">

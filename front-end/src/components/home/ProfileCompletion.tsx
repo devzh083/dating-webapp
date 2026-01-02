@@ -6,13 +6,11 @@ import { profileService } from "@/services/profileService";
 interface OnboardingData {
   firstName?: string;
   dateOfBirth?: Date | null;
-  gender?: string;
+  gender?: string; // "Man" or "Woman"
   interests?: string[];
   location?: string;
   photos?: string[];
-  relationshipType?: string;
   bio?: string;
-  orientation?: string[];
   drinking?: string;
   smoking?: string;
   workout?: string;
@@ -20,7 +18,8 @@ interface OnboardingData {
   communicationStyle?: string[];
   responsePace?: string;
   conversationStarter?: string;
-  interestedIn?: string[];
+  interestedIn?: string[]; // "Men", "Women", or "Everyone"
+  distance?: number;
 }
 
 const ProfileCompletion: React.FC = () => {
@@ -52,7 +51,7 @@ const ProfileCompletion: React.FC = () => {
 
       console.log("Profile data for completion check:", data);
 
-      // Validation Logic
+      // Validation Logic - Updated to match new 10-step flow
       const steps = [
         { 
           id: 1, 
@@ -61,44 +60,43 @@ const ProfileCompletion: React.FC = () => {
         },
         { 
           id: 2, 
-          valid: (data.orientation || []).length > 0 && !!data.relationshipType?.trim(),
-          label: "Orientation & Goals"
-        },
-        { 
-          id: 3, 
-          valid: true, // Distance has default
+          valid: typeof data.distance === 'number' && data.distance > 0, // Distance has default but checking anyway
           label: "Distance Preferences"
         },
         { 
-          id: 4, 
-          // FIXED: Check each field individually to handle empty strings
+          id: 3, 
           valid: !!data.drinking?.trim() && !!data.smoking?.trim() && !!data.workout?.trim() && !!data.pets?.trim(),
           label: "Lifestyle"
         },
         { 
-          id: 5, 
+          id: 4, 
           valid: (data.communicationStyle || []).length > 0 && !!data.responsePace?.trim(),
           label: "Communication Style"
         },
         { 
-          id: 6, 
+          id: 5, 
           valid: (data.interests || []).length > 0,
           label: "Interests"
         },
         { 
-          id: 7, 
+          id: 6, 
           valid: !!data.location?.trim(),
           label: "Location"
         },
         { 
-          id: 8, 
+          id: 7, 
           valid: (data.photos || []).length > 0,
           label: "Photos"
         },
         { 
-          id: 9, 
+          id: 8, 
           valid: !!data.bio?.trim() && !!data.conversationStarter?.trim(),
-          label: "Bio & Starter"
+          label: "Bio & Conversation Starter"
+        },
+        { 
+          id: 9, 
+          valid: true, // Social accounts are optional
+          label: "Social Accounts (Optional)"
         },
       ];
 
@@ -107,7 +105,7 @@ const ProfileCompletion: React.FC = () => {
         console.log(`Step ${step.id} (${step.label}): ${step.valid ? '✅' : '❌'}`);
       });
 
-      const totalDataSteps = 9; 
+      const totalDataSteps = 9; // 9 steps total (Step 10 is review)
       const completedSteps = steps.filter((s) => s.valid).length;
       
       const pct = Math.min(100, Math.round((completedSteps / totalDataSteps) * 100));

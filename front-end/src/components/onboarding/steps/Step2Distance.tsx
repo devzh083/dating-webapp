@@ -1,29 +1,29 @@
-// src/components/onboarding/steps/Step3Distance.tsx
+// src/components/onboarding/steps/Step2Distance.tsx
 import StepLayout from "../StepLayout";
 import { CustomSlider } from "../CustomSlider";
 import { ToggleSwitch } from "../ToggleSwitch";
 import { MapPin } from "lucide-react";
 import { OnboardingData } from "../OnboardingFlow";
 
-interface Step3Props {
+interface Step2Props {
   data: Pick<OnboardingData, 'distance' | 'strictDistance'>;
-  onChange: (data: Step3Props['data']) => void;
+  onChange: (data: Step2Props['data']) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
 }
 
-export const Step3Distance = ({
+export const Step2Distance = ({
   data,
   onChange,
   onNext,
   onBack,
   onSkip,
-}: Step3Props) => {
+}: Step2Props) => {
   return (
     <StepLayout
-      currentStep={3}
-      totalSteps={8}
+      currentStep={2}
+      totalSteps={7}
       title="How far would you go?"
       subtitle="Set your maximum distance for matches"
       onBack={onBack}
@@ -71,4 +71,4 @@ export const Step3Distance = ({
   );
 };
 
-export default Step3Distance;
+export default Step2Distance;

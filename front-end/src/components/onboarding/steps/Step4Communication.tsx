@@ -1,12 +1,12 @@
-// src/components/onboarding/steps/Step5Communication.tsx
+// src/components/onboarding/steps/Step4Communication.tsx
 import StepLayout from "../StepLayout";
 import { ChipSelector } from "../ChipSelector";
 import { OnboardingData } from "../OnboardingFlow";
 import { cn } from "@/lib/utils";
 
-interface Step5Props {
+interface Step4Props {
   data: Pick<OnboardingData, 'communicationStyle' | 'responsePace'>;
-  onChange: (data: Step5Props['data']) => void;
+  onChange: (data: Step4Props['data']) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -26,13 +26,13 @@ const paceOptions = [
   { label: "Slow responder", emoji: "🐢", description: "I'm bad at checking my phone" },
 ];
 
-export const Step5Communication = ({
+export const Step4Communication = ({
   data,
   onChange,
   onNext,
   onBack,
   onSkip,
-}: Step5Props) => {
+}: Step4Props) => {
   const toggleStyle = (style: string) => {
     const current = data.communicationStyle;
     if (current.includes(style)) {
@@ -47,8 +47,8 @@ export const Step5Communication = ({
 
   return (
     <StepLayout
-      currentStep={5}
-      totalSteps={8}
+      currentStep={4}
+      totalSteps={7}
       title="How do you vibe best?"
       subtitle="Let's find your communication match"
       onBack={onBack}
@@ -140,4 +140,4 @@ export const Step5Communication = ({
   );
 };
 
-export default Step5Communication;
+export default Step4Communication;

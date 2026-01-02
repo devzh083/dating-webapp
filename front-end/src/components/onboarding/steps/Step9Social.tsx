@@ -1,10 +1,10 @@
-// src/components/onboarding/steps/Step10Social.tsx
+// src/components/onboarding/steps/Step9Social.tsx
 import React, { useState } from "react";
 import { Instagram, MessageCircle, Send, Twitter, Linkedin } from "lucide-react";
 import { OnboardingData } from "../OnboardingFlow";
 import StepLayout from "../StepLayout";
 
-interface Props {
+interface Step9Props {
   data: OnboardingData;
   onChange: (data: Partial<OnboardingData>) => void;
   onNext: () => void;
@@ -12,7 +12,7 @@ interface Props {
   onSkip: () => void;
 }
 
-const Step10Social: React.FC<Props> = ({ data, onChange, onNext, onBack, onSkip }) => {
+const Step9Social: React.FC<Step9Props> = ({ data, onChange, onNext, onBack, onSkip }) => {
   const [instagram, setInstagram] = useState(data.socialAccounts?.instagram || "");
   const [whatsapp, setWhatsapp] = useState(data.socialAccounts?.whatsapp || "");
   const [snapchat, setSnapchat] = useState(data.socialAccounts?.snapchat || "");
@@ -36,8 +36,8 @@ const Step10Social: React.FC<Props> = ({ data, onChange, onNext, onBack, onSkip 
 
   return (
     <StepLayout
-      currentStep={10}
-      totalSteps={11}
+      currentStep={9}
+      totalSteps={9}
       title="Connect Your Socials"
       subtitle="Share your social media to make it easier to connect off the platform"
       onBack={onBack}
@@ -149,4 +149,4 @@ const Step10Social: React.FC<Props> = ({ data, onChange, onNext, onBack, onSkip 
   );
 };
 
-export default Step10Social;
+export default Step9Social;
