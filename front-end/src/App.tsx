@@ -43,7 +43,7 @@ const AppInner: React.FC = () => {
       console.error("Profile check failed:", error);
 
       // 🔴 token invalid or expired → force logout
-      handleLogout(); // Use the centralized logout function
+      handleLogout();
       return false;
     }
   };
@@ -96,7 +96,7 @@ const AppInner: React.FC = () => {
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("onboardingData");
     
-    // 2. Update Global State (Crucial to prevent redirect loop)
+    // 2. Update Global State
     setIsLoggedIn(false);
     setNeedsOnboarding(false);
     
@@ -140,7 +140,6 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            // ✅ Passed onLogout
             <HomePage onLogout={handleLogout} /> 
           )
         }
@@ -155,7 +154,6 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            // ✅ Passed onLogout
             <ChatsPage onLogout={handleLogout} />
           )
         }
@@ -170,7 +168,6 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            // ✅ Passed onLogout
             <NotificationsPage onLogout={handleLogout} />
           )
         }
@@ -185,7 +182,6 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            // ✅ Passed onLogout
             <CafesPage onLogout={handleLogout} />
           )
         }
@@ -207,7 +203,7 @@ const AppInner: React.FC = () => {
         }
       />
 
-      {/* Profile */}
+      {/* Profile - Corrected to assume login if reached */}
       <Route
         path="/profile"
         element={

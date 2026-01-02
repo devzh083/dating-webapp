@@ -2,30 +2,33 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
+// Layout Components
 import TopBar from "@/components/layout/TopBar";
 import ProgressBar from "@/components/onboarding/ProgressBar";
 
-import StepLayout from "./StepLayout";
+// Step Components
+// Note: Ensure all these components are updated to accept the 'onSkip' prop!
 import Step1BasicInfo from "./steps/Step1BasicInfo";
-import Step2Orientation from "./steps/Step2Orientation";
+import Step2Orientation from "./steps/Step2Orientation"; // Repurposed for Relationship Status
 import Step3Distance from "./steps/Step3Distance";
 import Step4Lifestyle from "./steps/Step4Lifestyle";
 import Step5Communication from "./steps/Step5Communication";
 import Step6Interests from "./steps/Step6Interests";
 import Step7Location from "./steps/Step7Location";
-import Step8Photos from "./steps/Step8Photos";
-import Step9Bio from "./steps/Step9Bio";
-import Step10Review from "./steps/Step10Review";
+// Step 8 (Photos) is REMOVED
+import Step9Bio from "./steps/Step9Bio"; // Now acts as Step 8
+import Step10Review from "./steps/Step10Review"; // Now acts as Step 9
 
+// --- TYPE DEFINITIONS ---
 export type OnboardingData = {
   firstName: string;
   dateOfBirth: Date | undefined;
-  gender: string;
+  gender: "Boy" | "Girl" | ""; // Restricted to Boy/Girl
   showGender: boolean;
   interestedIn: string[];
   orientation: string[];
   showOrientation: boolean;
-  relationshipType: string;
+  relationshipType: string; // "Single", "Committed", etc.
   distance: number;
   strictDistance: boolean;
   drinking: string;
@@ -37,12 +40,12 @@ export type OnboardingData = {
   interests: string[];
   location: string;
   useCurrentLocation: boolean;
-  photos?: string[];
   bio: string;
   conversationStarter: string;
+  // photos: string[]; // REMOVED
 };
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 9; // Reduced from 10
 
 const initialData: OnboardingData = {
   firstName: "",
@@ -64,7 +67,6 @@ const initialData: OnboardingData = {
   interests: [],
   location: "",
   useCurrentLocation: false,
-  photos: [],
   bio: "",
   conversationStarter: "",
 };
@@ -78,17 +80,16 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const [data, setData] = useState<OnboardingData>(initialData);
   const navigate = useNavigate();
 
-  // 1. Load Data & Step from LocalStorage on Mount
+  // --- 1. INITIALIZATION ---
   useEffect(() => {
-    // A. Load Data
+    // Load saved data
     const savedData = localStorage.getItem("onboardingData");
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        parsed.dateOfBirth = parsed.dateOfBirth
-          ? new Date(parsed.dateOfBirth)
-          : undefined;
-        // Ensure new fields exist for backward compatibility
+        // Rehydrate Dates
+        parsed.dateOfBirth = parsed.dateOfBirth ? new Date(parsed.dateOfBirth) : undefined;
+        // Ensure fields exist (Migration safety)
         if (!parsed.bio) parsed.bio = "";
         if (!parsed.conversationStarter) parsed.conversationStarter = "";
         setData(parsed);
@@ -97,19 +98,17 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       }
     }
 
-    // B. Load Saved Step (Critical for Resume functionality)
+    // Load saved step (Resume functionality)
     const savedStep = localStorage.getItem("onboardingStep");
     if (savedStep) {
       const stepNum = parseInt(savedStep, 10);
       if (!isNaN(stepNum) && stepNum >= 1 && stepNum <= TOTAL_STEPS) {
         setStep(stepNum);
       }
-    } else {
-      setStep(1);
     }
   }, []);
 
-  // 2. Persist Data & Step whenever they change
+  // --- 2. PERSISTENCE ---
   useEffect(() => {
     localStorage.setItem("onboardingData", JSON.stringify(data));
   }, [data]);
@@ -118,34 +117,28 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     localStorage.setItem("onboardingStep", step.toString());
   }, [step]);
 
+  // --- 3. HANDLERS ---
   const setStepData = (patch: Partial<OnboardingData>) => {
     setData((d) => ({ ...d, ...patch }));
   };
 
-  // ---- API: save profile ----
   const saveProfile = async () => {
     try {
       const payload = {
         ...data,
-        dateOfBirth: data.dateOfBirth
-          ? data.dateOfBirth.toISOString()
-          : null,
+        dateOfBirth: data.dateOfBirth ? data.dateOfBirth.toISOString() : null,
       };
 
       const res = await fetch("http://localhost:8000/api/profile/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${
-            localStorage.getItem("access_token") || ""
-          }`,
+          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
         },
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        console.error("Failed to save profile", await res.text());
-      }
+      if (!res.ok) console.error("Failed to save profile");
     } catch (err) {
       console.error("Error saving profile", err);
     }
@@ -156,11 +149,9 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       setStep((s) => s + 1);
       return;
     }
-
-    // Final Step
+    // Final Step Completion
     await saveProfile();
-    // Clear temporary step, maybe keep data for caching or clear it
-    localStorage.removeItem("onboardingStep");
+    localStorage.removeItem("onboardingStep"); // Clear progress
     
     if (onComplete) {
       onComplete();
@@ -177,6 +168,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     if (step < TOTAL_STEPS) {
       setStep((s) => s + 1);
     } else {
+      // If skipping the final step, just finish
       await saveProfile();
       localStorage.removeItem("onboardingStep");
       if (onComplete) onComplete();
@@ -184,181 +176,148 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     }
   };
 
+  // --- 4. PROGRESS CALCULATION ---
   const completionPercent = useMemo(() => {
+    // Basic heuristic for completion (Photos check removed)
     const checks = [
       !!data.firstName?.trim(),
       !!data.dateOfBirth,
-      !!data.gender?.trim(),
+      !!data.gender?.trim(), // Boy or Girl
       (data.interests || []).length > 0,
       !!data.location?.trim(),
-      (data.photos || []).length > 0,
       !!data.relationshipType?.trim(),
       !!data.bio?.trim(),
-      // Add more checks if needed for the internal bar (though ProfileCompletion handles its own logic)
     ];
     const satisfied = checks.filter(Boolean).length;
-    return Math.round((satisfied / checks.length) * 100);
+    // Total checks is arbitrary, just for the label
+    return Math.round((satisfied / 7) * 100); 
   }, [data]);
 
-  const completionLabel =
-    completionPercent === 0
-      ? "Please set up your profile"
-      : `${completionPercent}% complete`;
+  const completionLabel = completionPercent === 0 
+    ? "Start your profile" 
+    : `${Math.min(100, completionPercent)}% complete`;
 
+  const displayName = data.firstName?.trim() || "User";
+
+  // --- 5. RENDER LOGIC ---
   const renderStep = () => {
     switch (step) {
       case 1:
         return (
-          <Step1BasicInfo
-            data={{
-              firstName: data.firstName,
-              dateOfBirth: data.dateOfBirth,
-              gender: data.gender,
-              showGender: data.showGender,
-              interestedIn: data.interestedIn,
-            }}
-            onChange={(p) => setStepData(p)}
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={handleSkip}
+          <Step1BasicInfo 
+            data={data} 
+            onChange={setStepData} 
+            onNext={goNext} 
+            onSkip={handleSkip} 
           />
         );
       case 2:
         return (
-          <Step2Orientation
-            data={{
-              orientation: data.orientation,
-              showOrientation: data.showOrientation,
-              relationshipType: data.relationshipType,
-            }}
-            onChange={(p) => setStepData(p)}
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={handleSkip}
+          <Step2Orientation 
+            data={data} 
+            onChange={setStepData} 
+            onNext={goNext} 
+            onBack={goBack} 
+            onSkip={handleSkip} 
           />
         );
       case 3:
         return (
-          <Step3Distance
-            data={{
-              distance: data.distance,
-              strictDistance: data.strictDistance,
-            }}
-            onChange={(p) => setStepData(p)}
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={handleSkip}
+          <Step3Distance 
+            data={data} 
+            onChange={setStepData} 
+            onNext={goNext} 
+            onBack={goBack} 
+            onSkip={handleSkip} 
           />
         );
       case 4:
         return (
-          <Step4Lifestyle
-            data={{
-              drinking: data.drinking,
-              smoking: data.smoking,
-              workout: data.workout,
-              pets: data.pets,
-            }}
-            onChange={(p) => setStepData(p)}
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={handleSkip}
+          <Step4Lifestyle 
+            data={data} 
+            onChange={setStepData} 
+            onNext={goNext} 
+            onBack={goBack} 
+            onSkip={handleSkip} 
           />
         );
       case 5:
         return (
-          <Step5Communication
-            data={{
-              communicationStyle: data.communicationStyle,
-              responsePace: data.responsePace,
-            }}
-            onChange={(p) => setStepData(p)}
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={handleSkip}
+          <Step5Communication 
+            data={data} 
+            onChange={setStepData} 
+            onNext={goNext} 
+            onBack={goBack} 
+            onSkip={handleSkip} 
           />
         );
       case 6:
         return (
-          <Step6Interests
-            data={{ interests: data.interests }}
-            onChange={(p) => setStepData(p)}
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={handleSkip}
+          <Step6Interests 
+            data={data} 
+            onChange={setStepData} 
+            onNext={goNext} 
+            onBack={goBack} 
+            onSkip={handleSkip} 
           />
         );
       case 7:
         return (
-          <Step7Location
-            data={{
-              location: data.location,
-              useCurrentLocation: data.useCurrentLocation,
-            }}
-            onChange={(p) => setStepData(p)}
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={handleSkip}
+          <Step7Location 
+            data={data} 
+            onChange={setStepData} 
+            onNext={goNext} 
+            onBack={goBack} 
+            onSkip={handleSkip} 
           />
         );
-      case 8:
+      case 8: // Formerly Step 9
         return (
-          <Step8Photos
-            data={{ photos: data.photos || [] }}
-            onChange={(p) => setStepData(p)}
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={handleSkip}
+          <Step9Bio 
+            data={data} 
+            onChange={setStepData} 
+            onNext={goNext} 
+            onBack={goBack} 
+            onSkip={handleSkip} 
           />
         );
-      case 9:
-        return (
-          <Step9Bio
-            data={{ 
-              bio: data.bio, 
-              conversationStarter: data.conversationStarter 
-            }}
-            onChange={(p) => setStepData(p)}
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={handleSkip}
-          />
-        );
-      case 10:
+      case 9: // Formerly Step 10
       default:
         return (
-          <Step10Review
-            data={data}
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={handleSkip}
+          <Step10Review 
+            data={data} 
+            onNext={goNext} 
+            onBack={goBack} 
+            // Usually we don't skip the review, but we can allow finishing without review
+            onSkip={handleSkip} 
           />
         );
     }
   };
 
-  const displayName = data.firstName?.trim() || "User";
-
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <TopBar userName={displayName} />
-      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-4">
+      
+      {/* Progress Header */}
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 sticky top-16 bg-white z-40">
         <div className="flex-1">
           <ProgressBar currentStep={step} totalSteps={TOTAL_STEPS} />
         </div>
-        <div className="ml-4 text-sm font-medium text-muted-foreground">
+        <div className="ml-4 text-xs font-bold text-gray-400 uppercase tracking-wide">
           {completionLabel}
         </div>
       </div>
 
+      {/* Main Step Content */}
       <AnimatePresence mode="wait">
         <motion.div
           key={step}
-          initial={{ opacity: 0, x: 40 }}
+          initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -40 }}
-          transition={{ duration: 0.25 }}
-          className="flex-1"
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+          className="flex-1 overflow-y-auto"
         >
           {renderStep()}
         </motion.div>

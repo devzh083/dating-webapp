@@ -73,7 +73,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
           throw new Error("No access token found. Please login again.");
         }
 
-        const response = await fetch("http://127.0.0.1:8000/api/matches/", {
+        const response = await fetch("http:/  /127.0.0.1:8000/api/matches/", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
