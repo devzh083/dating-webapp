@@ -1,3 +1,4 @@
+// src/components/onboarding/steps/Step8Bio.tsx
 import React from "react";
 import StepLayout from "../StepLayout";
 import { OnboardingData } from "../OnboardingFlow";
@@ -5,9 +6,9 @@ import { MessageCircle, PenLine, Sparkles, Quote } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-interface Step9Props {
+interface Step8Props {
   data: Pick<OnboardingData, "bio" | "conversationStarter">;
-  onChange: (data: Step9Props["data"]) => void;
+  onChange: (data: Step8Props["data"]) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -22,19 +23,19 @@ const STARTERS = [
   "Two truths and a lie...",
 ];
 
-export const Step9Bio = ({
+export const Step8Bio = ({
   data,
   onChange,
   onNext,
   onBack,
   onSkip,
-}: Step9Props) => {
+}: Step8Props) => {
   const bioCharacterLimit = 150;
 
   return (
     <StepLayout
-      currentStep={9}
-      totalSteps={10} // Updated total steps
+      currentStep={8}
+      totalSteps={8}
       title="Express Yourself"
       subtitle="Let your personality shine through words"
       onBack={onBack}
@@ -129,4 +130,4 @@ export const Step9Bio = ({
   );
 };
 
-export default Step9Bio;
+export default Step8Bio;

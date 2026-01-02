@@ -1,13 +1,13 @@
-// src/components/onboarding/steps/Step6Interests.tsx
+// src/components/onboarding/steps/Step5Interests.tsx
 import StepLayout from "../StepLayout";
 import { ChipSelector } from "../ChipSelector";
 import { motion } from "framer-motion";
 import { OnboardingData } from "../OnboardingFlow";
 import { cn } from "@/lib/utils";
 
-interface Step6Props {
+interface Step5Props {
   data: Pick<OnboardingData, "interests">;
-  onChange: (data: Step6Props["data"]) => void;
+  onChange: (data: Step5Props["data"]) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -19,7 +19,7 @@ const interestCategories = [
     emoji: "🎬",
     options: [
       "Action", "Comedy", "Drama", "Horror", 
-      "Sci-Fi", "Documentaries", "Anime", "Reality TV"
+      "Sci-Fi", "Documentaries", "Anime", "Reality TV", "Other"
     ],
   },
   {
@@ -27,7 +27,7 @@ const interestCategories = [
     emoji: "🎵",
     options: [
       "Pop", "Hip-Hop", "Rock", "Electronic", 
-      "R&B", "Country", "Jazz", "Classical"
+      "R&B", "Country", "Jazz", "Classical", "Other"
     ],
   },
   {
@@ -35,7 +35,7 @@ const interestCategories = [
     emoji: "⚽",
     options: [
       "Football", "Basketball", "Tennis", "Swimming", 
-      "Running", "Yoga", "Cycling", "Golf"
+      "Running", "Yoga", "Cycling", "Golf", "Other"
     ],
   },
   {
@@ -43,7 +43,7 @@ const interestCategories = [
     emoji: "🍕",
     options: [
       "Cooking", "Fine Dining", "Street Food", "Coffee", 
-      "Wine", "Cocktails", "Vegan", "BBQ"
+      "Wine", "Cocktails", "Vegan", "BBQ", "Other"
     ],
   },
   {
@@ -51,7 +51,7 @@ const interestCategories = [
     emoji: "🎨",
     options: [
       "Photography", "Reading", "Gaming", "Art", 
-      "Writing", "Gardening", "DIY", "Crafts"
+      "Writing", "Gardening", "DIY", "Crafts", "Other"
     ],
   },
   {
@@ -59,20 +59,20 @@ const interestCategories = [
     emoji: "✈️",
     options: [
       "Beach", "Mountains", "City Trips", "Backpacking", 
-      "Road Trips", "Camping", "Cruises", "Staycations"
+      "Road Trips", "Camping", "Cruises", "Staycations", "Other"
     ],
   },
 ] as const;
 
 const MAX_INTERESTS = 10;
 
-export const Step6Interests = ({
+export const Step5Interests = ({
   data,
   onChange,
   onNext,
   onBack,
   onSkip,
-}: Step6Props) => {
+}: Step5Props) => {
   const toggleInterest = (interest: string) => {
     const current = data.interests;
     if (current.includes(interest)) {
@@ -87,8 +87,8 @@ export const Step6Interests = ({
 
   return (
     <StepLayout
-      currentStep={6}
-      totalSteps={8}
+      currentStep={5}
+      totalSteps={7}
       title="What are you into?"
       subtitle="Pick your top interests to help find better matches"
       onBack={onBack}
@@ -163,4 +163,4 @@ export const Step6Interests = ({
   );
 };
 
-export default Step6Interests;
+export default Step5Interests;

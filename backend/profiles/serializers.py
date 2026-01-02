@@ -19,9 +19,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'gender',
             'show_gender',
             'interested_in',
-            'orientation',
-            'show_orientation',
-            'relationship_type',
             'distance',
             'strict_distance',
             'drinking',
@@ -42,6 +39,31 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['created_at', 'updated_at', 'is_complete']
+    
+    def validate_gender(self, value):
+        """Validate gender is either 'Man' or 'Woman'"""
+        valid_genders = ['Man', 'Woman']
+        if value and value not in valid_genders:
+            raise serializers.ValidationError(
+                f"Gender must be one of: {', '.join(valid_genders)}"
+            )
+        return value
+    
+    def validate_interested_in(self, value):
+        """Validate interested_in contains only valid options"""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("interested_in must be a list")
+        
+        valid_options = ['Men', 'Women', 'Everyone']
+        invalid_options = [item for item in value if item not in valid_options]
+        
+        if invalid_options:
+            raise serializers.ValidationError(
+                f"Invalid options: {', '.join(invalid_options)}. "
+                f"Valid options are: {', '.join(valid_options)}"
+            )
+        
+        return value
     
     def validate_photos(self, value):
         """Ensure max 4 photos"""

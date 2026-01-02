@@ -9,15 +9,14 @@ import ProgressBar from "@/components/onboarding/ProgressBar";
 import { useNavigate, useLocation } from "react-router-dom";
 import Step1BasicInfo from "./steps/Step1BasicInfo";
 import Step2Orientation from "./steps/Step2Orientation";
-import Step3Distance from "./steps/Step3Distance";
-import Step4Lifestyle from "./steps/Step4Lifestyle";
-import Step5Communication from "./steps/Step5Communication";
-import Step6Interests from "./steps/Step6Interests";
-import Step7Location from "./steps/Step7Location";
-import Step8Photos from "./steps/Step8Photos";
-import Step9Bio from "./steps/Step9Bio";
-import Step10Social from "./steps/Step10Social";
-import Step11Review from "./steps/Step11Review";
+import Step3Lifestyle from "./steps/Step3Lifestyle";
+import Step4Communication from "./steps/Step4Communication";
+import Step5Interests from "./steps/Step5Interests";
+import Step6Location from "./steps/Step6Location";
+import Step7Photos from "./steps/Step7Photos";
+import Step8Bio from "./steps/Step8Bio";
+import Step9Social from "./steps/Step9Social";
+import Step10Review from "./steps/Step10Review";
 import { profileService } from "../../services/profileService";
 
 // --- TYPE DEFINITIONS ---
@@ -27,9 +26,6 @@ export type OnboardingData = {
   gender: string;
   showGender: boolean;
   interestedIn: string[];
-  orientation: string[];
-  showOrientation: boolean;
-  relationshipType: string;
   distance: number;
   strictDistance: boolean;
   drinking: string;
@@ -59,9 +55,9 @@ const initialData: OnboardingData = {
   gender: "",
   showGender: false,
   interestedIn: [],
-  orientation: [],
-  showOrientation: false,
-  relationshipType: "",
+  // orientation: [],
+  // showOrientation: false,
+  // relationshipType: "",
   distance: 25,
   strictDistance: false,
   drinking: "",
@@ -175,7 +171,7 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
   };
 
   const handleNext = () => {
-    if (currentStep < 11) {
+    if (currentStep < 10) {
       setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -239,25 +235,106 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
       case 2:
         return <Step2Orientation data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       case 3:
-        return <Step3Distance data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+        return <Step3Lifestyle data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       case 4:
-        return <Step4Lifestyle data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+        return <Step4Communication data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       case 5:
-        return <Step5Communication data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+        return <Step5Interests data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       case 6:
-        return <Step6Interests data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+        return <Step6Location data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       case 7:
-        return <Step7Location data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+        return <Step7Photos data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       case 8:
-        return <Step8Photos data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+        return <Step8Bio data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       case 9:
-        return <Step9Bio data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+        return <Step9Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       case 10:
-        return <Step10Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+        // return <Step10Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       default:
-        return <Step11Review data={data} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+        return <Step10Review data={data} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
     }
   };
+  const steps = [
+    <Step1BasicInfo
+      key="step1"
+      data={data}
+      onChange={(d) => updateData(d)}
+      onNext={handleNext}
+      // onBack={handleBack}
+      onSkip={handleSkip}
+    />,
+    <Step2Orientation
+      key="step2"
+      data={data}
+      onChange={(d) => updateData(d)}
+      onNext={handleNext}
+      onBack={handleBack}
+      onSkip={handleSkip}
+    />,
+    <Step3Lifestyle
+      key="step3"
+      data={data}
+      onChange={(d) => updateData(d)}
+      onNext={handleNext}
+      onBack={handleBack}
+      onSkip={handleSkip}
+    />,
+    <Step4Communication
+      key="step4"
+      data={data}
+      onChange={(d) => updateData(d)}
+      onNext={handleNext}
+      onBack={handleBack}
+      onSkip={handleSkip}
+    />,
+    <Step5Interests
+      key="step5"
+      data={data}
+      onChange={(d) => updateData(d)}
+      onNext={handleNext}
+      onBack={handleBack}
+      onSkip={handleSkip}
+    />,
+    <Step6Location
+      key="step6"
+      data={data}
+      onChange={(d) => updateData(d)}
+      onNext={handleNext}
+      onBack={handleBack}
+      onSkip={handleSkip}
+    />,
+    <Step7Photos
+      key="step7"
+      data={data}
+      onChange={(d) => updateData(d)}
+      onNext={handleNext}
+      onBack={handleBack}
+      onSkip={handleSkip}
+    />,
+    <Step8Bio
+      key="step8"
+      data={data}
+      onChange={(d) => updateData(d)}
+      onNext={handleNext}
+      onBack={handleBack}
+      onSkip={handleSkip}
+    />,
+    <Step9Social
+      key="step9"
+      data={data}
+      onChange={(d) => updateData(d)}
+      onNext={handleNext}
+      onBack={handleBack}
+      onSkip={handleSkip}
+    />,
+    <Step10Review
+      key="step10"
+      data={data}
+      onNext={handleFinish}
+      onBack={handleBack}
+      onSkip={handleFinish}
+    />,
+  ];
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

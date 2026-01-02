@@ -1,11 +1,11 @@
-// src/components/onboarding/steps/Step4Lifestyle.tsx
+// src/components/onboarding/steps/Step3Lifestyle.tsx
 import StepLayout from "../StepLayout";
 import { ChipSelector } from "../ChipSelector";
 import { OnboardingData } from "../OnboardingFlow";
 
-interface Step4Props {
+interface Step3Props {
   data: Pick<OnboardingData, 'drinking' | 'smoking' | 'workout' | 'pets'>;
-  onChange: (data: Step4Props['data']) => void;
+  onChange: (data: Step3Props['data']) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -26,27 +26,27 @@ const lifestyleOptions = {
     { label: "Never", emoji: "🛋️" },
     { label: "Sometimes", emoji: "🚶" },
     { label: "Often", emoji: "💪" },
-    { label: "Daily", emoji: "✨" }, // Updated emoji to match video vibe
+    { label: "Daily", emoji: "✨" },
   ],
   pets: [
-    { label: "Own pets", emoji: "🐾" }, // Updated to generic paw or dog
+    { label: "Own pets", emoji: "🐾" },
     { label: "Love pets", emoji: "❤️" },
     { label: "Allergic", emoji: "🤧" },
     { label: "None", emoji: "🚫" },
   ],
 } as const;
 
-export const Step4Lifestyle = ({
+export const Step3Lifestyle = ({
   data,
   onChange,
   onNext,
   onBack,
   onSkip,
-}: Step4Props) => {
+}: Step3Props) => {
   return (
     <StepLayout
-      currentStep={4}
-      totalSteps={8} // Matched to video "Step 4 of 8"
+      currentStep={3}
+      totalSteps={7}
       title="Your lifestyle"
       subtitle="No judgment here — just finding your vibe"
       onBack={onBack}
@@ -130,4 +130,4 @@ export const Step4Lifestyle = ({
   );
 };
 
-export default Step4Lifestyle;
+export default Step3Lifestyle;

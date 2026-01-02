@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  MapPin, Heart, MessageCircle, Quote,
+  MapPin, MessageCircle, Quote,
   Edit, Settings, LogOut, Camera, ArrowLeft, AlertCircle,
   Instagram, Send, Twitter, Linkedin, MessageCircleMore
 } from 'lucide-react';
@@ -14,9 +14,6 @@ interface UserProfile {
   gender: string;
   showGender: boolean;
   interestedIn: string[];
-  orientation: string[];
-  showOrientation: boolean;
-  relationshipType: string;
   distance: number;
   strictDistance: boolean;
   drinking: string;
@@ -308,11 +305,11 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                <Heart className="w-5 h-5 text-teal-500" />
+                <MapPin className="w-5 h-5 text-teal-500" />
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">Looking for</p>
+                  <p className="text-xs text-gray-500 font-medium">Max Distance</p>
                   <p className="text-sm font-bold text-gray-900">
-                    {profile.relationshipType || 'Not set'}
+                    {profile.distance} km
                   </p>
                 </div>
               </div>
@@ -339,24 +336,6 @@ const ProfilePage: React.FC = () => {
             {/* Tab Content */}
             {activeTab === 'about' && (
               <div className="space-y-6">
-                {profile.showOrientation && profile.orientation.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                      Orientation
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.orientation.map((item) => (
-                        <span
-                          key={item}
-                          className="px-3 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-700 text-sm font-semibold"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {lifestyleTags.length > 0 && (
                   <div>
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
@@ -540,6 +519,11 @@ const ProfilePage: React.FC = () => {
                   <h4 className="font-semibold text-gray-900 mb-2">Distance</h4>
                   <p className="text-sm text-gray-600">
                     Max: <span className="font-bold">{profile.distance} km</span>
+                    {profile.strictDistance && (
+                      <span className="ml-2 text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">
+                        Strict
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl">

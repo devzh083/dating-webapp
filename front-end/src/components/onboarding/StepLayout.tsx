@@ -11,8 +11,8 @@ interface StepLayoutProps {
   totalSteps: number;
   title: string;
   subtitle?: string;
-  onBack: () => void;
-  onSkip: () => void;
+  onBack?: () => void;
+  onSkip?: () => void;
   onNext: () => void;
   nextLabel?: string;
   canProceed?: boolean;

@@ -1,4 +1,4 @@
-// src/components/onboarding/steps/Step7Location.tsx
+// src/components/onboarding/steps/Step6Location.tsx
 import { useState } from "react";
 import StepLayout from "../StepLayout";
 import { TextInput } from "../TextInput";
@@ -7,21 +7,21 @@ import { motion } from "framer-motion";
 import { OnboardingData } from "../OnboardingFlow";
 import { cn } from "@/lib/utils";
 
-interface Step7Props {
+interface Step6Props {
   data: Pick<OnboardingData, "location" | "useCurrentLocation">;
-  onChange: (data: Step7Props["data"]) => void;
+  onChange: (data: Step6Props["data"]) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
 }
 
-export const Step7Location = ({
+export const Step6Location = ({
   data,
   onChange,
   onNext,
   onBack,
   onSkip,
-}: Step7Props) => {
+}: Step6Props) => {
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
@@ -176,8 +176,8 @@ export const Step7Location = ({
 
   return (
     <StepLayout
-      currentStep={7}
-      totalSteps={11}
+      currentStep={6}
+      totalSteps={10}
       title="Where are you?"
       subtitle="Help us show you people nearby"
       onBack={onBack}
@@ -199,15 +199,16 @@ export const Step7Location = ({
 
         {/* Location Input */}
         <div className="space-y-6">
-          <TextInput
-            value={data.location}
-            onChange={(location) =>
-              onChange({ ...data, location, useCurrentLocation: false })
-            }
-            placeholder="Enter your city"
-            icon={<MapPin className="w-5 h-5 text-gray-400" />}
-            disabled={isLoadingLocation}
-          />
+          <div className={cn(isLoadingLocation && "opacity-50 pointer-events-none")}>
+            <TextInput
+              value={data.location}
+              onChange={(location) =>
+                onChange({ ...data, location, useCurrentLocation: false })
+              }
+              placeholder="Enter your city"
+              icon={<MapPin className="w-5 h-5 text-gray-400" />}
+            />
+          </div>
 
           {/* Divider */}
           <div className="flex items-center gap-4 px-2">
@@ -271,7 +272,7 @@ export const Step7Location = ({
         {/* Privacy Note - Light Teal Box */}
         <div className="mt-8 bg-teal-50/50 rounded-xl p-4 border border-teal-100/50">
           <div className="flex gap-4">
-            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm text-teal-500">
+            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm text-teal-500">
               <Lock className="w-5 h-5" />
             </div>
             <div>
@@ -302,4 +303,4 @@ export const Step7Location = ({
   );
 };
 
-export default Step7Location;
+export default Step6Location;

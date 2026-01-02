@@ -1,4 +1,4 @@
-// src/components/onboarding/steps/Step8Photos.tsx
+// src/components/onboarding/steps/Step7Photos.tsx
 import React, { useState, useEffect } from "react";
 import StepLayout from "../StepLayout";
 import { OnboardingData } from "../OnboardingFlow";
@@ -6,9 +6,9 @@ import { Camera, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
-interface Step8Props {
+interface Step7Props {
   data: Pick<OnboardingData, "photos">;
-  onChange: (data: Step8Props["data"]) => void;
+  onChange: (data: Step7Props["data"]) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -16,7 +16,7 @@ interface Step8Props {
 
 const MAX_PHOTOS = 4;
 
-const Step8Photos: React.FC<Step8Props> = ({
+const Step7Photos: React.FC<Step7Props> = ({
   data,
   onChange,
   onNext,
@@ -99,8 +99,8 @@ const Step8Photos: React.FC<Step8Props> = ({
 
   return (
     <StepLayout
-      currentStep={8}
-      totalSteps={9}
+      currentStep={7}
+      totalSteps={10}
       title="Add your best photos"
       subtitle="Upload 4 photos to complete your profile. First photo will be your main profile picture."
       onBack={onBack}
@@ -168,7 +168,7 @@ const Step8Photos: React.FC<Step8Props> = ({
 
                     {/* Main Badge */}
                     {isMain && (
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent py-3 flex justify-center">
+                      <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/70 to-transparent py-3 flex justify-center">
                         <span className="text-xs font-bold text-white uppercase tracking-wider px-3 py-1 bg-teal-500 rounded-full">
                           Main
                         </span>
@@ -243,4 +243,4 @@ const Step8Photos: React.FC<Step8Props> = ({
   );
 };
 
-export default Step8Photos;
+export default Step7Photos;
