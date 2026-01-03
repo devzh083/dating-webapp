@@ -1,4 +1,3 @@
-// src/components/ui/calendar.tsx
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
@@ -24,30 +23,27 @@ function Calendar({
           "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
 
-        /* caption (title + dropdowns) */
+        /* caption */
         caption: "flex flex-col gap-2 pt-1 relative items-center",
         caption_label: "text-sm font-medium",
         caption_dropdowns: "flex items-center gap-2",
-        caption_dropdown:
-          "inline-flex items-center rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40",
 
-        /* navigation arrows */
-        nav: "space-x-1 flex items-center",
+        /* navigation */
+        nav: "flex items-center space-x-1",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
           "h-7 w-7 bg-transparent p-0 opacity-60 hover:opacity-100"
         ),
-        nav_button_previous: "absolute left-1",
-        nav_button_next: "absolute right-1",
 
-        /* table / grid */
+        /* table */
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell:
           "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
         row: "flex w-full mt-2",
 
-        cell: "h-9 w-9 text-center text-sm p-0 relative " +
+        cell:
+          "h-9 w-9 text-center text-sm p-0 relative " +
           "[&:has([aria-selected].day-range-end)]:rounded-r-md " +
           "[&:has([aria-selected].day-outside)]:bg-accent/50 " +
           "[&:has([aria-selected])]:bg-accent " +
@@ -71,12 +67,25 @@ function Calendar({
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
 
-        /* allow overrides from props */
         ...classNames,
       }}
       components={{
-        IconLeft: (_props) => <ChevronLeft className="h-4 w-4" />,
-        IconRight: (_props) => <ChevronRight className="h-4 w-4" />,
+        NavButton: ({ onClick, dir }) => (
+          <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-7 w-7 p-0 opacity-60 hover:opacity-100"
+            )}
+          >
+            {dir === "prev" ? (
+              <ChevronLeft className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </button>
+        ),
       }}
       {...props}
     />
