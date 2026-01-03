@@ -67,13 +67,13 @@ const HomePage = ({ onLogout }: HomePageProps) => {
       try {
         setLoading(true);
         setError(null);
-        
+
         const token = localStorage.getItem("access_token");
         if (!token) {
           throw new Error("No access token found. Please login again.");
         }
 
-        const response = await fetch("http:/  /127.0.0.1:8000/api/matches/", {
+        const response = await fetch("http://127.0.0.1:8000/api/matches/", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -82,6 +82,9 @@ const HomePage = ({ onLogout }: HomePageProps) => {
         });
 
         if (!response.ok) {
+          // Helpful diagnostics while debugging
+          const text = await response.text();
+          console.error("Bad response body:", text);
           throw new Error(`Failed to fetch matches: ${response.status} ${response.statusText}`);
         }
 
@@ -90,7 +93,8 @@ const HomePage = ({ onLogout }: HomePageProps) => {
         const transformedProfiles: SwipeProfile[] = data.map((item, index) => ({
           id: item.email || `profile-${index}`,
           firstName: item.profile.firstName,
-          selfDescription: item.profile.tagline || item.profile.firstName || "No description available",
+          selfDescription:
+            item.profile.tagline || item.profile.firstName || "No description available",
           conversationHook: item.profile.starter || "Tell me about yourself!",
           vibeTags: getRandomInterests(item.profile.interests || [], 4),
         }));
@@ -104,6 +108,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
         setLoading(false);
       }
     };
+
 
     fetchMatches();
   }, []);
