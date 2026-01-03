@@ -1,4 +1,4 @@
-// src/services/profileService.ts - ENHANCED DEBUG VERSION
+// C:\Users\vikas\dating-webapp\front-end\src\services\profileService.ts
 import { OnboardingData } from '../components/onboarding/OnboardingFlow';
 
 const API_BASE_URL = 'http://127.0.0.1:8000/api';
@@ -313,6 +313,104 @@ export const profileService = {
       return { success: true, url: data.url };
     } catch (error) {
       console.error('[profileService] Error uploading photo:', error);
+      throw error;
+    }
+  },
+};
+
+/// Admin Service - Token-based auth for Django superusers
+export const adminService = {
+  // Admin login (username/password only)
+  async adminLogin(username: string, password: string) {
+    console.log('[adminService] Admin login attempt');
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Login failed');
+      }
+
+      const data = await response.json();
+      
+      // Store admin token separately
+      localStorage.setItem('admin_token', data.token);
+      localStorage.setItem('admin_user', JSON.stringify(data.user));
+      
+      console.log('[adminService] Login successful:', data.user.username);
+      return data;
+    } catch (error) {
+      console.error('[adminService] Login error:', error);
+      throw error;
+    }
+  },
+
+  // Admin logout
+  adminLogout() {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+  },
+
+  // Get admin auth headers
+  getAdminHeaders() {
+    const token = localStorage.getItem('admin_token');
+    return {
+      'Authorization': `Token ${token}`,
+      'Content-Type': 'application/json',
+    };
+  },
+
+  // Check if user is admin
+  isAdmin() {
+    const user = localStorage.getItem('admin_user');
+    if (!user) return false;
+    
+    try {
+      const userData = JSON.parse(user);
+      return userData.is_staff === true;
+    } catch {
+      return false;
+    }
+  },
+
+  // Get current admin user
+  getAdminUser() {
+    const user = localStorage.getItem('admin_user');
+    if (!user) return null;
+    
+    try {
+      return JSON.parse(user);
+    } catch {
+      return null;
+    }
+  },
+
+  // Generic admin API call
+  async adminApiCall<T>(endpoint: string, method: string = 'GET', data: any = null): Promise<T> {
+    const options: RequestInit = {
+      method,
+      headers: this.getAdminHeaders(),
+    };
+
+    if (data && method !== 'GET') {
+      options.body = JSON.stringify(data);
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin${endpoint}`, options);
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(error.error || 'Request failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('[adminService] API error:', error);
       throw error;
     }
   },

@@ -203,9 +203,9 @@ export default function LoginPage({
   <Button
     variant="ghost"
     className="text-[12px] font-semibold"
-    onClick={() => navigate("/cafe-partner/login")}
+    onClick={() => navigate("/admin/login")}
   >
-    Café Partner
+    Admin
   </Button>
 
   <Button
@@ -510,14 +510,14 @@ export default function LoginPage({
                   >
                     New user? Sign up
                   </button>
-                  <p className="text-[11px] text-[#b0b5c0]">
+                  {/* <p className="text-[11px] text-[#b0b5c0]">
                     <Link
                       to="/cafe-partner/login"
                       className="hover:text-[#6b7280] underline-offset-2 hover:underline"
                     >
                       Café Partner Login
-                    </Link>
-                  </p>
+                    </Link> */}
+                  {/* </p> */}
                 </div>
               </div>
             </motion.div>

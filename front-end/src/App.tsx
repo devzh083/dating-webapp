@@ -12,8 +12,20 @@ import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
+import AdminLogin from './pages/AdminLogin';
+import AdminPanel from './pages/AdminPanel';
+import { adminService } from './services/profileService';
 
-
+// Admin Protected Route Component
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const isAdmin = adminService.isAdmin();
+  
+  if (!isAdmin) {
+    return <Navigate to="/admin/login" replace />;
+  }
+  
+  return <>{children}</>;
+};
 
 const AppInner: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = loading
@@ -54,6 +66,12 @@ const AppInner: React.FC = () => {
   /* ---------------- APP STARTUP ---------------- */
   useEffect(() => {
     const initAuth = async () => {
+      // Skip auth check for admin routes
+      if (location.pathname.startsWith('/admin')) {
+        setIsLoggedIn(false);
+        return;
+      }
+
       const params = new URLSearchParams(window.location.search);
       const accessFromQuery = params.get("access_token");
       const refreshFromQuery = params.get("refresh_token");
@@ -81,7 +99,7 @@ const AppInner: React.FC = () => {
     };
 
     initAuth();
-  }, []);
+  }, [location.pathname]);
 
   const handleLoginSuccess = async () => {
     const accessToken = localStorage.getItem("access_token");
@@ -103,8 +121,8 @@ const AppInner: React.FC = () => {
     navigate("/", { replace: true });
   };
 
-  // Show loading only on initial load
-  if (isLoggedIn === null) {
+  // Show loading only on initial load (skip for admin routes)
+  if (isLoggedIn === null && !location.pathname.startsWith('/admin')) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -117,6 +135,18 @@ const AppInner: React.FC = () => {
 
   return (
     <Routes>
+      {/* ---------------- ADMIN ROUTES (SEPARATE FROM USER ROUTES) ---------------- */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route
+        path="/admin/dashboard"
+        element={
+          <AdminRoute>
+            <AdminPanel />
+          </AdminRoute>
+        }
+      />
+      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+
       {/* ---------------- PUBLIC ROUTES ---------------- */}
       <Route
         path="/"

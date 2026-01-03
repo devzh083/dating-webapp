@@ -1,6 +1,6 @@
-# profiles/models.py
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 class UserProfile(models.Model):
     # Link to Django User (One-to-One relationship)
@@ -51,6 +51,36 @@ class UserProfile(models.Model):
     # Step 9: Social Accounts
     social_accounts = models.JSONField(default=dict, blank=True)
     
+    # ===== ADMIN PANEL FIELDS =====
+    STATUS_CHOICES = [
+        ('online', 'Online'),
+        ('away', 'Away'),
+        ('offline', 'Offline'),
+    ]
+    
+    ACCOUNT_STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('suspended', 'Suspended'),
+        ('banned', 'Banned'),
+        ('pending', 'Pending'),
+    ]
+    
+    phone = models.CharField(max_length=20, blank=True)
+    age = models.IntegerField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='offline')
+    account_status = models.CharField(max_length=20, choices=ACCOUNT_STATUS_CHOICES, default='active')
+    join_date = models.DateTimeField(auto_now_add=True)
+    last_active = models.DateTimeField(default=timezone.now)
+    active_time = models.IntegerField(default=0)  # in hours
+    matches = models.IntegerField(default=0)
+    messages = models.IntegerField(default=0)
+    photo_count = models.IntegerField(default=0)  # renamed from 'photos' to avoid conflict
+    reports = models.IntegerField(default=0)
+    profile_complete = models.BooleanField(default=False)
+    verified = models.BooleanField(default=False)
+    premium = models.BooleanField(default=False)
+    # ===== END ADMIN PANEL FIELDS =====
+    
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -69,6 +99,18 @@ class UserProfile(models.Model):
         if self.social_accounts is None:
             self.social_accounts = {}
         
+        # Calculate age from date_of_birth
+        if self.date_of_birth:
+            from datetime import date
+            today = date.today()
+            self.age = today.year - self.date_of_birth.year - (
+                (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
+            )
+        
+        # Update photo_count based on photos list
+        if isinstance(self.photos, list):
+            self.photo_count = len(self.photos)
+        
         # Auto-check if profile is complete
         self.is_complete = all([
             self.first_name,
@@ -77,4 +119,8 @@ class UserProfile(models.Model):
             self.location,
             len(self.photos) > 0 if isinstance(self.photos, list) else False
         ])
+        
+        # Sync profile_complete with is_complete
+        self.profile_complete = self.is_complete
+        
         super().save(*args, **kwargs)

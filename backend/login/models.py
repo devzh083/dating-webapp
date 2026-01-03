@@ -1,6 +1,6 @@
 from config.firebase import db
 from firebase_admin import firestore
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 
 class FirebaseAuthManager:
