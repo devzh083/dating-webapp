@@ -1,6 +1,3 @@
-# ============================================
-# profiles/serializers.py
-# ============================================
 from rest_framework import serializers
 from .models import UserProfile
 
@@ -12,8 +9,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = [
+            # User info
             'username',
             'email',
+            
+            # Profile setup fields
             'first_name',
             'date_of_birth',
             'gender',
@@ -37,8 +37,33 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'is_complete',
             'created_at',
             'updated_at',
+            
+            # Admin panel fields
+            'phone',
+            'age',
+            'status',
+            'account_status',
+            'join_date',
+            'last_active',
+            'active_time',
+            'matches',
+            'messages',
+            'photo_count',
+            'reports',
+            'profile_complete',
+            'verified',
+            'premium',
         ]
-        read_only_fields = ['created_at', 'updated_at', 'is_complete']
+        read_only_fields = [
+            'created_at', 
+            'updated_at', 
+            'is_complete', 
+            'age',  # Calculated from date_of_birth
+            'photo_count',  # Calculated from photos
+            'profile_complete',  # Synced with is_complete
+            'join_date',
+            'last_active',
+        ]
     
     def validate_gender(self, value):
         """Validate gender is either 'Man' or 'Woman'"""

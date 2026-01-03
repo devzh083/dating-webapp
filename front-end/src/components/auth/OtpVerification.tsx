@@ -1,3 +1,4 @@
+// C:\Users\vikas\dating-webapp\front-end\src\components\auth\OtpVerification.tsx
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Mail, ArrowLeft } from "lucide-react";

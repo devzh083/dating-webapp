@@ -1,4 +1,4 @@
-import { Home, MessageCircle, Bell, Coffee, Heart, Sparkles } from "lucide-react";
+import { Home, MessageCircle, Bell, Heart, Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import ProfileDropdown from "./ProfileDropdown";

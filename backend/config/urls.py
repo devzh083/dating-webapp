@@ -10,6 +10,7 @@ urlpatterns = [
     # All login app APIs under /api/
     path("api/", include("login.urls")),
     path('api/profile/', include('profiles.urls')),
+    path('api/admin/', include('admin_panel.urls')),  
 
 ]
 
