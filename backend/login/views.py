@@ -24,10 +24,22 @@ from rest_framework.permissions import IsAuthenticated
 
 from config.firebase import db
 from .models import FirebaseProfileManager
+from google.cloud import firestore
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+
+from .models import FirebaseMatchManager
+from .ws import notify_user
+
+from django.contrib.auth import get_user_model
 
 
 
-from .models import FirebaseAuthManager, FirebaseProfileManager
+from .models import FirebaseAuthManager, FirebaseProfileManager, FirebaseLikeManager, FirebaseMatchManager, FirebaseChatManager
+
 from .models_photos import UserPhoto  # <-- your ImageField model
 
 User = get_user_model()
@@ -708,13 +720,15 @@ class MatchRecommendationsView(APIView):
         docs = list(query.stream())
 
         results = []
-
+        liked_emails = get_liked_emails(email)
         for doc in docs:
             raw_other = doc.to_dict() or {}
             other = normalize_profile(raw_other)
             other_email = other.get("email")
 
             if not other_email or other_email == email:
+                continue
+            if other_email in liked_emails:
                 continue
 
             # mutual interest: I like their gender & they like mine
@@ -750,3 +764,90 @@ class MatchRecommendationsView(APIView):
 
         results.sort(key=lambda x: x["similarity"], reverse=True)
         return Response(results)
+    
+class LikeProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from_email = request.user.username
+        to_email = request.data.get("to_email")
+
+        if not to_email:
+            return Response(
+                {"error": "to_email is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        result = FirebaseLikeManager.send_like(
+            from_email=from_email,
+            to_email=to_email
+        )
+
+        if result.get("status") == "matched":
+            match = result.get("match")
+
+            try:
+                to_user = User.objects.get(username=to_email)
+            except User.DoesNotExist:
+                return Response(
+                    {"error": "Target user not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            notify_user(
+                to_user.id,
+                {
+                    "type": "MATCH_CREATED",
+                    "match_id": match["match_id"],
+                    "from_email": from_email,
+                }
+            )
+
+        return Response(result, status=status.HTTP_200_OK)
+
+def get_liked_emails(email: str) -> set[str]:
+    likes = (
+        db.collection("likes")
+        .where("from_email", "==", email)
+        .stream()
+    )
+    return {doc.to_dict().get("to_email") for doc in likes}
+
+class AcceptMatchView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user_email = request.user.username
+        match_id = request.data.get("match_id")
+
+        if not match_id:
+            return Response(
+                {"error": "match_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        result = FirebaseMatchManager.accept_match(
+            user_email=user_email,
+            match_id=match_id
+        )
+
+        if result.get("status") == "matched":
+            users = result.get("users", [])
+            chat_id = result.get("chat_id")
+
+            for email in users:
+                try:
+                    user = User.objects.get(username=email)
+                except User.DoesNotExist:
+                    continue  # fail silently, do not crash WS
+
+                notify_user(
+                    user.id,
+                    {
+                        "type": "MATCH_CONFIRMED",
+                        "match_id": match_id,
+                        "chat_id": chat_id,
+                    }
+                )
+
+        return Response(result, status=status.HTTP_200_OK)

@@ -38,13 +38,14 @@ X_FRAME_OPTIONS = 'ALLOWALL'
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None
-
+ASGI_APPLICATION = "config.asgi.application"
 
 # Application definition
 
 INSTALLED_APPS = [
     'rest_framework',
     'login',
+    "channels",
     'corsheaders',
     'rest_framework_simplejwt',
     'django.contrib.admin',
@@ -168,3 +169,12 @@ DEFAULT_FROM_EMAIL = 'venleonink@gmail.com'
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}

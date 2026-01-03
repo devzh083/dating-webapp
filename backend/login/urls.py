@@ -10,7 +10,7 @@ urlpatterns = [
 
     # Profile endpoints
     path("profile/", views.ProfileView.as_view(), name="profile"),
-    path("profiles/<str:email>/", views.ProfileDetailView.as_view(), name="profile-detail"),
+    path("profile/<path:email>/", views.ProfileDetailView.as_view(), name="profile-detail"),
 
     # Photo upload (media + URL stored in Firestore)
     path("photos/upload/", views.PhotoUploadView.as_view(), name="photo-upload"),
@@ -24,4 +24,7 @@ urlpatterns = [
 
     # Match recommendations
     path("matches/", views.MatchRecommendationsView.as_view(), name="matches"),
+
+    path("like/", views.LikeProfileView.as_view()),
+    path("matches/accept/", views.AcceptMatchView.as_view(), name="accept_match"),
 ]
