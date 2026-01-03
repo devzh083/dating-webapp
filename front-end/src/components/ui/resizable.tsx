@@ -1,40 +1,25 @@
-import { GripVertical } from "lucide-react";
-import * as ResizablePrimitive from "react-resizable-panels";
+// src/components/ui/resizable.tsx
 
-import { cn } from "@/lib/utils";
+import * as React from "react";
+
+/**
+ * Temporary no-op resizable components.
+ * This keeps the app building until react-resizable-panels
+ * is upgraded to a compatible version.
+ */
 
 const ResizablePanelGroup = ({
-  className,
-  ...props
-}: React.ComponentProps<typeof ResizablePrimitive.PanelGroup>) => (
-  <ResizablePrimitive.PanelGroup
-    className={cn(
-      "flex h-full w-full data-[panel-group-direction=vertical]:flex-col",
-      className
-    )}
-    {...props}
-  />
-);
+  children,
+}: {
+  children: React.ReactNode;
+}) => <div className="flex h-full w-full">{children}</div>;
 
-const ResizablePanel = ResizablePrimitive.Panel;
+const ResizablePanel = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => <div className="flex-1">{children}</div>;
 
-const ResizableHandle = ({
-  withHandle,
-  className,
-  ...props
-}: React.ComponentProps<typeof ResizablePrimitive.PanelResizeHandle> & {
-  withHandle?: boolean;
-}) => (
-  <ResizablePrimitive.PanelResizeHandle
-    className={cn("relative flex w-px bg-border", className)}
-    {...props}
-  >
-    {withHandle && (
-      <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-border">
-        <GripVertical className="h-2.5 w-2.5" />
-      </div>
-    )}
-  </ResizablePrimitive.PanelResizeHandle>
-);
+const ResizableHandle = () => null;
 
 export { ResizablePanelGroup, ResizablePanel, ResizableHandle };
