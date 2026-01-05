@@ -1,198 +1,224 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TopBar from "@/components/layout/TopBar";
-import { Search, MessageCircle, UserPlus, ArrowUpRight, MoreVertical, Send, Phone, Video, Smile, CheckCheck } from "lucide-react";
+import {
+  Search,
+  MessageCircle,
+  UserPlus,
+  ArrowUpRight,
+  MoreVertical,
+  Send,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
-/* ---------------- MOCK DATA ---------------- */
-const connectionRequests = [
-  { id: "r1", name: "Jessica", time: "2h ago", avatar: "J", bg: "bg-rose-100 text-rose-600", bio: "Loves hiking and coffee." },
-  { id: "r2", name: "Priya", time: "5h ago", avatar: "P", bg: "bg-purple-100 text-purple-600", bio: "Artist & Designer." },
-];
+/* ---------------- TYPES ---------------- */
 
-const requestedConnections = [
-  { id: "s1", name: "Ananya", status: "Pending", avatar: "A", bg: "bg-orange-100 text-orange-600", time: "1d ago" },
-  { id: "s2", name: "David", status: "Pending", avatar: "D", bg: "bg-indigo-100 text-indigo-600", time: "3d ago" },
-];
+interface ChatUser {
+  chat_id?: string;
+  match_id?: string;
+  email: string;
+  first_name: string | null;
+  profile_photo: string | null;
+}
 
-const activeConnections = [
-  { id: "c1", name: "Sarah", lastMessage: "Hey! How are you doing?", time: "2m ago", unread: 2, avatar: "S", bg: "bg-teal-100 text-teal-600", online: true },
-  { id: "c2", name: "Emma", lastMessage: "That sounds great! Let's meet up", time: "1h ago", unread: 0, avatar: "E", bg: "bg-blue-100 text-blue-600", online: false },
-  { id: "c3", name: "Maya", lastMessage: "I love that movie too!", time: "3h ago", unread: 0, avatar: "M", bg: "bg-emerald-100 text-emerald-600", online: true },
-  { id: "c4", name: "Rohan", lastMessage: "Sent a photo", time: "1d ago", unread: 0, avatar: "R", bg: "bg-gray-100 text-gray-600", online: false },
-];
-
-const mockMessages = [
-  { id: 1, sender: "them", text: "Hey! I saw you like hiking too. Have you been to Coorg?", time: "10:30 AM" },
-  { id: 2, sender: "me", text: "Yes! I went there last winter. It was magical ✨", time: "10:32 AM" },
-  { id: 3, sender: "them", text: "No way! I was planning a trip there next month. Any recommendations?", time: "10:33 AM" },
-];
+interface ChatsApiResponse {
+  chats: ChatUser[];
+  requests: ChatUser[];
+}
 
 interface ChatsPageProps {
   onLogout?: () => void;
 }
 
 export default function ChatsPage({ onLogout }: ChatsPageProps) {
-  const [activeTab, setActiveTab] = useState<"connections" | "requests" | "requested">("connections");
+  const [activeTab, setActiveTab] = useState<
+    "connections" | "requests" | "requested"
+  >("connections");
+
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState("");
 
-  const activeChatData = activeConnections.find(c => c.id === selectedChat);
+  const [chats, setChats] = useState<ChatUser[]>([]);
+  const [requests, setRequests] = useState<ChatUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  /* ---------------- FETCH DATA ---------------- */
+
+  useEffect(() => {
+    const fetchChats = async () => {
+      try {
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        const res = await fetch(
+          "http://127.0.0.1:8000/api/chats/matched/",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!res.ok) throw new Error("Failed to fetch chats");
+
+        const data: ChatsApiResponse = await res.json();
+        setChats(data.chats || []);
+        setRequests(data.requests || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChats();
+  }, []);
+
+  const activeChat = chats.find((c) => c.chat_id === selectedChat);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pt-20 pb-6 px-4 lg:px-8">
-      {/* New TopBar with Centered Nav */}
       <TopBar onLogout={onLogout} />
 
       <main className="container mx-auto max-w-7xl h-[calc(100vh-120px)]">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-          
+
           {/* ---------------- LEFT PANEL ---------------- */}
-          {/* Hidden on mobile if a chat is selected */}
-          <div className={cn(
-            "lg:col-span-4 flex flex-col gap-4 h-full",
-            selectedChat ? "hidden lg:flex" : "flex"
-          )}>
-            
+          <div
+            className={cn(
+              "lg:col-span-4 flex flex-col gap-4 h-full",
+              selectedChat ? "hidden lg:flex" : "flex"
+            )}
+          >
             <div className="flex flex-col gap-4 px-1">
-               <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-               
-               {/* Search */}
-               <div className="relative">
+              <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+
+              <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
-                  type="text"
                   placeholder="Search conversations..."
-                  className="w-full pl-10 pr-4 py-3.5 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all shadow-sm"
+                  className="w-full pl-10 pr-4 py-3.5 rounded-2xl border border-gray-200 bg-white text-sm"
                 />
               </div>
 
               {/* Tabs */}
-              <div className="bg-white rounded-xl border border-gray-100 p-1.5 grid grid-cols-3 gap-1 shadow-sm">
+              <div className="bg-white rounded-xl border border-gray-100 p-1.5 grid grid-cols-3 gap-1">
                 {[
                   { id: "connections", label: "Chats", icon: MessageCircle },
-                  { id: "requests", label: "Requests", icon: UserPlus, count: connectionRequests.length },
+                  { id: "requests", label: "Requests", icon: UserPlus },
                   { id: "requested", label: "Sent", icon: ArrowUpRight },
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
                     className={cn(
-                      "flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 relative",
+                      "flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold",
                       activeTab === tab.id
-                        ? "bg-teal-50 text-teal-700 shadow-sm"
-                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                        ? "bg-teal-50 text-teal-700"
+                        : "text-gray-500 hover:bg-gray-50"
                     )}
                   >
                     <tab.icon className="w-3.5 h-3.5" />
                     {tab.label}
-                    {tab.count ? (
-                      <span className="ml-1 px-1.5 py-0.5 bg-rose-500 text-white text-[10px] rounded-full min-w-[18px] text-center">
-                        {tab.count}
-                      </span>
-                    ) : null}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* List Content */}
-            <div className="flex-1 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-              <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-                
+            {/* ---------------- LIST CONTENT ---------------- */}
+            <div className="flex-1 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+
                 <AnimatePresence mode="wait">
-                  {/* 1. YOUR CONNECTIONS */}
+                  {/* ---------------- CHATS ---------------- */}
                   {activeTab === "connections" && (
-                    <motion.div 
+                    <motion.div
                       key="connections"
-                      initial={{ opacity: 0, x: -10 }} 
-                      animate={{ opacity: 1, x: 0 }} 
-                      exit={{ opacity: 0, x: 10 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       className="space-y-1"
                     >
-                      {activeConnections.map((chat) => (
+                      {loading && (
+                        <div className="text-center text-sm text-gray-400 py-6">
+                          Loading conversations…
+                        </div>
+                      )}
+
+                      {!loading && chats.length === 0 && (
+                        <div className="text-center text-sm text-gray-400 py-6">
+                          No chats yet
+                        </div>
+                      )}
+
+                      {chats.map((chat) => (
                         <button
-                          key={chat.id}
-                          onClick={() => setSelectedChat(chat.id)}
-                          className={cn(
-                            "w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-200 text-left group",
-                            selectedChat === chat.id
-                              ? "bg-teal-50 border border-teal-100 shadow-sm"
-                              : "hover:bg-gray-50 border border-transparent"
-                          )}
+                          key={chat.chat_id}
+                          onClick={() => setSelectedChat(chat.chat_id!)}
+                          className="w-full flex items-center gap-4 p-3.5 rounded-2xl hover:bg-gray-50 text-left"
                         >
-                          <div className="relative shrink-0">
-                            <div className={cn("w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shadow-sm", chat.bg)}>
-                              {chat.avatar}
-                            </div>
-                            {chat.online && (
-                              <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
-                            )}
+                          <div className="w-12 h-12 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-lg font-bold">
+                            {chat.first_name?.[0] ?? "?"}
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className={cn("font-bold text-sm", selectedChat === chat.id ? "text-teal-900" : "text-gray-900")}>
-                                {chat.name}
-                              </span>
-                              <span className="text-[10px] text-gray-400 font-medium">{chat.time}</span>
-                            </div>
-                            <p className={cn("text-xs truncate leading-relaxed", chat.unread > 0 ? "text-gray-900 font-semibold" : "text-gray-500")}>
-                              {chat.lastMessage}
+                            <span className="font-bold text-sm text-gray-900">
+                              {chat.first_name ?? "User"}
+                            </span>
+                            <p className="text-xs text-gray-500 truncate">
+                              Start a conversation
                             </p>
                           </div>
-                          
-                          {chat.unread > 0 && (
-                            <div className="w-5 h-5 rounded-full bg-teal-500 flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-sm">
-                              {chat.unread}
-                            </div>
-                          )}
                         </button>
                       ))}
                     </motion.div>
                   )}
 
-                  {/* 2. REQUESTS */}
+                  {/* ---------------- REQUESTS ---------------- */}
                   {activeTab === "requests" && (
-                    <motion.div key="requests" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3 p-1">
-                      {connectionRequests.map((req) => (
-                        <div key={req.id} className="p-4 rounded-2xl border border-gray-100 bg-white shadow-sm">
+                    <motion.div
+                      key="requests"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="space-y-2"
+                    >
+                      {!loading && requests.length === 0 && (
+                        <div className="text-center text-sm text-gray-400 py-6">
+                          No new requests
+                        </div>
+                      )}
+
+                      {requests.map((req) => (
+                        <div
+                          key={req.match_id}
+                          className="p-4 rounded-2xl border border-gray-100 bg-white shadow-sm"
+                        >
                           <div className="flex items-center gap-3 mb-3">
-                            <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold", req.bg)}>
-                              {req.avatar}
+                            <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
+                              {req.first_name?.[0] ?? "?"}
                             </div>
-                            <div>
-                              <h4 className="font-bold text-gray-900 text-sm">{req.name}</h4>
-                              <p className="text-xs text-gray-500">{req.bio}</p>
-                            </div>
+                            <h4 className="font-bold text-gray-900 text-sm">
+                              {req.first_name ?? "User"}
+                            </h4>
                           </div>
+
                           <div className="flex gap-2">
-                            <button className="flex-1 py-2 bg-teal-500 text-white text-xs font-bold rounded-xl hover:bg-teal-600 transition-colors">Accept</button>
-                            <button className="flex-1 py-2 bg-gray-50 text-gray-600 text-xs font-bold rounded-xl hover:bg-gray-100 transition-colors">Ignore</button>
+                            <button className="flex-1 py-2 bg-teal-500 text-white text-xs font-bold rounded-xl">
+                              Accept
+                            </button>
+                            <button className="flex-1 py-2 bg-gray-50 text-gray-600 text-xs font-bold rounded-xl">
+                              Ignore
+                            </button>
                           </div>
                         </div>
                       ))}
                     </motion.div>
                   )}
 
-                  {/* 3. REQUESTED */}
+                  {/* ---------------- SENT ---------------- */}
                   {activeTab === "requested" && (
-                     <motion.div key="requested" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2 p-1">
-                      {requestedConnections.map((req) => (
-                        <div key={req.id} className="flex items-center gap-3 p-3 rounded-2xl border border-gray-50 bg-gray-50/50">
-                           <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold opacity-70", req.bg)}>
-                            {req.avatar}
-                          </div>
-                          <div className="flex-1">
-                             <h4 className="font-semibold text-gray-700 text-sm">{req.name}</h4>
-                             <p className="text-xs text-teal-600/80 font-medium flex items-center gap-1">
-                               <ArrowUpRight className="w-3 h-3" /> Request Sent
-                             </p>
-                          </div>
-                          <span className="text-[10px] text-gray-400">{req.time}</span>
-                        </div>
-                      ))}
-                    </motion.div>
+                    <div className="text-center text-sm text-gray-400 py-6">
+                      Nothing here yet
+                    </div>
                   )}
                 </AnimatePresence>
 
@@ -200,128 +226,72 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
             </div>
           </div>
 
-          {/* ---------------- RIGHT PANEL (Chat Interface) ---------------- */}
-          {/* Visible on mobile only when chat selected */}
-          <div className={cn(
-            "lg:col-span-8 flex flex-col bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden h-full",
-            selectedChat ? "flex fixed inset-0 z-50 lg:static lg:z-auto" : "hidden lg:flex"
-          )}>
-            {selectedChat && activeChatData ? (
+          {/* ---------------- RIGHT PANEL ---------------- */}
+          <div
+            className={cn(
+              "lg:col-span-8 flex flex-col bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden h-full",
+              selectedChat
+                ? "flex fixed inset-0 z-50 lg:static"
+                : "hidden lg:flex"
+            )}
+          >
+            {activeChat ? (
               <>
-                {/* Chat Header */}
-                <div className="h-20 border-b border-gray-50 flex items-center justify-between px-6 bg-white sticky top-0 z-10">
+                <div className="h-20 border-b border-gray-50 flex items-center justify-between px-6">
                   <div className="flex items-center gap-4">
-                    {/* Mobile Back Button */}
-                    <button onClick={() => setSelectedChat(null)} className="lg:hidden p-2 -ml-2 text-gray-500">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    <button
+                      onClick={() => setSelectedChat(null)}
+                      className="lg:hidden"
+                    >
+                      ←
                     </button>
 
-                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shadow-sm", activeChatData.bg)}>
-                       {activeChatData.avatar}
+                    <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
+                      {activeChat.first_name?.[0] ?? "?"}
                     </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-base">{activeChatData.name}</h3>
-                      <div className="flex items-center gap-2">
-                        {activeChatData.online ? (
-                          <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            Online
-                          </span>
-                        ) : (
-                           <span className="text-xs text-gray-400">Offline</span>
-                        )}
-                        <span className="text-gray-300 mx-1">•</span>
-                        <span className="text-xs text-teal-600 font-medium bg-teal-50 px-2 py-0.5 rounded-full">
-                           85% Match
-                        </span>
-                      </div>
-                    </div>
+
+                    <h3 className="font-bold text-gray-900">
+                      {activeChat.first_name ?? "User"}
+                    </h3>
                   </div>
-                  
-                  <div className="flex items-center gap-1">
-                     <button className="p-2.5 text-gray-400 hover:bg-gray-50 hover:text-teal-600 rounded-full transition-colors">
-                        <Phone className="w-5 h-5" />
-                     </button>
-                     <button className="p-2.5 text-gray-400 hover:bg-gray-50 hover:text-teal-600 rounded-full transition-colors">
-                        <Video className="w-5 h-5" />
-                     </button>
-                     <button className="p-2.5 text-gray-400 hover:bg-gray-50 hover:text-gray-900 rounded-full transition-colors">
-                        <MoreVertical className="w-5 h-5" />
-                     </button>
-                  </div>
+
+                  <MoreVertical />
                 </div>
 
-                {/* Messages Area */}
-                <div className="flex-1 bg-[#F9FAFB] p-6 overflow-y-auto space-y-6">
-                   <div className="flex justify-center">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-100 px-3 py-1 rounded-full">Today</span>
-                   </div>
-
-                   {mockMessages.map((msg) => (
-                     <div key={msg.id} className={cn("flex gap-3 max-w-[85%] lg:max-w-[70%]", msg.sender === "me" ? "ml-auto flex-row-reverse" : "")}>
-                        
-                        {msg.sender === "them" && (
-                           <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-auto shadow-sm", activeChatData.bg)}>
-                              {activeChatData.avatar}
-                           </div>
-                        )}
-
-                        <div className={cn(
-                           "p-4 rounded-2xl text-sm leading-relaxed shadow-sm relative group", 
-                           msg.sender === "me" 
-                              ? "bg-teal-500 text-white rounded-br-none" 
-                              : "bg-white border border-gray-100 text-gray-700 rounded-bl-none"
-                        )}>
-                           {msg.text}
-                           <div className={cn(
-                              "flex items-center gap-1 text-[10px] mt-1 opacity-70",
-                              msg.sender === "me" ? "justify-end text-teal-100" : "text-gray-400"
-                           )}>
-                              <span>{msg.time}</span>
-                              {msg.sender === "me" && <CheckCheck className="w-3 h-3" />}
-                           </div>
-                        </div>
-                     </div>
-                   ))}
+                <div className="flex-1 bg-[#F9FAFB] flex items-center justify-center text-gray-400">
+                  No messages yet
                 </div>
 
-                {/* Input Area */}
                 <div className="p-4 bg-white border-t border-gray-50">
                   <div className="relative flex items-center gap-2">
-                    <button className="p-3 text-gray-400 hover:bg-gray-50 rounded-full transition-colors">
-                        <Smile className="w-6 h-6" />
-                    </button>
-                    <input 
-                      type="text" 
+                    <input
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
-                      placeholder="Type a message..." 
-                      className="flex-1 bg-gray-50 border border-gray-200 rounded-full py-3.5 pl-6 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white focus:border-teal-500 transition-all placeholder:text-gray-400"
+                      placeholder="Type a message..."
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded-full py-3.5 pl-6 pr-12 text-sm"
                     />
-                    <button 
+                    <button
                       className={cn(
-                        "p-3 rounded-full transition-all shadow-md",
-                        messageInput.trim() ? "bg-teal-500 text-white hover:bg-teal-600 hover:scale-105" : "bg-gray-100 text-gray-300"
+                        "p-3 rounded-full",
+                        messageInput.trim()
+                          ? "bg-teal-500 text-white"
+                          : "bg-gray-100 text-gray-300"
                       )}
                     >
-                      <Send className="w-5 h-5 ml-0.5" />
+                      <Send className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
               </>
             ) : (
-              // Empty State (No Chat Selected)
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-gray-50/30">
-                 <div className="relative">
-                    <div className="w-24 h-24 bg-teal-50 rounded-full flex items-center justify-center mb-6 animate-pulse">
-                        <MessageCircle className="w-10 h-10 text-teal-500" />
-                    </div>
-                 </div>
-                 
-                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Select a conversation</h3>
-                 <p className="text-gray-500 max-w-xs leading-relaxed">
-                   Choose a connection from the left or check your new requests.
-                 </p>
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+                <MessageCircle className="w-10 h-10 text-teal-500 mb-4" />
+                <h3 className="text-xl font-bold text-gray-900 mb-1">
+                  Select a conversation
+                </h3>
+                <p className="text-gray-500">
+                  Choose a match to start chatting
+                </p>
               </div>
             )}
           </div>

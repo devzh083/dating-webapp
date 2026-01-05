@@ -23,7 +23,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from config.firebase import db
-from .models import FirebaseProfileManager
+from .models import FirebaseProfileManager, clean_firestore_data
 from google.cloud import firestore
 
 from rest_framework.views import APIView
@@ -765,6 +765,44 @@ class MatchRecommendationsView(APIView):
         results.sort(key=lambda x: x["similarity"], reverse=True)
         return Response(results)
     
+# class LikeProfileView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         from_email = request.user.username
+#         to_email = request.data.get("to_email")
+
+#         if not to_email:
+#             return Response(
+#                 {"error": "to_email is required"},
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         result = FirebaseLikeManager.send_like(
+#             from_email=from_email,
+#             to_email=to_email
+#         )
+
+#         if result.get("status") == "matched":
+#             match = result.get("match")
+
+#             try:
+#                 to_user = User.objects.get(username=to_email)
+#             except User.DoesNotExist:
+#                 pass
+#             else:
+#                 notify_user(
+#                     to_user.id,
+#                     {
+#                         "type": "MATCH_CREATED",
+#                         "match_id": match["match_id"],
+#                         "chat_id": match["chat_id"],
+#                         "from_email": from_email,
+#                     }
+#                 )
+
+
+#         return Response(result, status=status.HTTP_200_OK)
 class LikeProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -773,35 +811,23 @@ class LikeProfileView(APIView):
         to_email = request.data.get("to_email")
 
         if not to_email:
-            return Response(
-                {"error": "to_email is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "to_email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        result = FirebaseLikeManager.send_like(
-            from_email=from_email,
-            to_email=to_email
-        )
+        result = FirebaseLikeManager.send_like(from_email=from_email, to_email=to_email)
 
+        # No cleaning needed - create_match returns clean data
         if result.get("status") == "matched":
             match = result.get("match")
-
             try:
                 to_user = User.objects.get(username=to_email)
-            except User.DoesNotExist:
-                return Response(
-                    {"error": "Target user not found"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-            notify_user(
-                to_user.id,
-                {
+                notify_user(to_user.id, {
                     "type": "MATCH_CREATED",
                     "match_id": match["match_id"],
+                    "chat_id": match["chat_id"],
                     "from_email": from_email,
-                }
-            )
+                })
+            except User.DoesNotExist:
+                pass
 
         return Response(result, status=status.HTTP_200_OK)
 
@@ -813,41 +839,86 @@ def get_liked_emails(email: str) -> set[str]:
     )
     return {doc.to_dict().get("to_email") for doc in likes}
 
-class AcceptMatchView(APIView):
+
+
+# class MatchedChatsView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request):
+#         my_email = request.user.username
+
+#         matches_ref = (
+#             db.collection("matches")
+#             .where("users", "array_contains", my_email)
+#         )
+
+#         chats = []
+
+#         for match_doc in matches_ref.stream():
+#             match = match_doc.to_dict() or {}
+
+#             chat_id = match.get("chat_id")
+#             users = match.get("users", [])
+
+#             # Enforce invariant: active chat must exist
+#             if not chat_id or len(users) != 2:
+#                 continue
+
+#             other_email = users[0] if users[1] == my_email else users[1]
+
+#             profile = FirebaseProfileManager.get_profile(other_email) or {}
+
+#             chats.append({
+#                 "chat_id": chat_id,
+#                 "email": other_email,
+#                 "first_name": profile.get("firstName"),
+#                 "profile_photo": (
+#                     profile.get("photos", [None])[0]
+#                     if profile.get("photos")
+#                     else None
+#                 ),
+#             })
+
+#         return Response(chats, status=status.HTTP_200_OK)
+
+class MatchedChatsView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        user_email = request.user.username
-        match_id = request.data.get("match_id")
+    def get(self, request):
+        my_email = request.user.username.lower()
 
-        if not match_id:
-            return Response(
-                {"error": "match_id is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        result = FirebaseMatchManager.accept_match(
-            user_email=user_email,
-            match_id=match_id
+        matches_ref = (
+            db.collection("matches")
+            .where("users", "array_contains", my_email)
         )
 
-        if result.get("status") == "matched":
-            users = result.get("users", [])
-            chat_id = result.get("chat_id")
+        chats = []
 
-            for email in users:
-                try:
-                    user = User.objects.get(username=email)
-                except User.DoesNotExist:
-                    continue  # fail silently, do not crash WS
+        for match_doc in matches_ref.stream():
+            match = match_doc.to_dict() or {}
 
-                notify_user(
-                    user.id,
-                    {
-                        "type": "MATCH_CONFIRMED",
-                        "match_id": match_id,
-                        "chat_id": chat_id,
-                    }
-                )
+            chat_id = match.get("chat_id")
+            users = match.get("users", [])
 
-        return Response(result, status=status.HTTP_200_OK)
+            # Now chat_id always exists for valid matches
+            if not chat_id or len(users) != 2:
+                continue
+
+            other_email = users[0] if users[1] == my_email else users[1]
+            profile = FirebaseProfileManager.get_profile(other_email) or {}
+
+            chats.append({
+                "chat_id": chat_id,
+                "match_id": match_doc.id,
+                "status": match.get("status", "active"),
+                "created_at": clean_firestore_data({"created_at": match.get("created_at")}).get("created_at"),
+                "email": other_email,
+                "first_name": profile.get("firstName"),
+                "profile_photo": (
+                    profile.get("photos", [None])[0]
+                    if profile.get("photos")
+                    else None
+                ),
+            })
+
+        return Response(chats, status=status.HTTP_200_OK)

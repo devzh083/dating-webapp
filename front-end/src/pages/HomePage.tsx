@@ -70,7 +70,6 @@ const HomePage = ({ onLogout }: HomePageProps) => {
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchProfile, setMatchProfile] = useState<SwipeProfile | null>(null);
   const [matchChatId, setMatchChatId] = useState<string | null>(null);
-  const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
 
   /* -------- FETCH MATCHES -------- */
 
@@ -125,19 +124,10 @@ const HomePage = ({ onLogout }: HomePageProps) => {
       `ws://127.0.0.1:8000/ws/notifications/?token=${token}`
     );
 
-    ws.onopen = () => {
-      console.log("✅ WebSocket connected");
-    };
-
     ws.onmessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log("📨 WS EVENT:", data);
 
-      /* --- MATCH CREATED (other user liked you) --- */
       if (data.type === "MATCH_CREATED") {
-        const token = localStorage.getItem("access_token");
-        if (!token) return;
-
         const res = await fetch(
           `http://127.0.0.1:8000/api/profile/${data.from_email}/`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -154,19 +144,10 @@ const HomePage = ({ onLogout }: HomePageProps) => {
           vibeTags: profile.interests || [],
         });
 
-        setPendingMatchId(data.match_id);
-        setShowMatchModal(true);
-      }
-
-      /* --- BOTH ACCEPTED → CHAT ACTIVE --- */
-      if (data.type === "MATCH_CONFIRMED") {
         setMatchChatId(data.chat_id);
         setShowMatchModal(true);
       }
     };
-
-    ws.onclose = () => console.log("❌ WebSocket closed");
-    ws.onerror = (err) => console.error("WebSocket error:", err);
 
     return () => ws.close();
   }, []);
@@ -194,10 +175,10 @@ const HomePage = ({ onLogout }: HomePageProps) => {
 
       if (data.status === "matched") {
         setMatchProfile(likedProfile || null);
-        setPendingMatchId(data.match_id);
+        setMatchChatId(data.chat_id);
         setShowMatchModal(true);
-      } else if (data.status === "liked") {
-        toast.success("Like sent! Waiting for them to accept.");
+      } else {
+        toast.success("Like sent!");
       }
     } catch {
       toast.error("Failed to like");
@@ -210,23 +191,8 @@ const HomePage = ({ onLogout }: HomePageProps) => {
 
   /* -------- MATCH MODAL COMPLETE -------- */
 
-  const handleMatchComplete = async () => {
+  const handleMatchComplete = () => {
     setShowMatchModal(false);
-
-    const token = localStorage.getItem("access_token");
-
-    if (pendingMatchId && token) {
-      await fetch("http://127.0.0.1:8000/api/matches/accept/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ match_id: pendingMatchId }),
-      });
-      setPendingMatchId(null);
-    }
-
     if (matchChatId) navigate(`/chats/${matchChatId}`);
   };
 
@@ -240,7 +206,6 @@ const HomePage = ({ onLogout }: HomePageProps) => {
         <MatchModal
           profile={matchProfile}
           onComplete={handleMatchComplete}
-          pendingMatchId={pendingMatchId}
         />
       )}
 

@@ -26,5 +26,8 @@ urlpatterns = [
     path("matches/", views.MatchRecommendationsView.as_view(), name="matches"),
 
     path("like/", views.LikeProfileView.as_view()),
-    path("matches/accept/", views.AcceptMatchView.as_view(), name="accept_match"),
+    # path("matches/accept/", views.AcceptMatchView.as_view(), name="accept_match"),
+
+    path("chats/matched/", views.MatchedChatsView.as_view(), name="matched-chats"),
+
 ]

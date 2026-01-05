@@ -1,9 +1,25 @@
+from datetime import datetime 
 from config.firebase import db
 from firebase_admin import firestore
 from typing import Dict, Any, Optional, List
 from google.cloud import firestore
 
-
+def clean_firestore_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Bulletproof Firestore data cleaner - NO import issues"""
+    if not isinstance(data, dict):
+        return data
+    
+    cleaned = {}
+    for k, v in data.items():
+        if hasattr(v, 'isoformat'):  # Timestamp
+            cleaned[k] = v.isoformat()
+        elif str(type(v)).find('Sentinel') != -1 or str(type(v)).find('SERVER_TIMESTAMP') != -1:
+            cleaned[k] = None  # Safe fallback
+        elif isinstance(v, (list, dict)):
+            cleaned[k] = clean_firestore_data(v)
+        else:
+            cleaned[k] = v
+    return cleaned
 class FirebaseAuthManager:
     """Firestore `users` collection: one doc per email, auth state only."""
 
@@ -176,153 +192,94 @@ class LegacyFirebaseUserManager(FirebaseUserManager):
 
 
 class FirebaseLikeManager:
-    """Handles likes and match detection (atomic-safe)"""
-
     @staticmethod
     def send_like(from_email: str, to_email: str) -> Dict[str, Any]:
         likes_ref = db.collection("likes")
 
-        # 1️⃣ Prevent duplicate like
+        # 1. Prevent duplicate like
         existing_like = list(
             likes_ref
-            .where("from_email", "==", from_email)
-            .where("to_email", "==", to_email)
+            .where("from_email", "==", from_email.lower())
+            .where("to_email", "==", to_email.lower())
             .limit(1)
             .stream()
         )
-
         if existing_like:
             return {"status": "already_liked"}
 
-        # 2️⃣ Check reverse like FIRST (match detection)
+        # 2. Check reverse like
         reverse_like = list(
             likes_ref
-            .where("from_email", "==", to_email)
-            .where("to_email", "==", from_email)
+            .where("from_email", "==", to_email.lower())
+            .where("to_email", "==", from_email.lower())
             .limit(1)
             .stream()
         )
 
-        # 3️⃣ MATCH FOUND
+        # 3. MATCH → create chat immediately
         if reverse_like:
             match = FirebaseMatchManager.create_match(from_email, to_email)
-
-            # 🧹 Cleanup incoming likes (both directions)
             FirebaseLikeManager._cleanup_incoming_likes(from_email, to_email)
+            return {"status": "matched", "match": match}
 
-            return {
-                "status": "matched",
-                "match": match,
-            }
-
-        # 4️⃣ NO MATCH → save like
+        # 4. Save like
         likes_ref.add({
-            "from_email": from_email,
-            "to_email": to_email,
+            "from_email": from_email.lower(),
+            "to_email": to_email.lower(),
             "created_at": firestore.SERVER_TIMESTAMP,
         })
-
         return {"status": "liked"}
 
     @staticmethod
     def _cleanup_incoming_likes(a: str, b: str):
-        """
-        Remove stale incoming_like cards once match occurs
-        """
+        """Remove stale incoming_like cards once match occurs"""
         incoming_ref = db.collection("incoming_likes")
-
         queries = [
-            incoming_ref.where("from_email", "==", a).where("to_email", "==", b),
-            incoming_ref.where("from_email", "==", b).where("to_email", "==", a),
+            incoming_ref.where("from_email", "==", a.lower()).where("to_email", "==", b.lower()),
+            incoming_ref.where("from_email", "==", b.lower()).where("to_email", "==", a.lower()),
         ]
-
         for q in queries:
             for doc in q.stream():
                 doc.reference.delete()
 
-
 class FirebaseMatchManager:
-    """Handles matches and chat creation with two-step consent"""
-
     @staticmethod
     def create_match(user_a: str, user_b: str) -> Dict[str, Any]:
-        users = sorted([user_a, user_b])
+        users = sorted([user_a.lower(), user_b.lower()])
 
-        # Prevent duplicate matches
         matches_ref = db.collection("matches")
-        existing = list(
-            matches_ref.where("users", "==", users).limit(1).stream()
-        )
+        existing = list(matches_ref.where("users", "==", users).limit(1).stream())
         if existing:
-            return existing[0].to_dict()
+            return clean_firestore_data(existing[0].to_dict())
 
-        # Create match doc WITHOUT chat_id
+        chat_id = FirebaseChatManager.create_chat(users)
+
+        # Store with SERVER_TIMESTAMP (Firestore handles it)
         match_ref = matches_ref.document()
         match_ref.set({
             "users": users,
-            "accepted_by": [],   # New: tracks who accepted
-            "chat_id": None,     # Chat created only after both accept
-            "status": "matched", # matched -> waiting for both acceptance
-            "created_at": firestore.SERVER_TIMESTAMP,
+            "chat_id": chat_id,
+            "status": "active",
+            "created_at": firestore.SERVER_TIMESTAMP,  # OK for storage
         })
 
-        return {
+        # Return CLEAN data WITHOUT Sentinel
+        response_data = {
             "match_id": match_ref.id,
             "users": users,
-            "chat_id": None,
-            "status": "matched",
-            "accepted_by": [],
+            "chat_id": chat_id,
+            "status": "active",
+            "created_at": datetime.utcnow().isoformat() + "Z"  # Clean timestamp
         }
-
-    @staticmethod
-    def accept_match(user_email: str, match_id: str) -> Dict[str, Any]:
-        """
-        Called when a user presses 'Start Chat' from the modal
-        - Adds user to accepted_by
-        - Creates chat if both accepted
-        """
-        match_ref = db.collection("matches").document(match_id)
-        match_doc = match_ref.get()
-        if not match_doc.exists:
-            return {"error": "Match not found"}
-
-        match_data = match_doc.to_dict()
-        accepted_by: List[str] = match_data.get("accepted_by", [])
-        users: List[str] = match_data.get("users", [])
-
-        if user_email not in users:
-            return {"error": "User not part of this match"}
-
-        if user_email in accepted_by:
-            return {"status": "already_accepted"}
-
-        # Add user to accepted_by
-        accepted_by.append(user_email)
-        match_ref.update({"accepted_by": accepted_by})
-
-        # Check if both accepted
-        if set(accepted_by) == set(users):
-            # Create chat
-            chat_id = FirebaseChatManager.create_chat(users)
-            match_ref.update({
-                "chat_id": chat_id,
-                "status": "active",
-            })
-            return {"status": "chat_active", "chat_id": chat_id}
-
-        # Waiting for other user
-        return {"status": "waiting_other", "accepted_by": accepted_by}
-
+        return response_data  # No cleaning needed!
 
 class FirebaseChatManager:
-    """Chat room creation"""
-
     @staticmethod
     def create_chat(users: List[str]) -> str:
         chat_ref = db.collection("chats").document()
         chat_ref.set({
             "participants": users,
-            "created_at": firestore.SERVER_TIMESTAMP,
+            "created_at": firestore.SERVER_TIMESTAMP,  # OK for storage
             "last_message": None,
         })
-        return chat_ref.id
+        return chat_ref.id  # Just ID - no data returned
