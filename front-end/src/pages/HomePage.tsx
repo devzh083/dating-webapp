@@ -128,26 +128,62 @@ const HomePage = ({ onLogout }: HomePageProps) => {
       const data = JSON.parse(event.data);
 
       if (data.type === "MATCH_CREATED") {
-        const res = await fetch(
-          `http://127.0.0.1:8000/api/profile/${data.from_email}/`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        try {
+          const token = localStorage.getItem("access_token");
+          if (!token) return;
 
-        if (!res.ok) return;
-        const profile = await res.json();
+          // Fetch profile for match modal
+          const res = await fetch(
+            `http://127.0.0.1:8000/api/profile/${data.from_email}/`,
+            { 
+              headers: { 
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+              } 
+            }
+          );
 
-        setMatchProfile({
-          id: data.from_email,
-          firstName: profile.firstName,
-          selfDescription: profile.tagline || "",
-          conversationHook: profile.starter || "",
-          vibeTags: profile.interests || [],
-        });
+          if (!res.ok) {
+            console.warn("Profile fetch failed, using fallback");
+            // Fallback - show modal with basic info
+            setMatchProfile({
+              id: data.from_email,
+              firstName: data.from_email.split("@")[0], // Extract name from email
+              selfDescription: "New match!",
+              conversationHook: "Say hello!",
+              vibeTags: [],
+            });
+          } else {
+            const profile = await res.json();
+            setMatchProfile({
+              id: data.from_email,
+              firstName: profile.firstName || data.from_email.split("@")[0],
+              selfDescription: profile.tagline || profile.starter || "New match!",
+              conversationHook: profile.starter || "Say hello!",
+              vibeTags: profile.interests || [],
+            });
+          }
 
-        setMatchChatId(data.chat_id);
-        setShowMatchModal(true);
+          setMatchChatId(data.chat_id);
+          setShowMatchModal(true);
+          toast.success("It's a match! 🎉");
+        } catch (error) {
+          console.error("Match notification error:", error);
+          // Emergency fallback
+          setMatchProfile({
+            id: data.from_email,
+            firstName: data.from_email.split("@")[0],
+            selfDescription: "Congratulations! You have a new match.",
+            conversationHook: "Start chatting!",
+            vibeTags: [],
+          });
+          setMatchChatId(data.chat_id);
+          setShowMatchModal(true);
+          toast.success("New match! 🎉");
+        }
       }
     };
+
 
     return () => ws.close();
   }, []);
@@ -155,35 +191,38 @@ const HomePage = ({ onLogout }: HomePageProps) => {
   /* -------- LIKE / DISLIKE -------- */
 
   const handleLike = async (profileId: string) => {
-    const likedProfile = profiles.find((p) => p.id === profileId);
-    setProfiles((prev) => prev.filter((p) => p.id !== profileId));
+  const likedProfile = profiles.find((p) => p.id === profileId);
+  setProfiles((prev) => prev.filter((p) => p.id !== profileId));
 
-    try {
-      const token = localStorage.getItem("access_token");
-      if (!token) return;
+  try {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
 
-      const res = await fetch("http://127.0.0.1:8000/api/like/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ to_email: profileId }),
-      });
+    const res = await fetch("http://127.0.0.1:8000/api/like/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ to_email: profileId }),
+    });
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (data.status === "matched") {
-        setMatchProfile(likedProfile || null);
-        setMatchChatId(data.chat_id);
-        setShowMatchModal(true);
-      } else {
-        toast.success("Like sent!");
-      }
-    } catch {
-      toast.error("Failed to like");
+    if (data.status === "matched") {
+      // Show modal for User B (who triggered the like)
+      setMatchProfile(likedProfile || null);
+      setMatchChatId(data.match.chat_id);  // Use data.match.chat_id
+      setShowMatchModal(true);
+      toast.success("It's a match! 🎉");
+    } else {
+      toast.success("Like sent!");
     }
-  };
+  } catch {
+    toast.error("Failed to like");
+  }
+};
+
 
   const handleDislike = (profileId: string) => {
     setProfiles((prev) => prev.filter((p) => p.id !== profileId));
@@ -193,8 +232,17 @@ const HomePage = ({ onLogout }: HomePageProps) => {
 
   const handleMatchComplete = () => {
     setShowMatchModal(false);
-    if (matchChatId) navigate(`/chats/${matchChatId}`);
+    setMatchProfile(null);
+    setMatchChatId(null);
+    
+    // Navigate to chats page WITH chat_id
+    if (matchChatId) {
+      navigate("/chats");
+    } else {
+      navigate("/chats");
+    }
   };
+
 
   /* ================= RENDER ================= */
 
@@ -202,12 +250,14 @@ const HomePage = ({ onLogout }: HomePageProps) => {
     <div className="min-h-screen bg-[#F8F9FA] pt-16">
       <TopBar userName="User" onLogout={onLogout} />
 
-      {showMatchModal && matchProfile && (
+      {showMatchModal && matchProfile && matchChatId && (
         <MatchModal
           profile={matchProfile}
+          chatId={matchChatId}  // ✅ Pass chatId
           onComplete={handleMatchComplete}
         />
       )}
+
 
       <div className="flex">
         <main className="flex-1 lg:mr-80 w-full p-4 lg:p-8 overflow-y-auto">
