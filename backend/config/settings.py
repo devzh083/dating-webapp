@@ -9,7 +9,8 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
+import pymysql
+pymysql.install_as_MySQLdb()
 from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -93,8 +94,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'dating_app_db',
+        'USER': 'root',
+        'PASSWORD': 'DatingApp@2026!',
+        'HOST': 'localhost',
+        'PORT': '3306',
     }
 }
 

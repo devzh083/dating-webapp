@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, LogOut } from "lucide-react";
+import { Settings, LogOut, Shield, FileText, Sparkles } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 interface ProfileDropdownProps {
@@ -25,13 +25,8 @@ export default function ProfileDropdown({ userName = "User", onLogout }: Profile
   }, []);
 
   const handleLogout = () => {
-    // 1. Trigger the app-level logout logic (clear tokens/state)
     onLogout?.();
-    
-    // 2. Close the dropdown
     setIsOpen(false);
-    
-    // 3. Redirect to Landing Page
     navigate("/");
   };
 
@@ -55,7 +50,7 @@ export default function ProfileDropdown({ userName = "User", onLogout }: Profile
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 origin-top-right"
+            className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 origin-top-right"
           >
             {/* Header */}
             <div className="px-4 py-3 border-b border-gray-50">
@@ -65,7 +60,8 @@ export default function ProfileDropdown({ userName = "User", onLogout }: Profile
 
             {/* Menu Items */}
             <div className="p-2 space-y-1">
-              {/* ✅ Link to Onboarding for Edit Profile */}
+              
+              {/* Edit Profile */}
               <Link
                 to="/onboarding"
                 className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-50 hover:text-teal-600 transition-colors w-full text-left"
@@ -74,8 +70,42 @@ export default function ProfileDropdown({ userName = "User", onLogout }: Profile
                 <Settings className="w-4 h-4" />
                 Edit Profile
               </Link>
-              
-              {/* ✅ Redirects to Landing Page on Logout */}
+
+              {/* ✨ Get Premium */}
+              <Link
+                to="/premium"
+                className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-xl hover:bg-pink-50 hover:text-pink-600 transition-colors w-full text-left"
+                onClick={() => setIsOpen(false)}
+              >
+                <Sparkles className="w-4 h-4 text-pink-500" />
+                <span className="text-pink-600 font-semibold">Get Premium</span>
+              </Link>
+
+              <div className="my-1 border-t border-gray-50"></div>
+
+              {/* Privacy Policy */}
+              <Link
+                to="/privacy"
+                className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition-colors w-full text-left"
+                onClick={() => setIsOpen(false)}
+              >
+                <Shield className="w-4 h-4 text-gray-400" />
+                Privacy Policy
+              </Link>
+
+              {/* Terms */}
+              <Link
+                to="/terms"
+                className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition-colors w-full text-left"
+                onClick={() => setIsOpen(false)}
+              >
+                <FileText className="w-4 h-4 text-gray-400" />
+                Terms of Service
+              </Link>
+
+              <div className="my-1 border-t border-gray-50"></div>
+
+              {/* Logout */}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-colors w-full text-left"

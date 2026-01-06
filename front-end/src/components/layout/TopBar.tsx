@@ -1,4 +1,3 @@
-// src/components/layout/TopBar.tsx
 import { Home, MessageCircle, Bell, Coffee, Heart, Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -20,7 +19,7 @@ export default function TopBar({ userName = "User", onLogout }: TopBarProps) {
     { icon: Home, label: "Home", path: "/home" },
     { icon: MessageCircle, label: "Chats", path: "/chats" },
     { icon: Bell, label: "Notifications", path: "/notifications" },
-    { icon: Coffee, label: "Cafés", path: "/cafes" },
+    // { icon: Coffee, label: "Cafés", path: "/cafes" }, // HIDDEN AS REQUESTED
   ];
 
   return (

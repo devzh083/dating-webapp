@@ -4,7 +4,7 @@ import TopBar from "@/components/layout/TopBar";
 import NearbyBanner from "@/components/home/NearbyBanner";
 import PremiumBanner from "@/components/home/PremiumBanner";
 import AnonymousSwipeDeck from "@/components/home/AnonymousSwipeDeck";
-import AnonymousReviewsBanner from "@/components/home/AnonymousReviewsBanner";
+import ReviewCarousel from "@/components/home/ReviewCarousel"; // ✅ The new carousel
 import SecurityBanner from "@/components/home/SecurityBanner";
 import ProfileCompletion from "@/components/home/ProfileCompletion";
 import { useNavigate } from "react-router-dom";
@@ -135,11 +135,11 @@ const HomePage = ({ onLogout }: HomePageProps) => {
           // Fetch profile for match modal
           const res = await fetch(
             `http://127.0.0.1:8000/api/profile/${data.from_email}/`,
-            { 
-              headers: { 
+            {
+              headers: {
                 Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json"
-              } 
+                "Content-Type": "application/json",
+              },
             }
           );
 
@@ -158,7 +158,8 @@ const HomePage = ({ onLogout }: HomePageProps) => {
             setMatchProfile({
               id: data.from_email,
               firstName: profile.firstName || data.from_email.split("@")[0],
-              selfDescription: profile.tagline || profile.starter || "New match!",
+              selfDescription:
+                profile.tagline || profile.starter || "New match!",
               conversationHook: profile.starter || "Say hello!",
               vibeTags: profile.interests || [],
             });
@@ -184,45 +185,43 @@ const HomePage = ({ onLogout }: HomePageProps) => {
       }
     };
 
-
     return () => ws.close();
   }, []);
 
   /* -------- LIKE / DISLIKE -------- */
 
   const handleLike = async (profileId: string) => {
-  const likedProfile = profiles.find((p) => p.id === profileId);
-  setProfiles((prev) => prev.filter((p) => p.id !== profileId));
+    const likedProfile = profiles.find((p) => p.id === profileId);
+    setProfiles((prev) => prev.filter((p) => p.id !== profileId));
 
-  try {
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
 
-    const res = await fetch("http://127.0.0.1:8000/api/like/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ to_email: profileId }),
-    });
+      const res = await fetch("http://127.0.0.1:8000/api/like/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ to_email: profileId }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.status === "matched") {
-      // Show modal for User B (who triggered the like)
-      setMatchProfile(likedProfile || null);
-      setMatchChatId(data.match.chat_id);  // Use data.match.chat_id
-      setShowMatchModal(true);
-      toast.success("It's a match! 🎉");
-    } else {
-      toast.success("Like sent!");
+      if (data.status === "matched") {
+        // Show modal for User B (who triggered the like)
+        setMatchProfile(likedProfile || null);
+        setMatchChatId(data.match.chat_id); // Use data.match.chat_id
+        setShowMatchModal(true);
+        toast.success("It's a match! 🎉");
+      } else {
+        toast.success("Like sent!");
+      }
+    } catch {
+      toast.error("Failed to like");
     }
-  } catch {
-    toast.error("Failed to like");
-  }
-};
-
+  };
 
   const handleDislike = (profileId: string) => {
     setProfiles((prev) => prev.filter((p) => p.id !== profileId));
@@ -234,7 +233,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
     setShowMatchModal(false);
     setMatchProfile(null);
     setMatchChatId(null);
-    
+
     // Navigate to chats page WITH chat_id
     if (matchChatId) {
       navigate("/chats");
@@ -243,21 +242,20 @@ const HomePage = ({ onLogout }: HomePageProps) => {
     }
   };
 
-
   /* ================= RENDER ================= */
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pt-16">
       <TopBar userName="User" onLogout={onLogout} />
 
+      {/* ✅ This is the part that caused the error - now the variables exist! */}
       {showMatchModal && matchProfile && matchChatId && (
         <MatchModal
           profile={matchProfile}
-          chatId={matchChatId}  // ✅ Pass chatId
+          chatId={matchChatId} // ✅ Pass chatId
           onComplete={handleMatchComplete}
         />
       )}
-
 
       <div className="flex">
         <main className="flex-1 lg:mr-80 w-full p-4 lg:p-8 overflow-y-auto">
@@ -278,13 +276,19 @@ const HomePage = ({ onLogout }: HomePageProps) => {
               )}
             </section>
 
-            <section className="space-y-6 pb-12">
+            {/* ✅ NEW DESIGN SECTION */}
+            <section className="space-y-8 pb-12">
               <div className="flex items-center gap-3">
                 <div className={`h-8 w-1.5 rounded-full ${PRIMARY_GRADIENT}`} />
                 <h3 className="text-xl font-bold">Why People Love Us</h3>
               </div>
-              <div className="grid md:grid-cols-2 gap-6">
-                <AnonymousReviewsBanner />
+              
+              {/* Stacked Layout instead of Grid */}
+              <div className="flex flex-col gap-8">
+                {/* 1. Full width Carousel */}
+                <ReviewCarousel />
+
+                {/* 2. Full width Security Banner */}
                 <SecurityBanner />
               </div>
             </section>
