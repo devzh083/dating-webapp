@@ -279,7 +279,67 @@ class FirebaseChatManager:
         chat_ref = db.collection("chats").document()
         chat_ref.set({
             "participants": users,
-            "created_at": firestore.SERVER_TIMESTAMP,  # OK for storage
+            "created_at": firestore.SERVER_TIMESTAMP,
             "last_message": None,
+            "last_message_at": None,
         })
-        return chat_ref.id  # Just ID - no data returned
+        return chat_ref.id
+
+    @staticmethod
+    def add_message(
+        chat_id: str,
+        sender: str,
+        receiver: str,
+        content: str,
+        message_type: str = "text",
+    ) -> None:
+        message = {
+            "chat_id": chat_id,
+            "sender": sender,
+            "receiver": receiver,
+            "content": content,
+            "type": message_type,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "read": False,
+        }
+
+        # Store message
+        db.collection("chats") \
+          .document(chat_id) \
+          .collection("messages") \
+          .add(message)
+
+        # Update chat metadata
+        db.collection("chats").document(chat_id).update({
+            "last_message": content,
+            "last_message_at": firestore.SERVER_TIMESTAMP,
+        })
+
+    @staticmethod
+    def get_chat_messages(
+        chat_id: str,
+        limit: int = 50,
+        before: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        query = (
+            db.collection("chats")
+            .document(chat_id)
+            .collection("messages")
+            .order_by("created_at", direction=firestore.Query.DESCENDING)
+            .limit(limit)
+        )
+
+        if before:
+            query = query.where("created_at", "<", before)
+
+        messages = query.stream()
+        return [
+            clean_firestore_data(msg.to_dict())
+            for msg in messages
+        ]
+    
+    @staticmethod
+    def get_chat(chat_id: str) -> Optional[Dict[str, Any]]:
+        doc = db.collection("chats").document(chat_id).get()
+        return doc.to_dict() if doc.exists else None
+

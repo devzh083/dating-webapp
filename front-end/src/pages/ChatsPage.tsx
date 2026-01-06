@@ -1,29 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import TopBar from "@/components/layout/TopBar";
 import {
   Search,
   MessageCircle,
-  UserPlus,
-  ArrowUpRight,
   MoreVertical,
   Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
 
 /* ---------------- TYPES ---------------- */
 
 interface ChatUser {
   chat_id?: string;
   match_id?: string;
+  status?: string;
+  created_at?: string;
   email: string;
   first_name: string | null;
   profile_photo: string | null;
 }
 
-interface ChatsApiResponse {
-  chats: ChatUser[];
-  requests: ChatUser[];
+interface Message {
+  sender: string;
+  receiver: string;
+  content: string;
+  created_at?: string;
 }
 
 interface ChatsPageProps {
@@ -40,9 +41,15 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
   const [chats, setChats] = useState<ChatUser[]>([]);
   const [requests, setRequests] = useState<ChatUser[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
-  /* ---------------- FETCH DATA ---------------- */
+  const socketRef = useRef<WebSocket | null>(null);
+  const currentUserEmail = localStorage.getItem("user_email");
+
+  const activeChat = chats.find((c) => c.chat_id === selectedChat);
+
+  /* ---------------- FETCH CHATS ---------------- */
 
   useEffect(() => {
     const fetchChats = async () => {
@@ -61,11 +68,11 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
         if (!res.ok) throw new Error("Failed to fetch chats");
 
-        const data: ChatsApiResponse = await res.json();
-        setChats(data.chats || []);
+        const data = await res.json();
+        setChats(Array.isArray(data) ? data : data.chats || []);
         setRequests(data.requests || []);
       } catch (err) {
-        console.error(err);
+        console.error("FETCH CHATS ERROR:", err);
       } finally {
         setLoading(false);
       }
@@ -74,7 +81,145 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     fetchChats();
   }, []);
 
-  const activeChat = chats.find((c) => c.chat_id === selectedChat);
+  /* ---------------- LOAD MESSAGE HISTORY ---------------- */
+
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    const loadMessages = async () => {
+      try {
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        const res = await fetch(
+          `http://127.0.0.1:8000/api/chats/${selectedChat}/messages/`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!res.ok) throw new Error("Failed to load messages");
+
+        const data = await res.json();
+        setMessages(data.messages || []);
+      } catch (err) {
+        console.error("LOAD MESSAGES ERROR:", err);
+      }
+    };
+
+    loadMessages();
+  }, [selectedChat]);
+
+  /* ---------------- MARK CHAT READ ---------------- */
+
+  const markChatAsRead = async (chatId: string) => {
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+
+      await fetch(
+        `http://127.0.0.1:8000/api/chats/${chatId}/read/`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+    } catch (err) {
+      console.error("MARK READ ERROR:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedChat) markChatAsRead(selectedChat);
+  }, [selectedChat]);
+
+  /* ---------------- WEBSOCKET ---------------- */
+
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    const ws = new WebSocket(
+      `ws://127.0.0.1:8000/ws/chat/${selectedChat}/?token=${token}`
+    );
+
+    socketRef.current = ws;
+
+    ws.onopen = () => console.log("WS OPENED:", selectedChat);
+    ws.onclose = (e) => console.log("WS CLOSED:", e.code, e.reason);
+    ws.onerror = (e) => console.error("WS ERROR:", e);
+
+    ws.onmessage = (event) => {
+      const data: Message = JSON.parse(event.data);
+
+      setMessages((prev) => {
+        const exists = prev.some(
+          (m) =>
+            m.sender === data.sender &&
+            m.content === data.content &&
+            Math.abs(
+              new Date(m.created_at || "").getTime() -
+                new Date(data.created_at || "").getTime()
+            ) < 1000
+        );
+        return exists ? prev : [...prev, data];
+      });
+
+      markChatAsRead(selectedChat);
+    };
+
+    return () => {
+      ws.close();
+      socketRef.current = null;
+    };
+  }, [selectedChat]);
+
+  /* ---------------- SEND MESSAGE ---------------- */
+
+  const sendMessage = () => {
+    console.log("SEND BUTTON CLICKED");
+    console.log("messageInput:", messageInput);
+    console.log("socketRef:", socketRef.current);
+    console.log(
+      "socketState:",
+      socketRef.current?.readyState,
+      "(0=CONNECTING,1=OPEN,2=CLOSING,3=CLOSED)"
+    );
+    console.log("currentUserEmail:", currentUserEmail);
+    console.log("activeChat:", activeChat);
+
+    if (!messageInput.trim()) return;
+    if (!socketRef.current) return;
+    if (socketRef.current.readyState !== WebSocket.OPEN) return;
+    if (!currentUserEmail) return;
+    if (!activeChat) return;
+
+    const tempMessage: Message = {
+      sender: currentUserEmail,
+      receiver: activeChat.email,
+      content: messageInput,
+      created_at: new Date().toISOString(),
+    };
+
+    console.log("SENDING MESSAGE:", tempMessage);
+
+    // Optimistic UI
+    setMessages((prev) => [...prev, tempMessage]);
+
+    socketRef.current.send(
+      JSON.stringify({ content: messageInput })
+    );
+
+    setMessageInput("");
+  };
+
+  /* ---------------- RENDER ---------------- */
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pt-20 pb-6 px-4 lg:px-8">
@@ -83,7 +228,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
       <main className="container mx-auto max-w-7xl h-[calc(100vh-120px)]">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
 
-          {/* ---------------- LEFT PANEL ---------------- */}
+          {/* LEFT PANEL */}
           <div
             className={cn(
               "lg:col-span-4 flex flex-col gap-4 h-full",
@@ -91,192 +236,95 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
             )}
           >
             <div className="flex flex-col gap-4 px-1">
-              <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+              <h1 className="text-2xl font-bold">Messages</h1>
 
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4" />
                 <input
                   placeholder="Search conversations..."
-                  className="w-full pl-10 pr-4 py-3.5 rounded-2xl border border-gray-200 bg-white text-sm"
+                  className="w-full pl-10 pr-4 py-3.5 rounded-2xl border"
                 />
               </div>
 
-              {/* Tabs */}
-              <div className="bg-white rounded-xl border border-gray-100 p-1.5 grid grid-cols-3 gap-1">
-                {[
-                  { id: "connections", label: "Chats", icon: MessageCircle },
-                  { id: "requests", label: "Requests", icon: UserPlus },
-                  { id: "requested", label: "Sent", icon: ArrowUpRight },
-                ].map((tab) => (
+              <div className="bg-white rounded-xl p-1.5 grid grid-cols-3 gap-1">
+                {["connections", "requests", "requested"].map((t) => (
                   <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
+                    key={t}
+                    onClick={() => setActiveTab(t as any)}
                     className={cn(
-                      "flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold",
-                      activeTab === tab.id
-                        ? "bg-teal-50 text-teal-700"
-                        : "text-gray-500 hover:bg-gray-50"
+                      "py-2 rounded-lg text-xs font-semibold",
+                      activeTab === t && "bg-teal-50 text-teal-700"
                     )}
                   >
-                    <tab.icon className="w-3.5 h-3.5" />
-                    {tab.label}
+                    {t}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* ---------------- LIST CONTENT ---------------- */}
-            <div className="flex-1 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
-
-                <AnimatePresence mode="wait">
-                  {/* ---------------- CHATS ---------------- */}
-                  {activeTab === "connections" && (
-                    <motion.div
-                      key="connections"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="space-y-1"
-                    >
-                      {loading && (
-                        <div className="text-center text-sm text-gray-400 py-6">
-                          Loading conversations…
-                        </div>
-                      )}
-
-                      {!loading && chats.length === 0 && (
-                        <div className="text-center text-sm text-gray-400 py-6">
-                          No chats yet
-                        </div>
-                      )}
-
-                      {chats.map((chat) => (
-                        <button
-                          key={chat.chat_id}
-                          onClick={() => setSelectedChat(chat.chat_id!)}
-                          className="w-full flex items-center gap-4 p-3.5 rounded-2xl hover:bg-gray-50 text-left"
-                        >
-                          <div className="w-12 h-12 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-lg font-bold">
-                            {chat.first_name?.[0] ?? "?"}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <span className="font-bold text-sm text-gray-900">
-                              {chat.first_name ?? "User"}
-                            </span>
-                            <p className="text-xs text-gray-500 truncate">
-                              Start a conversation
-                            </p>
-                          </div>
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-
-                  {/* ---------------- REQUESTS ---------------- */}
-                  {activeTab === "requests" && (
-                    <motion.div
-                      key="requests"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="space-y-2"
-                    >
-                      {!loading && requests.length === 0 && (
-                        <div className="text-center text-sm text-gray-400 py-6">
-                          No new requests
-                        </div>
-                      )}
-
-                      {requests.map((req) => (
-                        <div
-                          key={req.match_id}
-                          className="p-4 rounded-2xl border border-gray-100 bg-white shadow-sm"
-                        >
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
-                              {req.first_name?.[0] ?? "?"}
-                            </div>
-                            <h4 className="font-bold text-gray-900 text-sm">
-                              {req.first_name ?? "User"}
-                            </h4>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <button className="flex-1 py-2 bg-teal-500 text-white text-xs font-bold rounded-xl">
-                              Accept
-                            </button>
-                            <button className="flex-1 py-2 bg-gray-50 text-gray-600 text-xs font-bold rounded-xl">
-                              Ignore
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </motion.div>
-                  )}
-
-                  {/* ---------------- SENT ---------------- */}
-                  {activeTab === "requested" && (
-                    <div className="text-center text-sm text-gray-400 py-6">
-                      Nothing here yet
+            <div className="flex-1 bg-white rounded-3xl overflow-y-auto p-3">
+              {activeTab === "connections" &&
+                chats.map((chat) => (
+                  <button
+                    key={chat.chat_id}
+                    onClick={() => setSelectedChat(chat.chat_id!)}
+                    className="w-full flex items-center gap-4 p-3 hover:bg-gray-50"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold">
+                      {(chat.first_name || chat.email)[0].toUpperCase()}
                     </div>
-                  )}
-                </AnimatePresence>
-
-              </div>
+                    <span className="font-bold">
+                      {chat.first_name || chat.email}
+                    </span>
+                  </button>
+                ))}
             </div>
           </div>
 
-          {/* ---------------- RIGHT PANEL ---------------- */}
+          {/* RIGHT PANEL */}
           <div
             className={cn(
-              "lg:col-span-8 flex flex-col bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden h-full",
-              selectedChat
-                ? "flex fixed inset-0 z-50 lg:static"
-                : "hidden lg:flex"
+              "lg:col-span-8 flex flex-col bg-white rounded-[32px] h-full",
+              selectedChat ? "flex" : "hidden lg:flex"
             )}
           >
             {activeChat ? (
               <>
-                <div className="h-20 border-b border-gray-50 flex items-center justify-between px-6">
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => setSelectedChat(null)}
-                      className="lg:hidden"
+                <div className="h-20 border-b flex items-center px-6">
+                  <h3 className="font-bold">
+                    {activeChat.first_name || activeChat.email}
+                  </h3>
+                  <MoreVertical className="ml-auto" />
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                  {messages.map((m, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "max-w-xs p-3 rounded-xl",
+                        m.sender === currentUserEmail
+                          ? "bg-teal-500 text-white ml-auto"
+                          : "bg-gray-100"
+                      )}
                     >
-                      ←
-                    </button>
-
-                    <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
-                      {activeChat.first_name?.[0] ?? "?"}
+                      {m.content}
                     </div>
-
-                    <h3 className="font-bold text-gray-900">
-                      {activeChat.first_name ?? "User"}
-                    </h3>
-                  </div>
-
-                  <MoreVertical />
+                  ))}
                 </div>
 
-                <div className="flex-1 bg-[#F9FAFB] flex items-center justify-center text-gray-400">
-                  No messages yet
-                </div>
-
-                <div className="p-4 bg-white border-t border-gray-50">
-                  <div className="relative flex items-center gap-2">
+                <div className="p-4 border-t">
+                  <div className="flex items-center gap-2">
                     <input
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
+                      className="flex-1 rounded-full border px-4 py-3"
                       placeholder="Type a message..."
-                      className="flex-1 bg-gray-50 border border-gray-200 rounded-full py-3.5 pl-6 pr-12 text-sm"
                     />
                     <button
-                      className={cn(
-                        "p-3 rounded-full",
-                        messageInput.trim()
-                          ? "bg-teal-500 text-white"
-                          : "bg-gray-100 text-gray-300"
-                      )}
+                      type="button"
+                      onClick={sendMessage}
+                      className="p-3 bg-teal-500 text-white rounded-full"
                     >
                       <Send className="w-5 h-5" />
                     </button>
@@ -284,18 +332,11 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                <MessageCircle className="w-10 h-10 text-teal-500 mb-4" />
-                <h3 className="text-xl font-bold text-gray-900 mb-1">
-                  Select a conversation
-                </h3>
-                <p className="text-gray-500">
-                  Choose a match to start chatting
-                </p>
+              <div className="flex-1 flex items-center justify-center">
+                <MessageCircle className="w-10 h-10 text-teal-500" />
               </div>
             )}
           </div>
-
         </div>
       </main>
     </div>

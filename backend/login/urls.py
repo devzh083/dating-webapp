@@ -30,4 +30,8 @@ urlpatterns = [
 
     path("chats/matched/", views.MatchedChatsView.as_view(), name="matched-chats"),
 
+    path("chats/<str:chat_id>/messages/", views.ChatMessagesView.as_view()),
+    path("chats/<str:chat_id>/send/", views.SendChatMessageView.as_view()),
+    path("chats/<str:chat_id>/read/", views.MarkChatReadView.as_view()),
+
 ]

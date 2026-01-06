@@ -922,3 +922,115 @@ class MatchedChatsView(APIView):
             })
 
         return Response(chats, status=status.HTTP_200_OK)
+
+class ChatMessagesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, chat_id):
+        user_email = request.user.username.lower()
+
+        chat = FirebaseChatManager.get_chat(chat_id)
+        if not chat:
+            return Response(
+                {"detail": "Chat not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # 🔐 Authorization
+        if user_email not in chat.get("participants", []):
+            return Response(
+                {"detail": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        messages_ref = (
+            db.collection("chats")
+            .document(chat_id)
+            .collection("messages")
+            .order_by("created_at", direction=firestore.Query.ASCENDING)
+            .stream()
+        )
+
+        messages = [
+            clean_firestore_data({
+                "id": msg.id,
+                **msg.to_dict()
+            })
+            for msg in messages_ref
+        ]
+
+        return Response(messages, status=status.HTTP_200_OK)
+
+class SendChatMessageView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, chat_id):
+        sender = request.user.username.lower()
+        content = request.data.get("content")
+
+        if not content:
+            return Response(
+                {"detail": "Message content required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        chat = FirebaseChatManager.get_chat(chat_id)
+        if not chat or sender not in chat.get("participants", []):
+            return Response(
+                {"detail": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        receiver = next(p for p in chat["participants"] if p != sender)
+
+        message = {
+            "chat_id": chat_id,
+            "sender": sender,
+            "receiver": receiver,
+            "content": content,
+            "type": "text",
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "read": False,
+        }
+
+        db.collection("chats") \
+          .document(chat_id) \
+          .collection("messages") \
+          .add(message)
+
+        return Response(
+            {"status": "sent"},
+            status=status.HTTP_201_CREATED
+        )
+
+class MarkChatReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, chat_id):
+        user_email = request.user.username.lower()
+
+        chat = FirebaseChatManager.get_chat(chat_id)
+        if not chat or user_email not in chat.get("participants", []):
+            return Response(
+                {"detail": "Forbidden"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        messages_ref = (
+            db.collection("chats")
+            .document(chat_id)
+            .collection("messages")
+            .where("receiver", "==", user_email)
+            .where("read", "==", False)
+            .stream()
+        )
+
+        batch = db.batch()
+        for msg in messages_ref:
+            batch.update(msg.reference, {
+                "read": True,
+                "read_at": firestore.SERVER_TIMESTAMP
+            })
+        batch.commit()
+
+        return Response({"status": "ok"}, status=status.HTTP_200_OK)

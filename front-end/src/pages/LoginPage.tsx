@@ -39,21 +39,38 @@ export default function LoginPage({
 
   /* ---------------- GOOGLE REDIRECT HANDLING ---------------- */
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const access = params.get("access_token");
-    const refresh = params.get("refresh_token");
+      const params = new URLSearchParams(location.search);
+      const access = params.get("access_token");
+      const refresh = params.get("refresh_token");
 
-    if (access && refresh) {
+      if (!access || !refresh) return;
+
       localStorage.setItem("access_token", access);
       localStorage.setItem("refresh_token", refresh);
-      window.history.replaceState({}, "", window.location.pathname);
-      onLoginSuccess();
-      navigate("/home");
-    }
-  }, [location.search, navigate, onLoginSuccess]);
+
+      fetch(`${API_BASE_URL}/me/`, {
+        headers: { Authorization: `Bearer ${access}` },
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to fetch user");
+          return res.json();
+        })
+        .then((user) => {
+          if (user?.email) {
+            localStorage.setItem("user_email", user.email);
+          }
+
+          window.history.replaceState({}, "", window.location.pathname);
+          onLoginSuccess();
+          navigate("/home");
+        })
+        .catch(() => {
+          setErrorMsg("Google login failed. Please try again.");
+        });
+    }, [location.search, navigate, onLoginSuccess]);
 
   /* ---------------- LOGIN ---------------- */
-  const handleLogin = async (e: React.FormEvent) => {
+   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setLoading(true);
@@ -69,22 +86,16 @@ export default function LoginPage({
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.detail || "Invalid credentials");
-      }
+      if (!res.ok) throw new Error(data.detail || "Invalid credentials");
 
       const { access, refresh, user } = data;
-      const is_verified = user?.is_verified ?? false;
 
-      // If not verified: send OTP and go to OTP screen
-      if (!is_verified) {
+      if (!user?.is_verified) {
         await fetch(`${API_BASE_URL}/login/send-otp/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username: email.trim() }),
         });
-
         setView("otp");
         setLoading(false);
         return;
@@ -92,15 +103,16 @@ export default function LoginPage({
 
       localStorage.setItem("access_token", access);
       localStorage.setItem("refresh_token", refresh);
+      localStorage.setItem("user_email", user.email);
 
       onLoginSuccess();
       navigate("/home");
     } catch (err: any) {
       setErrorMsg(err.message);
+    } finally {
       setLoading(false);
     }
   };
-
   /* ---------------- SIGNUP ---------------- */
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
