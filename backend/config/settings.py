@@ -13,14 +13,13 @@ import pymysql
 pymysql.install_as_MySQLdb()
 from datetime import timedelta
 from pathlib import Path
-from dotenv import load_dotenv
 from decouple import Config, RepositoryEnv
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-env_path = os.path.join(BASE_DIR, "..", ".env")
+env_path = os.path.join(BASE_DIR, ".env")
 env_config = Config(RepositoryEnv(env_path))
 
 # Quick-start development settings - unsuitable for production
@@ -41,11 +40,14 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None
 ASGI_APPLICATION = "config.asgi.application"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+
 # Application definition
 
 INSTALLED_APPS = [
     'rest_framework',
-    'login',
     "channels",
     'corsheaders',
     'rest_framework_simplejwt',
@@ -55,6 +57,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'cafe',
+    'login',
 ]
 
 MIDDLEWARE = [
@@ -93,16 +97,15 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'dating_app_db',
-        'USER': 'root',
-        'PASSWORD': 'DatingApp@2026!',
-        'HOST': 'localhost',
-        'PORT': '3306',
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "dating_app_db",
+        "USER": "dating_user",
+        "PASSWORD": "DatingUser@2026!",
+        "HOST": "127.0.0.1",
+        "PORT": "3306",
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

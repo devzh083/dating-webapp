@@ -76,6 +76,7 @@ export default function OtpVerification({
       if (data.access && data.refresh) {
         localStorage.setItem("access_token", data.access);
         localStorage.setItem("refresh_token", data.refresh);
+        localStorage.setItem("user_email", email.toLowerCase());
       }
 
       onSuccess();

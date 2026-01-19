@@ -1,6 +1,7 @@
 from datetime import datetime 
 from config.firebase import db
 from firebase_admin import firestore
+from django.db import models
 from typing import Dict, Any, Optional, List
 from google.cloud import firestore
 
@@ -191,155 +192,196 @@ class LegacyFirebaseUserManager(FirebaseUserManager):
     pass
 
 
-class FirebaseLikeManager:
-    @staticmethod
-    def send_like(from_email: str, to_email: str) -> Dict[str, Any]:
-        likes_ref = db.collection("likes")
+# class FirebaseLikeManager:
+#     @staticmethod
+#     def send_like(from_email: str, to_email: str) -> Dict[str, Any]:
+#         likes_ref = db.collection("likes")
 
-        # 1. Prevent duplicate like
-        existing_like = list(
-            likes_ref
-            .where("from_email", "==", from_email.lower())
-            .where("to_email", "==", to_email.lower())
-            .limit(1)
-            .stream()
-        )
-        if existing_like:
-            return {"status": "already_liked"}
+#         # 1. Prevent duplicate like
+#         existing_like = list(
+#             likes_ref
+#             .where("from_email", "==", from_email.lower())
+#             .where("to_email", "==", to_email.lower())
+#             .limit(1)
+#             .stream()
+#         )
+#         if existing_like:
+#             return {"status": "already_liked"}
 
-        # 2. Check reverse like
-        reverse_like = list(
-            likes_ref
-            .where("from_email", "==", to_email.lower())
-            .where("to_email", "==", from_email.lower())
-            .limit(1)
-            .stream()
-        )
+#         # 2. Check reverse like
+#         reverse_like = list(
+#             likes_ref
+#             .where("from_email", "==", to_email.lower())
+#             .where("to_email", "==", from_email.lower())
+#             .limit(1)
+#             .stream()
+#         )
 
-        # 3. MATCH → create chat immediately
-        if reverse_like:
-            match = FirebaseMatchManager.create_match(from_email, to_email)
-            FirebaseLikeManager._cleanup_incoming_likes(from_email, to_email)
-            return {"status": "matched", "match": match}
+#         # 3. MATCH → create chat immediately
+#         if reverse_like:
+#             match = FirebaseMatchManager.create_match(from_email, to_email)
+#             FirebaseLikeManager._cleanup_incoming_likes(from_email, to_email)
+#             return {"status": "matched", "match": match}
 
-        # 4. Save like
-        likes_ref.add({
-            "from_email": from_email.lower(),
-            "to_email": to_email.lower(),
-            "created_at": firestore.SERVER_TIMESTAMP,
-        })
-        return {"status": "liked"}
+#         # 4. Save like
+#         likes_ref.add({
+#             "from_email": from_email.lower(),
+#             "to_email": to_email.lower(),
+#             "created_at": firestore.SERVER_TIMESTAMP,
+#         })
+#         return {"status": "liked"}
 
-    @staticmethod
-    def _cleanup_incoming_likes(a: str, b: str):
-        """Remove stale incoming_like cards once match occurs"""
-        incoming_ref = db.collection("incoming_likes")
-        queries = [
-            incoming_ref.where("from_email", "==", a.lower()).where("to_email", "==", b.lower()),
-            incoming_ref.where("from_email", "==", b.lower()).where("to_email", "==", a.lower()),
-        ]
-        for q in queries:
-            for doc in q.stream():
-                doc.reference.delete()
+#     @staticmethod
+#     def _cleanup_incoming_likes(a: str, b: str):
+#         """Remove stale incoming_like cards once match occurs"""
+#         incoming_ref = db.collection("incoming_likes")
+#         queries = [
+#             incoming_ref.where("from_email", "==", a.lower()).where("to_email", "==", b.lower()),
+#             incoming_ref.where("from_email", "==", b.lower()).where("to_email", "==", a.lower()),
+#         ]
+#         for q in queries:
+#             for doc in q.stream():
+#                 doc.reference.delete()
 
-class FirebaseMatchManager:
-    @staticmethod
-    def create_match(user_a: str, user_b: str) -> Dict[str, Any]:
-        users = sorted([user_a.lower(), user_b.lower()])
+# class FirebaseMatchManager:
+#     @staticmethod
+#     def create_match(user_a: str, user_b: str) -> Dict[str, Any]:
+#         users = sorted([user_a.lower(), user_b.lower()])
 
-        matches_ref = db.collection("matches")
-        existing = list(matches_ref.where("users", "==", users).limit(1).stream())
-        if existing:
-            return clean_firestore_data(existing[0].to_dict())
+#         matches_ref = db.collection("matches")
+#         existing = list(matches_ref.where("users", "==", users).limit(1).stream())
+#         if existing:
+#             return clean_firestore_data(existing[0].to_dict())
 
-        chat_id = FirebaseChatManager.create_chat(users)
+#         chat_id = FirebaseChatManager.create_chat(users)
 
-        # Store with SERVER_TIMESTAMP (Firestore handles it)
-        match_ref = matches_ref.document()
-        match_ref.set({
-            "users": users,
-            "chat_id": chat_id,
-            "status": "active",
-            "created_at": firestore.SERVER_TIMESTAMP,  # OK for storage
-        })
+#         # Store with SERVER_TIMESTAMP (Firestore handles it)
+#         match_ref = matches_ref.document()
+#         match_ref.set({
+#             "users": users,
+#             "chat_id": chat_id,
+#             "status": "active",
+#             "created_at": firestore.SERVER_TIMESTAMP,  # OK for storage
+#         })
 
-        # Return CLEAN data WITHOUT Sentinel
-        response_data = {
-            "match_id": match_ref.id,
-            "users": users,
-            "chat_id": chat_id,
-            "status": "active",
-            "created_at": datetime.utcnow().isoformat() + "Z"  # Clean timestamp
-        }
-        return response_data  # No cleaning needed!
+#         # Return CLEAN data WITHOUT Sentinel
+#         response_data = {
+#             "match_id": match_ref.id,
+#             "users": users,
+#             "chat_id": chat_id,
+#             "status": "active",
+#             "created_at": datetime.utcnow().isoformat() + "Z"  # Clean timestamp
+#         }
+#         return response_data  # No cleaning needed!
 
-class FirebaseChatManager:
-    @staticmethod
-    def create_chat(users: List[str]) -> str:
-        chat_ref = db.collection("chats").document()
-        chat_ref.set({
-            "participants": users,
-            "created_at": firestore.SERVER_TIMESTAMP,
-            "last_message": None,
-            "last_message_at": None,
-        })
-        return chat_ref.id
+# class FirebaseChatManager:
+#     @staticmethod
+#     def create_chat(users: List[str]) -> str:
+#         chat_ref = db.collection("chats").document()
+#         chat_ref.set({
+#             "participants": users,
+#             "created_at": firestore.SERVER_TIMESTAMP,
+#             "last_message": None,
+#             "last_message_at": None,
+#         })
+#         return chat_ref.id
 
-    @staticmethod
-    def add_message(
-        chat_id: str,
-        sender: str,
-        receiver: str,
-        content: str,
-        message_type: str = "text",
-    ) -> None:
-        message = {
-            "chat_id": chat_id,
-            "sender": sender,
-            "receiver": receiver,
-            "content": content,
-            "type": message_type,
-            "created_at": firestore.SERVER_TIMESTAMP,
-            "read": False,
-        }
+#     @staticmethod
+#     def add_message(
+#         chat_id: str,
+#         sender: str,
+#         receiver: str,
+#         content: str,
+#         message_type: str = "text",
+#     ) -> None:
+#         message = {
+#             "chat_id": chat_id,
+#             "sender": sender,
+#             "receiver": receiver,
+#             "content": content,
+#             "type": message_type,
+#             "created_at": firestore.SERVER_TIMESTAMP,
+#             "read": False,
+#         }
 
-        # Store message
-        db.collection("chats") \
-          .document(chat_id) \
-          .collection("messages") \
-          .add(message)
+#         # Store message
+#         db.collection("chats") \
+#           .document(chat_id) \
+#           .collection("messages") \
+#           .add(message)
 
-        # Update chat metadata
-        db.collection("chats").document(chat_id).update({
-            "last_message": content,
-            "last_message_at": firestore.SERVER_TIMESTAMP,
-        })
+#         # Update chat metadata
+#         db.collection("chats").document(chat_id).update({
+#             "last_message": content,
+#             "last_message_at": firestore.SERVER_TIMESTAMP,
+#         })
 
-    @staticmethod
-    def get_chat_messages(
-        chat_id: str,
-        limit: int = 50,
-        before: Optional[datetime] = None,
-    ) -> List[Dict[str, Any]]:
-        query = (
-            db.collection("chats")
-            .document(chat_id)
-            .collection("messages")
-            .order_by("created_at", direction=firestore.Query.DESCENDING)
-            .limit(limit)
-        )
+#     @staticmethod
+#     def get_chat_messages(
+#         chat_id: str,
+#         limit: int = 50,
+#         before: Optional[datetime] = None,
+#     ) -> List[Dict[str, Any]]:
+#         query = (
+#             db.collection("chats")
+#             .document(chat_id)
+#             .collection("messages")
+#             .order_by("created_at", direction=firestore.Query.DESCENDING)
+#             .limit(limit)
+#         )
 
-        if before:
-            query = query.where("created_at", "<", before)
+#         if before:
+#             query = query.where("created_at", "<", before)
 
-        messages = query.stream()
-        return [
-            clean_firestore_data(msg.to_dict())
-            for msg in messages
-        ]
+#         messages = query.stream()
+#         return [
+#             clean_firestore_data(msg.to_dict())
+#             for msg in messages
+#         ]
     
-    @staticmethod
-    def get_chat(chat_id: str) -> Optional[Dict[str, Any]]:
-        doc = db.collection("chats").document(chat_id).get()
-        return doc.to_dict() if doc.exists else None
+#     @staticmethod
+#     def get_chat(chat_id: str) -> Optional[Dict[str, Any]]:
+#         doc = db.collection("chats").document(chat_id).get()
+#         return doc.to_dict() if doc.exists else None
+
+class Like(models.Model):
+    from_email = models.EmailField()
+    to_email = models.EmailField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("from_email", "to_email")
+
+class Chat(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_message = models.TextField(null=True, blank=True)
+    last_message_at = models.DateTimeField(null=True, blank=True)
+
+
+class ChatParticipant(models.Model):
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE)
+    email = models.EmailField()
+
+    class Meta:
+        unique_together = ("chat", "email")
+
+class Message(models.Model):
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE)
+    sender = models.EmailField()
+    receiver = models.EmailField()
+    content = models.TextField()
+    type = models.CharField(max_length=20, default="text")
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+class Match(models.Model):
+    user_a = models.EmailField()
+    user_b = models.EmailField()
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, default="active")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user_a", "user_b")
 

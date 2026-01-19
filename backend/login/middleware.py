@@ -1,26 +1,24 @@
 from urllib.parse import parse_qs
 from channels.db import database_sync_to_async
+from django.contrib.auth.models import AnonymousUser
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
 @database_sync_to_async
 def get_user_from_token(token):
-    from django.contrib.auth.models import AnonymousUser
-    from rest_framework_simplejwt.authentication import JWTAuthentication
-
     try:
-        validated_token = JWTAuthentication().get_validated_token(token)
-        return JWTAuthentication().get_user(validated_token)
+        jwt_auth = JWTAuthentication()
+        validated_token = jwt_auth.get_validated_token(token)
+        return jwt_auth.get_user(validated_token)
     except Exception:
         return AnonymousUser()
 
 
 class JWTAuthMiddleware:
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, inner):
+        self.inner = inner
 
     async def __call__(self, scope, receive, send):
-        from django.contrib.auth.models import AnonymousUser
-
         query_string = scope.get("query_string", b"").decode()
         params = parse_qs(query_string)
         token = params.get("token", [None])[0]
@@ -30,4 +28,8 @@ class JWTAuthMiddleware:
         else:
             scope["user"] = AnonymousUser()
 
-        return await self.app(scope, receive, send)
+        return await self.inner(scope, receive, send)
+
+
+def JWTAuthMiddlewareStack(inner):
+    return JWTAuthMiddleware(inner)

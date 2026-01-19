@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 /* ---------------- TYPES ---------------- */
 
 interface ChatUser {
-  chat_id?: string;
+  chat_id: number;
   match_id?: string;
   status?: string;
   created_at?: string;
@@ -21,22 +21,71 @@ interface ChatUser {
 }
 
 interface Message {
+  id: number | string;
   sender: string;
   receiver: string;
   content: string;
   created_at?: string;
+  is_read?: boolean;
+  read_at?: string | null;
 }
+
 
 interface ChatsPageProps {
   onLogout?: () => void;
 }
+// ---------------- TIME FORMATTER ----------------
+const formatTime = (iso?: string) => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+// ---------------- DATE HELPERS ----------------
+
+const isToday = (date: Date) => {
+  const today = new Date();
+  return (
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear()
+  );
+};
+
+const isYesterday = (date: Date) => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  return (
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear()
+  );
+};
+
+const formatDateLabel = (dateString: string) => {
+  const date = new Date(dateString);
+
+  if (isToday(date)) return "Today";
+  if (isYesterday(date)) return "Yesterday";
+
+  return date.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 
 export default function ChatsPage({ onLogout }: ChatsPageProps) {
   const [activeTab, setActiveTab] = useState<
     "connections" | "requests" | "requested"
   >("connections");
 
-  const [selectedChat, setSelectedChat] = useState<string | null>(null);
+  const [selectedChat, setSelectedChat] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
 
   const [chats, setChats] = useState<ChatUser[]>([]);
@@ -44,10 +93,11 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const socketRef = useRef<WebSocket | null>(null);
-  const currentUserEmail = localStorage.getItem("user_email");
+  const socketRef = useRef<WebSocket | null>(null);const 
+  currentUserEmail = localStorage.getItem("user_email")?.toLowerCase() ?? "";
 
   const activeChat = chats.find((c) => c.chat_id === selectedChat);
+  
 
   /* ---------------- FETCH CHATS ---------------- */
 
@@ -69,8 +119,16 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         if (!res.ok) throw new Error("Failed to fetch chats");
 
         const data = await res.json();
-        setChats(Array.isArray(data) ? data : data.chats || []);
+
+        const chatsArray = Array.isArray(data) ? data : data.chats || [];
+        setChats(chatsArray);
         setRequests(data.requests || []);
+
+        // ✅ Store user_email in localStorage
+        if (chatsArray.length > 0 && chatsArray[0].user_email) {
+          localStorage.setItem("user_email", chatsArray[0].user_email);
+        }
+
       } catch (err) {
         console.error("FETCH CHATS ERROR:", err);
       } finally {
@@ -80,6 +138,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
     fetchChats();
   }, []);
+
 
   /* ---------------- LOAD MESSAGE HISTORY ---------------- */
 
@@ -101,9 +160,17 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         );
 
         if (!res.ok) throw new Error("Failed to load messages");
+        const data: Record<string, Message[]> = await res.json();
+        const flatMessages: Message[] = Object.entries(data).flatMap(
+          ([date, msgs]: [string, any[]]) =>
+            msgs.map((m) => ({
+              ...m,
+              created_at: m.created_at || `${date}T00:00:00Z`,
+            }))
+        );
 
-        const data = await res.json();
-        setMessages(data.messages || []);
+        setMessages(flatMessages);
+
       } catch (err) {
         console.error("LOAD MESSAGES ERROR:", err);
       }
@@ -114,7 +181,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
   /* ---------------- MARK CHAT READ ---------------- */
 
-  const markChatAsRead = async (chatId: string) => {
+  const markChatAsRead = async (chatId: number) => {
     try {
       const token = localStorage.getItem("access_token");
       if (!token) return;
@@ -156,23 +223,23 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     ws.onerror = (e) => console.error("WS ERROR:", e);
 
     ws.onmessage = (event) => {
-      const data: Message = JSON.parse(event.data);
+    const data = JSON.parse(event.data);
 
-      setMessages((prev) => {
-        const exists = prev.some(
-          (m) =>
-            m.sender === data.sender &&
-            m.content === data.content &&
-            Math.abs(
-              new Date(m.created_at || "").getTime() -
-                new Date(data.created_at || "").getTime()
-            ) < 1000
-        );
-        return exists ? prev : [...prev, data];
-      });
-
-      markChatAsRead(selectedChat);
+    const incomingMessage: Message = {
+      id: data.id ?? crypto.randomUUID(), // backend id OR fallback
+      sender: data.sender,
+      receiver: data.receiver,
+      content: data.content,
+      created_at: data.created_at ?? new Date().toISOString(),
     };
+
+    setMessages((prev) => {
+      const exists = prev.some((m) => m.id === incomingMessage.id);
+      return exists ? prev : [...prev, incomingMessage];
+    });
+
+    markChatAsRead(selectedChat);
+  };
 
     return () => {
       ws.close();
@@ -182,42 +249,44 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
   /* ---------------- SEND MESSAGE ---------------- */
 
-  const sendMessage = () => {
-    console.log("SEND BUTTON CLICKED");
-    console.log("messageInput:", messageInput);
-    console.log("socketRef:", socketRef.current);
-    console.log(
-      "socketState:",
-      socketRef.current?.readyState,
-      "(0=CONNECTING,1=OPEN,2=CLOSING,3=CLOSED)"
+const sendMessage = async () => {
+  if (!messageInput.trim() || !activeChat) return;
+
+  const token = localStorage.getItem("access_token");
+  if (!token || !currentUserEmail) return;
+
+  const content = messageInput;
+  setMessageInput(""); // clear input only
+
+  try {
+    await fetch(
+      `http://127.0.0.1:8000/api/chats/${activeChat.chat_id}/send/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content }),
+      }
     );
-    console.log("currentUserEmail:", currentUserEmail);
-    console.log("activeChat:", activeChat);
+  } catch (err) {
+    console.error("SEND ERROR:", err);
+  }
+};
 
-    if (!messageInput.trim()) return;
-    if (!socketRef.current) return;
-    if (socketRef.current.readyState !== WebSocket.OPEN) return;
-    if (!currentUserEmail) return;
-    if (!activeChat) return;
+// ---------------- GROUP MESSAGES BY DATE ----------------
 
-    const tempMessage: Message = {
-      sender: currentUserEmail,
-      receiver: activeChat.email,
-      content: messageInput,
-      created_at: new Date().toISOString(),
-    };
+const groupedMessages = messages.reduce((acc, msg) => {
+  if (!msg.created_at) return acc;
 
-    console.log("SENDING MESSAGE:", tempMessage);
+  const dateKey = msg.created_at.split("T")[0];
+  if (!acc[dateKey]) acc[dateKey] = [];
+  acc[dateKey].push(msg);
 
-    // Optimistic UI
-    setMessages((prev) => [...prev, tempMessage]);
+  return acc;
+}, {} as Record<string, Message[]>);
 
-    socketRef.current.send(
-      JSON.stringify({ content: messageInput })
-    );
-
-    setMessageInput("");
-  };
 
   /* ---------------- RENDER ---------------- */
 
@@ -267,7 +336,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                 chats.map((chat) => (
                   <button
                     key={chat.chat_id}
-                    onClick={() => setSelectedChat(chat.chat_id!)}
+                    onClick={() => setSelectedChat(Number(chat.chat_id))}
                     className="w-full flex items-center gap-4 p-3 hover:bg-gray-50"
                   >
                     <div className="w-12 h-12 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold">
@@ -298,17 +367,49 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                  {messages.map((m, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "max-w-xs p-3 rounded-xl",
-                        m.sender === currentUserEmail
-                          ? "bg-teal-500 text-white ml-auto"
-                          : "bg-gray-100"
-                      )}
-                    >
-                      {m.content}
+                  {Object.entries(groupedMessages).map(([date, msgs]) => (
+                    <div key={date} className="space-y-3">
+                      {/* DATE SEPARATOR */}
+                      <div className="flex justify-center my-4">
+                        <span className="px-4 py-1 text-xs font-medium text-gray-600 bg-gray-200 rounded-full">
+                          {formatDateLabel(date)}
+                        </span>
+                      </div>
+
+                      {/* MESSAGES */}
+                      {msgs.map((m) => {
+                        const isMe = m.sender === currentUserEmail;
+
+                        return (
+                          <div
+                            key={m.id}
+                            className={cn(
+                              "max-w-xs flex flex-col gap-1",
+                              isMe ? "ml-auto items-end" : "items-start"
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "p-3 rounded-xl",
+                                isMe
+                                  ? "bg-teal-500 text-white"
+                                  : "bg-gray-100 text-gray-900"
+                              )}
+                            >
+                              {m.content}
+                            </div>
+
+                            <span
+                              className={cn(
+                                "text-[11px]",
+                                isMe ? "text-gray-400" : "text-gray-500"
+                              )}
+                            >
+                              {formatTime(m.created_at)}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
@@ -318,6 +419,12 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                     <input
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          sendMessage();
+                        }
+                      }}
                       className="flex-1 rounded-full border px-4 py-3"
                       placeholder="Type a message..."
                     />

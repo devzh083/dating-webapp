@@ -14,6 +14,7 @@ from django.core.cache import cache
 import urllib.parse
 import requests
 import random
+from django.db.models import Q
 import string
 
 from math import radians, sin, cos, asin, sqrt
@@ -21,6 +22,7 @@ from math import radians, sin, cos, asin, sqrt
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from login.models import Match
 
 from config.firebase import db
 from .models import FirebaseProfileManager, clean_firestore_data
@@ -31,14 +33,19 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
-from .models import FirebaseMatchManager
+
 from .ws import notify_user
 
 from django.contrib.auth import get_user_model
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
+from .models import FirebaseAuthManager, FirebaseProfileManager
 
+from login.mysql_managers import MySQLChatManager, MySQLLikeManager as FirebaseLikeManager
+from login.mysql_managers import MySQLMatchManager as FirebaseMatchManager
+from login.mysql_managers import MySQLChatManager as FirebaseChatManager
 
-from .models import FirebaseAuthManager, FirebaseProfileManager, FirebaseLikeManager, FirebaseMatchManager, FirebaseChatManager
 
 from .models_photos import UserPhoto  # <-- your ImageField model
 
@@ -887,31 +894,27 @@ class MatchedChatsView(APIView):
     def get(self, request):
         my_email = request.user.username.lower()
 
-        matches_ref = (
-            db.collection("matches")
-            .where("users", "array_contains", my_email)
-        )
+        matches = Match.objects.filter(
+            Q(user_a=my_email) | Q(user_b=my_email)
+        ).select_related("chat")
 
         chats = []
 
-        for match_doc in matches_ref.stream():
-            match = match_doc.to_dict() or {}
+        for match in matches:
+            # Determine other user
+            if match.user_a == my_email:
+                other_email = match.user_b
+            else:
+                other_email = match.user_a
 
-            chat_id = match.get("chat_id")
-            users = match.get("users", [])
-
-            # Now chat_id always exists for valid matches
-            if not chat_id or len(users) != 2:
-                continue
-
-            other_email = users[0] if users[1] == my_email else users[1]
             profile = FirebaseProfileManager.get_profile(other_email) or {}
 
             chats.append({
-                "chat_id": chat_id,
-                "match_id": match_doc.id,
-                "status": match.get("status", "active"),
-                "created_at": clean_firestore_data({"created_at": match.get("created_at")}).get("created_at"),
+                "chat_id": match.chat.id if match.chat else None,
+                "match_id": match.id,
+                "status": match.status,
+                "created_at": match.created_at.isoformat(),
+                "user_email": my_email,
                 "email": other_email,
                 "first_name": profile.get("firstName"),
                 "profile_photo": (
@@ -929,38 +932,23 @@ class ChatMessagesView(APIView):
     def get(self, request, chat_id):
         user_email = request.user.username.lower()
 
-        chat = FirebaseChatManager.get_chat(chat_id)
+        chat = MySQLChatManager.get_chat(chat_id)
         if not chat:
             return Response(
                 {"detail": "Chat not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # 🔐 Authorization
-        if user_email not in chat.get("participants", []):
+        if user_email not in chat["participants"]:
             return Response(
                 {"detail": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        messages_ref = (
-            db.collection("chats")
-            .document(chat_id)
-            .collection("messages")
-            .order_by("created_at", direction=firestore.Query.ASCENDING)
-            .stream()
-        )
-
-        messages = [
-            clean_firestore_data({
-                "id": msg.id,
-                **msg.to_dict()
-            })
-            for msg in messages_ref
-        ]
+        messages = MySQLChatManager.get_messages(chat_id)
 
         return Response(messages, status=status.HTTP_200_OK)
-
+    
 class SendChatMessageView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -974,34 +962,44 @@ class SendChatMessageView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        chat = FirebaseChatManager.get_chat(chat_id)
-        if not chat or sender not in chat.get("participants", []):
+        chat = MySQLChatManager.get_chat(chat_id)
+        if not chat or sender not in chat["participants"]:
             return Response(
                 {"detail": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        receiver = next(p for p in chat["participants"] if p != sender)
+        receiver = next(
+            email for email in chat["participants"] if email != sender
+        )
 
-        message = {
-            "chat_id": chat_id,
-            "sender": sender,
-            "receiver": receiver,
-            "content": content,
-            "type": "text",
-            "created_at": firestore.SERVER_TIMESTAMP,
-            "read": False,
-        }
+        # 1️⃣ Persist message
+        MySQLChatManager.add_message(
+            chat_id=chat_id,
+            sender=sender,
+            receiver=receiver,
+            content=content
+        )
 
-        db.collection("chats") \
-          .document(chat_id) \
-          .collection("messages") \
-          .add(message)
+        # 2️⃣ Broadcast to WebSocket group
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{chat_id}",
+            {
+                "type": "chat.message",
+                "message": {
+                    "sender": sender,
+                    "receiver": receiver,
+                    "content": content,
+                }
+            }
+        )
 
         return Response(
             {"status": "sent"},
             status=status.HTTP_201_CREATED
         )
+
 
 class MarkChatReadView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1009,28 +1007,16 @@ class MarkChatReadView(APIView):
     def post(self, request, chat_id):
         user_email = request.user.username.lower()
 
-        chat = FirebaseChatManager.get_chat(chat_id)
-        if not chat or user_email not in chat.get("participants", []):
+        chat = MySQLChatManager.get_chat(chat_id)
+        if not chat or user_email not in chat["participants"]:
             return Response(
                 {"detail": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        messages_ref = (
-            db.collection("chats")
-            .document(chat_id)
-            .collection("messages")
-            .where("receiver", "==", user_email)
-            .where("read", "==", False)
-            .stream()
+        MySQLChatManager.mark_read(
+            chat_id=chat_id,
+            receiver_email=user_email
         )
-
-        batch = db.batch()
-        for msg in messages_ref:
-            batch.update(msg.reference, {
-                "read": True,
-                "read_at": firestore.SERVER_TIMESTAMP
-            })
-        batch.commit()
 
         return Response({"status": "ok"}, status=status.HTTP_200_OK)
