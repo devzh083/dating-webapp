@@ -45,18 +45,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close(code=4401)
             return
 
+        chat_id = self.scope["url_route"]["kwargs"].get("chat_id")
+        if not chat_id:
+            await self.close(code=4400)
+            return
+
         self.user = user
-        self.chat_id = int(self.scope["url_route"]["kwargs"]["chat_id"])
+        self.chat_id = int(chat_id)
         self.room_group_name = f"chat_{self.chat_id}"
 
-        # 🔐 Authorization check (NON-BLOCKING)
         chat = await get_chat(self.chat_id)
         if not chat:
             await self.close(code=4404)
             return
 
         participants = chat.get("participants", [])
-        if user.username.lower() not in participants:
+        if user.email.lower() not in participants:
             await self.close(code=4403)
             return
 
@@ -64,6 +68,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
+
         await self.accept()
 
     async def disconnect(self, close_code):
@@ -72,8 +77,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 self.channel_name
             )
-
-    # REST API is authoritative — WebSocket is read-only
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps(event["message"]))

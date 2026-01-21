@@ -11,9 +11,9 @@ urlpatterns = [
     path("google-login/", views.GoogleLoginView.as_view(), name="google-login"),
     path("google-callback/", views.GoogleCallbackView.as_view(), name="google-callback"),
 
-    # Profile endpoints
-    path("profile/", views.ProfileView.as_view(), name="profile"),
-    path("profile/<path:email>/", views.ProfileDetailView.as_view(), name="profile-detail"),
+    # # Profile endpoints
+    # path("profile/", views.ProfileView.as_view(), name="profile"),
+    # path("profile/<path:email>/", views.ProfileDetailView.as_view(), name="profile-detail"),
 
     # Photo upload (media + URL stored in Firestore)
     path("photos/upload/", views.PhotoUploadView.as_view(), name="photo-upload"),
@@ -26,10 +26,10 @@ urlpatterns = [
     path("login/verify-otp/", views.VerifyLoginOTPView.as_view(), name="verify-login-otp"),
     
     # ========== PROFILE (Using profiles app) ==========
-    path("profile/", profile_views.get_profile, name="profile"),
-    path("profile/save/", profile_views.create_or_update_profile, name="save-profile"),
-    path("profile/status/", profile_views.profile_status, name="profile-status"),
-    path("profile/upload-photo/", profile_views.upload_photo, name="upload-photo"),
+    # path("profile/", profile_views.get_profile, name="profile"),
+    # path("profile/save/", profile_views.create_or_update_profile, name="save-profile"),
+    # path("profile/status/", profile_views.profile_status, name="profile-status"),
+    # path("profile/upload-photo/", profile_views.upload_photo, name="upload-photo"),
     
     # ========== MATCHING ==========
     path("matches/", views.MatchRecommendationsView.as_view(), name="matches"),
