@@ -63,6 +63,22 @@ class MySQLMatchManager:
 class MySQLChatManager:
 
     @staticmethod
+    @transaction.atomic
+    def create_chat(users: List[str]) -> Chat:
+        """
+        Creates a chat and its participants.
+        users: list of user emails (lowercase)
+        """
+        chat = Chat.objects.create()
+
+        ChatParticipant.objects.bulk_create([
+            ChatParticipant(chat=chat, email=user_email)
+            for user_email in users
+        ])
+
+        return chat
+
+    @staticmethod
     def get_chat(chat_id: int) -> Optional[Dict]:
         try:
             chat = Chat.objects.get(id=chat_id)
