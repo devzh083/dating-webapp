@@ -9,8 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-import pymysql
-pymysql.install_as_MySQLdb()
+
 from datetime import timedelta
 from pathlib import Path
 from decouple import Config, RepositoryEnv
@@ -107,13 +106,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "dating_app_db",
+        "NAME": "dating_app",
         "USER": "dating_user",
-        "PASSWORD": "DatingUser@2026!",
+        "PASSWORD": "Deva@2026",
         "HOST": "127.0.0.1",
         "PORT": "3306",
     }
 }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

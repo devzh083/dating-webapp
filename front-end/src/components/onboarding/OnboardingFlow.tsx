@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import TopBar from "@/components/layout/TopBar";
 import ProgressBar from "@/components/onboarding/ProgressBar";
 
-
 import { useNavigate, useLocation } from "react-router-dom";
 import Step1BasicInfo from "./steps/Step1BasicInfo";
 import Step2Orientation from "./steps/Step2Orientation";
@@ -47,7 +46,7 @@ export type OnboardingData = {
     twitter: string;
     linkedin: string;
   };
-}
+};
 
 const initialData: OnboardingData = {
   firstName: "",
@@ -55,9 +54,6 @@ const initialData: OnboardingData = {
   gender: "",
   showGender: false,
   interestedIn: [],
-  // orientation: [],
-  // showOrientation: false,
-  // relationshipType: "",
   distance: 25,
   strictDistance: false,
   drinking: "",
@@ -99,7 +95,6 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        // Restore Date object
         if (parsed.dateOfBirth) {
           parsed.dateOfBirth = new Date(parsed.dateOfBirth);
         }
@@ -115,14 +110,21 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
     localStorage.setItem("onboardingData", JSON.stringify(data));
   }, [data]);
 
+  // Load existing profile + start step
+  useEffect(() => {
+    loadExistingProfile();
+
+    const state = location.state as { startStep?: number } | null;
+    if (state?.startStep) {
+      setCurrentStep(state.startStep);
+    }
+  }, []);
+
   const setStepData = (patch: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...patch }));
   };
 
   const handleFinish = () => {
-    // Clear temp storage
-    // localStorage.removeItem("onboardingData"); 
-    // ^ Optional: keep it if you want to remember user's choices if they come back
     if (onComplete) {
       onComplete();
     } else {
@@ -135,27 +137,18 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
       setStep((s) => s + 1);
     } else {
       handleFinish();
-  // Load existing profile data when component mounts
-  useEffect(() => {
-    loadExistingProfile();
-    
-    // Check if we should start at a specific step
-    const state = location.state as { startStep?: number } | null;
-    if (state?.startStep) {
-      setCurrentStep(state.startStep);
     }
-  }, []);
+  };
 
   const goBack = () => {
     setStep((s) => Math.max(1, s - 1));
   };
 
-
   const loadExistingProfile = async () => {
     try {
       setIsLoading(true);
       const result = await profileService.getProfile();
-      
+
       if (result.exists && result.data) {
         console.log("✅ Loading existing profile for editing:", result.data);
         setData(result.data);
@@ -164,7 +157,6 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
       }
     } catch (err) {
       console.error("⚠️ Error loading profile:", err);
-      // Continue with empty data if loading fails
     } finally {
       setIsLoading(false);
     }
@@ -184,50 +176,14 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
     }
   };
 
-  // const handleSkip = () => {
-  //   handleNext();
-  // };
-
-  // const handleFinish = async () => {
-  //   console.log("=== SAVING PROFILE ===");
-  //   console.log("Current data state:", data);
-    
-  //   setIsSaving(true);
-  //   setError(null);
-    
-  //   try {
-  //     console.log("Sending to API:", data);
-      
-  //     const result = await profileService.saveProfile(data);
-  //     console.log("✅ Profile saved successfully:", result);
-      
-  //     await new Promise(resolve => setTimeout(resolve, 500));
-      
-  //     navigate("/home");
-  //   } catch (err: any) {
-  //     console.error("❌ Error saving profile:", err);
-  //     setError(err.message || "Failed to save profile. Please try again.");
-  //     setIsSaving(false);
-  //   }
-  // };
-
   const updateData = (newData: Partial<OnboardingData>) => {
-    console.log(`Step ${currentStep} - Updating data:`, newData);
-    setData((prev) => {
-      const updated = { ...prev, ...newData };
-      console.log("Updated state:", updated);
-      return updated;
-    });
+    setData((prev) => ({ ...prev, ...newData }));
   };
 
   const handleSkip = () => {
-    // Logic for skipping a step (usually just goes next)
     goNext();
   };
 
-  
-
-  // --- RENDER CURRENT STEP ---
   const renderStep = () => {
     switch (step) {
       case 1:
@@ -248,98 +204,15 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
         return <Step8Bio data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       case 9:
         return <Step9Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 10:
-        // return <Step10Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       default:
         return <Step10Review data={data} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
     }
   };
-  const steps = [
-    <Step1BasicInfo
-      key="step1"
-      data={data}
-      onChange={(d) => updateData(d)}
-      onNext={handleNext}
-      // onBack={handleBack}
-      onSkip={handleSkip}
-    />,
-    <Step2Orientation
-      key="step2"
-      data={data}
-      onChange={(d) => updateData(d)}
-      onNext={handleNext}
-      onBack={handleBack}
-      onSkip={handleSkip}
-    />,
-    <Step3Lifestyle
-      key="step3"
-      data={data}
-      onChange={(d) => updateData(d)}
-      onNext={handleNext}
-      onBack={handleBack}
-      onSkip={handleSkip}
-    />,
-    <Step4Communication
-      key="step4"
-      data={data}
-      onChange={(d) => updateData(d)}
-      onNext={handleNext}
-      onBack={handleBack}
-      onSkip={handleSkip}
-    />,
-    <Step5Interests
-      key="step5"
-      data={data}
-      onChange={(d) => updateData(d)}
-      onNext={handleNext}
-      onBack={handleBack}
-      onSkip={handleSkip}
-    />,
-    <Step6Location
-      key="step6"
-      data={data}
-      onChange={(d) => updateData(d)}
-      onNext={handleNext}
-      onBack={handleBack}
-      onSkip={handleSkip}
-    />,
-    <Step7Photos
-      key="step7"
-      data={data}
-      onChange={(d) => updateData(d)}
-      onNext={handleNext}
-      onBack={handleBack}
-      onSkip={handleSkip}
-    />,
-    <Step8Bio
-      key="step8"
-      data={data}
-      onChange={(d) => updateData(d)}
-      onNext={handleNext}
-      onBack={handleBack}
-      onSkip={handleSkip}
-    />,
-    <Step9Social
-      key="step9"
-      data={data}
-      onChange={(d) => updateData(d)}
-      onNext={handleNext}
-      onBack={handleBack}
-      onSkip={handleSkip}
-    />,
-    <Step10Review
-      key="step10"
-      data={data}
-      onNext={handleFinish}
-      onBack={handleBack}
-      onSkip={handleFinish}
-    />,
-  ];
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <TopBar userName={data.firstName || "User"} />
-      
+
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 sticky top-16 bg-white z-40">
         <div className="flex-1">
           <ProgressBar currentStep={step} totalSteps={TOTAL_STEPS} />
@@ -348,7 +221,7 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
           Step {step}/{TOTAL_STEPS}
         </div>
       </div>
-   
+
       <AnimatePresence mode="wait">
         <motion.div
           key={step}
@@ -364,4 +237,3 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
     </div>
   );
 }
-}}
