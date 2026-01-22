@@ -94,8 +94,14 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     localStorage.getItem("user_email")?.toLowerCase() ?? "";
 
   const activeChat = chats.find((c) => c.chat_id === selectedChat);
+  const [typingUser, setTypingUser] = useState<boolean>(false);
+  const [isOnlineMap, setIsOnlineMap] = useState<Record<string, boolean>>({});
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+
 
   /* ---------------- FETCH CHATS ---------------- */
+  
   useEffect(() => {
     const fetchChats = async () => {
       try {
@@ -109,9 +115,17 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         if (!res.ok) throw new Error("Failed to fetch chats");
 
         const data = await res.json();
+
         const chatsArray = Array.isArray(data) ? data : data.chats || [];
-        setChats(chatsArray);
+
+        const normalizedChats = chatsArray.map((c: any) => ({
+          ...c,
+          email: (c.email || c.user_email || "").toLowerCase(),
+        }));
+
+        setChats(normalizedChats);
         setRequests(data.requests || []);
+
 
         if (chatsArray.length > 0 && chatsArray[0].user_email) {
           localStorage.setItem("user_email", chatsArray[0].user_email);
@@ -125,6 +139,46 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
     fetchChats();
   }, []);
+
+useEffect(() => {
+  const token = localStorage.getItem("access_token");
+  if (!token) {
+    console.log("❌ No token for notification socket");
+    return;
+  }
+
+  const ws = new WebSocket(
+    `ws://127.0.0.1:8000/ws/notifications/?token=${token}`
+  );
+
+  ws.onopen = () => {
+    console.log("🟢 Notification socket connected");
+  };
+
+  ws.onmessage = (event) => {
+    console.log("📩 Presence event received:", event.data);
+    const data = JSON.parse(event.data);
+
+    if (data.type === "presence" && data.user_email) {
+      setIsOnlineMap((prev) => ({
+        ...prev,
+        [data.user_email.toLowerCase()]: data.is_online,
+      }));
+    }
+  };
+
+
+  ws.onerror = (e) => {
+    console.error("❌ Notification socket error", e);
+  };
+
+  ws.onclose = () => {
+    console.log("🔴 Notification socket closed");
+  };
+
+  return () => ws.close();
+}, []);
+
 
   /* ---------------- LOAD MESSAGE HISTORY ---------------- */
   useEffect(() => {
@@ -192,6 +246,12 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+
+      if (data.type === "typing") {
+        setTypingUser(data.is_typing);
+        return;
+      }
+
       const incomingMessage: Message = {
         id: data.id ?? crypto.randomUUID(),
         sender: data.sender,
@@ -199,6 +259,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         content: data.content,
         created_at: data.created_at ?? new Date().toISOString(),
       };
+
       setMessages((prev) => {
         const exists = prev.some((m) => m.id === incomingMessage.id);
         return exists ? prev : [...prev, incomingMessage];
@@ -212,6 +273,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   }, [selectedChat]);
 
   /* ---------------- SEND MESSAGE ---------------- */
+  
   const sendMessage = async () => {
     if (!messageInput.trim() || !activeChat) return;
     const token = localStorage.getItem("access_token");
@@ -219,6 +281,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
     const content = messageInput;
     setMessageInput("");
+    sendTypingEvent(false);
 
     try {
       await fetch(
@@ -245,6 +308,19 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     acc[dateKey].push(msg);
     return acc;
   }, {} as Record<string, Message[]>);
+
+  const sendTypingEvent = (isTyping: boolean) => {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN)
+      return;
+
+    socketRef.current.send(
+      JSON.stringify({
+        type: "typing",
+        is_typing: isTyping,
+      })
+    );
+  };
+
 
   /* ---------------- RENDER ---------------- */
   return (
@@ -345,7 +421,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                         "text-xs truncate w-full text-left font-medium mt-0.5",
                         selectedChat === chat.chat_id ? "text-teal-600" : "text-gray-400"
                       )}>
-                        {selectedChat === chat.chat_id ? "Messaging..." : "Tap to chat"}
+                        {selectedChat === chat.chat_id ? "Tap to chat" : "Tap to chat"}
                       </span>
                     </div>
                   </button>
@@ -385,7 +461,22 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                         <h3 className="font-bold text-slate-800 text-lg leading-tight">
                         {activeChat.first_name || activeChat.email}
                         </h3>
-                        <span className="text-[11px] text-teal-600 font-bold tracking-wide uppercase">Active Now</span>
+                        <span
+                          className={cn(
+                            "text-[11px] font-bold tracking-wide uppercase",
+                            typingUser
+                              ? "text-orange-500"
+                              : isOnlineMap[activeChat.email?.toLowerCase()]
+                              ? "text-teal-600"
+                              : "text-gray-400"
+                          )}
+                        >
+                          {typingUser
+                            ? "Typing..."
+                            : isOnlineMap[activeChat.email?.toLowerCase()]
+                            ? "Active Now"
+                            : "Offline"}
+                        </span>
                     </div>
                   </div>
 
@@ -461,7 +552,20 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                   <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-1.5 border border-gray-200 focus-within:ring-4 focus-within:ring-teal-500/10 focus-within:border-teal-500 transition-all shadow-inner">
                     <input
                       value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
+                      onChange={(e) => {
+                        setMessageInput(e.target.value);
+
+                        sendTypingEvent(true);
+
+                        if (typingTimeoutRef.current) {
+                          clearTimeout(typingTimeoutRef.current);
+                        }
+
+                        typingTimeoutRef.current = setTimeout(() => {
+                          sendTypingEvent(false);
+                        }, 1500);
+                      }}
+
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();

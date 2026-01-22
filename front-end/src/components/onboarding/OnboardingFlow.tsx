@@ -18,7 +18,8 @@ import Step9Social from "./steps/Step9Social";
 import Step10Review from "./steps/Step10Review";
 import { profileService } from "../../services/profileService";
 
-// --- TYPE DEFINITIONS ---
+// ---------------- TYPES ----------------
+
 export type OnboardingData = {
   firstName: string;
   dateOfBirth: Date | null;
@@ -79,17 +80,20 @@ const initialData: OnboardingData = {
 
 const TOTAL_STEPS = 10;
 
+// ---------------- COMPONENT ----------------
+
 export default function OnboardingFlow({ onComplete }: { onComplete?: () => void }) {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<OnboardingData>(initialData);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load from localStorage on mount
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // ---------------- LOCAL STORAGE ----------------
+
   useEffect(() => {
     const savedData = localStorage.getItem("onboardingData");
     if (savedData) {
@@ -105,38 +109,41 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
     }
   }, []);
 
-  // Save to localStorage on change
   useEffect(() => {
     localStorage.setItem("onboardingData", JSON.stringify(data));
   }, [data]);
 
-  // Load existing profile + start step
+  // ---------------- LOAD EXISTING PROFILE ----------------
+
   useEffect(() => {
     loadExistingProfile();
-
-    const state = location.state as { startStep?: number } | null;
-    if (state?.startStep) {
-      setCurrentStep(state.startStep);
-    }
   }, []);
+
+  const loadExistingProfile = async () => {
+    try {
+      setIsLoading(true);
+      const result = await profileService.getProfile();
+
+      if (result?.exists && result?.data) {
+        console.log("✅ Existing profile loaded:", result.data);
+        setData({ ...initialData, ...result.data });
+      }
+    } catch (err) {
+      console.error("⚠️ Failed to load profile:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ---------------- STEP CONTROL ----------------
 
   const setStepData = (patch: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...patch }));
   };
 
-  const handleFinish = () => {
-    if (onComplete) {
-      onComplete();
-    } else {
-      navigate("/home");
-    }
-  };
-
   const goNext = () => {
     if (step < TOTAL_STEPS) {
       setStep((s) => s + 1);
-    } else {
-      handleFinish();
     }
   };
 
@@ -144,45 +151,35 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
     setStep((s) => Math.max(1, s - 1));
   };
 
-  const loadExistingProfile = async () => {
-    try {
-      setIsLoading(true);
-      const result = await profileService.getProfile();
-
-      if (result.exists && result.data) {
-        console.log("✅ Loading existing profile for editing:", result.data);
-        setData(result.data);
-      } else {
-        console.log("ℹ️ No existing profile found, starting fresh");
-      }
-    } catch (err) {
-      console.error("⚠️ Error loading profile:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleNext = () => {
-    if (currentStep < 10) {
-      setCurrentStep(currentStep + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
-  const updateData = (newData: Partial<OnboardingData>) => {
-    setData((prev) => ({ ...prev, ...newData }));
-  };
-
   const handleSkip = () => {
     goNext();
   };
+
+  // ---------------- FINAL SAVE ----------------
+
+  const saveProfileAndFinish = async () => {
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      await profileService.saveProfile(data);
+
+      localStorage.removeItem("onboardingData");
+
+      if (onComplete) {
+        onComplete();
+      } else {
+        navigate("/home", { replace: true });
+      }
+    } catch (err) {
+      console.error("❌ Profile save failed:", err);
+      setError("Failed to save profile. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ---------------- STEP RENDER ----------------
 
   const renderStep = () => {
     switch (step) {
@@ -205,9 +202,18 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
       case 9:
         return <Step9Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
       default:
-        return <Step10Review data={data} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+        return (
+          <Step10Review
+            data={data}
+            onNext={saveProfileAndFinish}
+            onBack={goBack}
+            onSkip={handleSkip}
+          />
+        );
     }
   };
+
+  // ---------------- RENDER ----------------
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
