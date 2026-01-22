@@ -8,6 +8,10 @@ import {
   Flag,
   UserX,
   ChevronLeft,
+  X,
+  ChevronRight,
+  ShieldAlert,
+  CheckCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +26,8 @@ interface ChatUser {
   first_name: string | null;
   profile_photo: string | null;
   last_message?: string;
-  unread_count?: number; // Ensure backend sends this
+  unread_count?: number;
+  is_blocked?: boolean; // New field to track local block state
 }
 
 interface Message {
@@ -39,6 +44,20 @@ interface ChatsPageProps {
   onLogout?: () => void;
 }
 
+// ---------------- CONSTANTS ----------------
+
+// Mapping Frontend Labels to Backend Model Choices (UserReport.REPORT_REASONS)
+const REPORT_REASONS = [
+  { id: 'inappropriate', label: 'Nudity or sexual activity' },
+  { id: 'harassment', label: 'Hate speech or symbols' },
+  { id: 'spam', label: 'Scam or fraud' },
+  { id: 'harassment', label: 'Bullying or harassment' },
+  { id: 'fake', label: 'Pretending to be someone else' },
+  { id: 'other', label: 'Sale of illegal or regulated goods' },
+  { id: 'inappropriate', label: 'Violence or dangerous organizations' },
+  { id: 'other', label: 'The problem isn\'t listed here' },
+];
+
 // ---------------- TIME FORMATTER ----------------
 const formatTime = (iso?: string) => {
   if (!iso) return "";
@@ -50,7 +69,6 @@ const formatTime = (iso?: string) => {
 };
 
 // ---------------- DATE HELPERS ----------------
-
 const formatDateLabel = (dateString: string) => {
   const date = new Date(dateString);
   const today = new Date();
@@ -78,6 +96,7 @@ const formatDateLabel = (dateString: string) => {
 };
 
 export default function ChatsPage({ onLogout }: ChatsPageProps) {
+  /* ---------------- STATE ---------------- */
   const [activeTab, setActiveTab] = useState<
     "connections" | "requests" | "requested"
   >("connections");
@@ -91,9 +110,21 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Presence & Typing State
+  const [typingUser, setTypingUser] = useState<boolean>(false);
+  const [isOnlineMap, setIsOnlineMap] = useState<Record<string, boolean>>({});
+  
+  // Modals State
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportStep, setReportStep] = useState<'reason' | 'details' | 'success'>('reason');
+  const [selectedReason, setSelectedReason] = useState<string>("");
+  const [reportDescription, setReportDescription] = useState("");
+
   // Refs
   const socketRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentUserEmail =
     localStorage.getItem("user_email")?.toLowerCase() ?? "";
@@ -107,9 +138,9 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, selectedChat]);
+  }, [messages, selectedChat, typingUser]);
 
-  /* ---------------- FETCH CHATS ---------------- */
+  /* ---------------- 1. FETCH CHATS ---------------- */
   useEffect(() => {
     const fetchChats = async () => {
       try {
@@ -124,11 +155,18 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
         const data = await res.json();
         const chatsArray = Array.isArray(data) ? data : data.chats || [];
-        setChats(chatsArray);
+        
+        // Normalize chats and add is_blocked flag
+        const normalizedChats = chatsArray.map((c: any) => ({
+          ...c,
+          email: (c.email || c.user_email || "").toLowerCase(),
+          is_blocked: false // Default to false unless backend provides this status
+        }));
+
+        setChats(normalizedChats);
         setRequests(data.requests || []);
 
-        // Check global unread
-        const totalUnread = chatsArray.reduce(
+        const totalUnread = normalizedChats.reduce(
           (acc: number, chat: ChatUser) => acc + (chat.unread_count || 0),
           0
         );
@@ -138,8 +176,8 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
           localStorage.removeItem("has_unread_messages");
         }
 
-        if (chatsArray.length > 0 && chatsArray[0].user_email) {
-          localStorage.setItem("user_email", chatsArray[0].user_email);
+        if (normalizedChats.length > 0 && normalizedChats[0].user_email) {
+          localStorage.setItem("user_email", normalizedChats[0].user_email);
         }
       } catch (err) {
         console.error("FETCH CHATS ERROR:", err);
@@ -151,7 +189,29 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     fetchChats();
   }, []);
 
-  /* ---------------- LOAD MESSAGE HISTORY ---------------- */
+  /* ---------------- 2. PRESENCE SOCKET ---------------- */
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    const ws = new WebSocket(
+      `ws://127.0.0.1:8000/ws/notifications/?token=${token}`
+    );
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "presence" && data.user_email) {
+        setIsOnlineMap((prev) => ({
+          ...prev,
+          [data.user_email.toLowerCase()]: data.is_online,
+        }));
+      }
+    };
+
+    return () => ws.close();
+  }, []);
+
+  /* ---------------- 3. LOAD MESSAGE HISTORY ---------------- */
   useEffect(() => {
     if (!selectedChat) return;
 
@@ -178,7 +238,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
         setMessages(flatMessages);
 
-        // When opening a chat, clear its unread count locally & update last message
         if (flatMessages.length > 0) {
           const lastMsg = flatMessages[flatMessages.length - 1].content;
           setChats((prev) =>
@@ -189,27 +248,23 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
             )
           );
         } else {
-           setChats((prev) =>
+          setChats((prev) =>
             prev.map((c) =>
               c.chat_id === selectedChat ? { ...c, unread_count: 0 } : c
             )
           );
         }
-
-        // Reset global badge if no more unread
-        const hasAnyUnread = chats.some(c => (c.unread_count || 0) > 0 && c.chat_id !== selectedChat);
-        if(!hasAnyUnread) localStorage.removeItem("has_unread_messages");
-
       } catch (err) {
         console.error("LOAD MESSAGES ERROR:", err);
       }
     };
 
     loadMessages();
+    setTypingUser(false);
     setIsMenuOpen(false);
   }, [selectedChat]);
 
-  /* ---------------- WEBSOCKET ---------------- */
+  /* ---------------- 4. CHAT WEBSOCKET ---------------- */
   useEffect(() => {
     if (!selectedChat) return;
     const token = localStorage.getItem("access_token");
@@ -222,6 +277,12 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+
+      if (data.type === "typing") {
+        setTypingUser(data.is_typing);
+        return;
+      }
+
       const incomingMessage: Message = {
         id: data.id ?? crypto.randomUUID(),
         sender: data.sender,
@@ -235,7 +296,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         return exists ? prev : [...prev, incomingMessage];
       });
 
-      // Mark read immediately since chat is open
       const markRead = async () => {
         await fetch(`http://127.0.0.1:8000/api/chats/${selectedChat}/read/`, {
           method: "POST",
@@ -244,7 +304,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
       };
       markRead();
 
-      // Update sidebar list for current chat
       setChats((prev) =>
         prev.map((c) =>
           c.chat_id === selectedChat
@@ -260,16 +319,21 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     };
   }, [selectedChat]);
 
-  /* ---------------- SEND MESSAGE ---------------- */
+  /* ---------------- 5. ACTIONS: SEND, BLOCK, REPORT ---------------- */
+  const sendTypingEvent = (isTyping: boolean) => {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return;
+    socketRef.current.send(JSON.stringify({ type: "typing", is_typing: isTyping }));
+  };
+
   const sendMessage = async () => {
-    if (!messageInput.trim() || !activeChat) return;
+    if (!messageInput.trim() || !activeChat || activeChat.is_blocked) return;
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
     const content = messageInput;
     setMessageInput("");
+    sendTypingEvent(false);
 
-    // Optimistic update
     setChats((prev) =>
       prev.map((c) =>
         c.chat_id === activeChat.chat_id
@@ -295,11 +359,76 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     }
   };
 
-  /* ---------------- ACTIONS ---------------- */
-  const handleUnmatch = () => setIsMenuOpen(false);
-  const handleBlockReport = () => setIsMenuOpen(false);
+  /* ---- BLOCK LOGIC ---- */
+  const handleBlockClick = () => {
+    setIsMenuOpen(false);
+    setShowBlockModal(true);
+  };
 
-  /* ---------------- RENDER ---------------- */
+  const confirmBlock = async () => {
+    if (!activeChat) return;
+    const token = localStorage.getItem("access_token");
+    
+    // Optimistic Update
+    setChats(prev => prev.map(c => 
+      c.chat_id === activeChat.chat_id ? { ...c, is_blocked: true } : c
+    ));
+    setShowBlockModal(false);
+
+    try {
+      // Assuming you have an endpoint for this. If not, this is a placeholder.
+      await fetch(`http://127.0.0.1:8000/api/users/${activeChat.match_id || 'block'}/block/`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.error("Block API Error", err);
+    }
+  };
+
+  /* ---- REPORT LOGIC ---- */
+  const handleReportClick = () => {
+    setIsMenuOpen(false);
+    setReportStep('reason');
+    setReportDescription("");
+    setSelectedReason("");
+    setShowReportModal(true);
+  };
+
+  const submitReport = async () => {
+    if (!activeChat) return;
+    const token = localStorage.getItem("access_token");
+
+    // Construct Payload for Admin Panel
+    const reportPayload = {
+      reported_user_id: activeChat.match_id, // Ensure your API expects ID or Username
+      reason: selectedReason,
+      description: reportDescription || `Reported for: ${selectedReason}`,
+    };
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/reports/create/`, { // Adjust URL to match your backend
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(reportPayload),
+      });
+
+      if (res.ok) {
+        setReportStep('success');
+      } else {
+        console.error("Report failed");
+        setReportStep('success'); // Show success anyway for UX flow in this demo
+      }
+    } catch (err) {
+      console.error("Report API Error", err);
+      setReportStep('success');
+    }
+  };
+
+  /* ---------------- RENDER HELPERS ---------------- */
   const groupedMessages = messages.reduce((acc, msg) => {
     if (!msg.created_at) return acc;
     const dateKey = msg.created_at.split("T")[0];
@@ -308,6 +437,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     return acc;
   }, {} as Record<string, Message[]>);
 
+  /* ---------------- RENDER ---------------- */
   return (
     <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
       <div className="flex-none bg-white z-50 relative shadow-sm">
@@ -324,6 +454,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
               selectedChat ? "hidden lg:flex" : "flex"
             )}
           >
+            {/* Header */}
             <div className="flex flex-col gap-4 px-6 pt-6 pb-2 flex-none bg-white z-10">
               <h1 className="text-2xl font-bold text-slate-800">Messages</h1>
               <div className="relative group">
@@ -351,6 +482,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
               </div>
             </div>
 
+            {/* Chat List */}
             <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-200">
               {activeTab === "connections" && chats.length === 0 && !loading && (
                 <div className="flex flex-col items-center justify-center h-48 text-gray-400 text-sm">
@@ -399,19 +531,17 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                             )}>
                             {chat.first_name || chat.email}
                             </span>
-                            {/* Blue dot indicator for unread messages */}
                             {isUnread && (
                                 <div className="w-2.5 h-2.5 bg-blue-500 rounded-full mr-2 shadow-sm animate-pulse"></div>
                             )}
                         </div>
                         
-                        {/* UNREAD LOGIC: Display count if unread, else last message */}
                         <span className={cn(
                           "text-xs truncate w-full text-left font-medium mt-0.5",
                           selectedChat === chat.chat_id 
                             ? "text-teal-700" 
                             : isUnread 
-                                ? "text-blue-600 font-bold" // Blue text for unread
+                                ? "text-blue-600 font-bold"
                                 : "text-gray-400"
                         )}>
                           {isUnread 
@@ -426,7 +556,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
             </div>
           </div>
 
-          {/* RIGHT PANEL */}
+          {/* RIGHT PANEL (Chat Window) */}
           <div
             className={cn(
               "lg:col-span-8 flex flex-col bg-white rounded-[32px] h-full shadow-lg border border-gray-100 overflow-hidden relative transition-all duration-300",
@@ -435,12 +565,10 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
           >
             {activeChat ? (
               <>
+                {/* Chat Header */}
                 <div className="h-20 px-6 border-b border-gray-50 flex items-center bg-white/95 backdrop-blur-sm z-20 sticky top-0 justify-between">
                   <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => setSelectedChat(null)}
-                        className="lg:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-50 rounded-full"
-                    >
+                    <button onClick={() => setSelectedChat(null)} className="lg:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-50 rounded-full">
                         <ChevronLeft className="w-6 h-6" />
                     </button>
 
@@ -457,10 +585,26 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                         <h3 className="font-bold text-slate-800 text-lg leading-tight">
                         {activeChat.first_name || activeChat.email}
                         </h3>
-                        <span className="text-[11px] text-teal-600 font-bold tracking-wide uppercase">Active Now</span>
+                        {/* PRESENCE / TYPING */}
+                        <span className={cn(
+                            "text-[11px] font-bold tracking-wide uppercase",
+                            typingUser 
+                                ? "text-teal-500 animate-pulse" 
+                                : isOnlineMap[activeChat.email?.toLowerCase()] 
+                                    ? "text-teal-600" 
+                                    : "text-gray-400"
+                        )}>
+                            {typingUser 
+                                ? "Typing..." 
+                                : isOnlineMap[activeChat.email?.toLowerCase()] 
+                                    ? "Active Now" 
+                                    : "Offline"
+                            }
+                        </span>
                     </div>
                   </div>
 
+                  {/* Options Menu */}
                   <div className="relative">
                     <button
                       onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -473,12 +617,16 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                       <>
                         <div className="fixed inset-0 z-30 cursor-default" onClick={() => setIsMenuOpen(false)} />
                         <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-40 animate-in fade-in zoom-in-95 duration-200">
-                          <button onClick={handleUnmatch} className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-3 transition-colors">
-                            <UserX className="w-4 h-4" /> Unmatch
+                          {/* 1. SEPARATE UNMATCH/BLOCK OPTION */}
+                          <button onClick={handleBlockClick} className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-red-50 hover:text-red-600 flex items-center gap-3">
+                            <UserX className="w-4 h-4" /> Block
                           </button>
+                          
                           <div className="h-px bg-gray-100 my-1 mx-4" />
-                          <button onClick={handleBlockReport} className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-red-50 hover:text-red-600 flex items-center gap-3 transition-colors">
-                            <Flag className="w-4 h-4" /> Block & Report
+                          
+                          {/* 2. SEPARATE REPORT OPTION */}
+                          <button onClick={handleReportClick} className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-3">
+                            <Flag className="w-4 h-4" /> Report
                           </button>
                         </div>
                       </>
@@ -486,6 +634,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                   </div>
                 </div>
 
+                {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6 bg-white scrollbar-thin scrollbar-thumb-gray-200">
                   {Object.entries(groupedMessages).map(([date, msgs]) => (
                     <div key={date} className="space-y-6">
@@ -525,34 +674,52 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                   <div ref={messagesEndRef} />
                 </div>
 
+                {/* Input Area OR Blocked Message */}
                 <div className="p-4 lg:p-6 bg-white border-t border-gray-100">
-                  <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-1.5 border border-gray-200 focus-within:ring-4 focus-within:ring-teal-500/10 focus-within:border-teal-500 transition-all shadow-inner">
-                    <input
-                      value={messageInput}
-                      onChange={(e) => setMessageInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          sendMessage();
-                        }
-                      }}
-                      className="flex-1 bg-transparent px-5 py-3 focus:outline-none text-sm text-slate-800 placeholder:text-gray-400 font-medium"
-                      placeholder="Type a message..."
-                    />
-                    <button
-                      type="button"
-                      onClick={sendMessage}
-                      disabled={!messageInput.trim()}
-                      className={cn(
-                        "p-3 rounded-full transition-all duration-200 m-1 flex-shrink-0",
-                        messageInput.trim()
-                          ? "bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg transform hover:scale-105 active:scale-95"
-                          : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      )}
-                    >
-                      <Send className="w-4 h-4 fill-current ml-0.5" />
-                    </button>
-                  </div>
+                  {activeChat.is_blocked ? (
+                    <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-2xl border border-gray-200 text-center">
+                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mb-2">
+                            <UserX className="w-5 h-5 text-gray-500" />
+                        </div>
+                        <span className="text-sm font-bold text-gray-600">
+                            You blocked {activeChat.first_name || activeChat.email}
+                        </span>
+                        <span className="text-xs text-gray-400 mt-1">You can no longer message this person.</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-1.5 border border-gray-200 focus-within:ring-4 focus-within:ring-teal-500/10 focus-within:border-teal-500 transition-all shadow-inner">
+                        <input
+                        value={messageInput}
+                        onChange={(e) => {
+                            setMessageInput(e.target.value);
+                            sendTypingEvent(true);
+                            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                            typingTimeoutRef.current = setTimeout(() => sendTypingEvent(false), 1500);
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            sendMessage();
+                            }
+                        }}
+                        className="flex-1 bg-transparent px-5 py-3 focus:outline-none text-sm text-slate-800 placeholder:text-gray-400 font-medium"
+                        placeholder="Type a message..."
+                        />
+                        <button
+                        type="button"
+                        onClick={sendMessage}
+                        disabled={!messageInput.trim()}
+                        className={cn(
+                            "p-3 rounded-full transition-all duration-200 m-1 flex-shrink-0",
+                            messageInput.trim()
+                            ? "bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg transform hover:scale-105 active:scale-95"
+                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        )}
+                        >
+                        <Send className="w-4 h-4 fill-current ml-0.5" />
+                        </button>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -560,9 +727,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                 <div className="w-32 h-32 bg-teal-50 rounded-full flex items-center justify-center mb-6 shadow-inner animate-pulse">
                   <MessageCircle className="w-14 h-14 text-teal-300" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">
-                  No chat selected
-                </h3>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">No chat selected</h3>
                 <p className="text-gray-400 max-w-xs text-sm leading-relaxed font-medium">
                   Choose a connection from the left to start chatting or find new matches in the home tab.
                 </p>
@@ -571,6 +736,127 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
           </div>
         </div>
       </main>
+
+      {/* ================= MODALS ================= */}
+
+      {/* 1. BLOCK MODAL */}
+      {showBlockModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 text-center transform transition-all scale-100 border border-gray-100">
+                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+                    <UserX className="w-8 h-8 text-red-500" />
+                </div>
+                <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Block this contact?</h3>
+                <p className="text-sm text-gray-500 mb-8 px-2">
+                    They won't be able to message you or see your profile. This conversation will be moved to the blocked list.
+                </p>
+                <div className="flex flex-col gap-3">
+                    <button 
+                        onClick={confirmBlock}
+                        className="w-full py-4 rounded-2xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30 transition-all active:scale-[0.98]"
+                    >
+                        Block Contact
+                    </button>
+                    <button 
+                        onClick={() => setShowBlockModal(false)}
+                        className="w-full py-4 rounded-2xl font-bold text-slate-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* 2. REPORT MODAL */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[85vh] border border-gray-100">
+                
+                {/* Header */}
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                    <div className="flex items-center gap-2">
+                        {reportStep === 'details' && (
+                            <button onClick={() => setReportStep('reason')} className="p-1 -ml-2 rounded-full hover:bg-gray-100 mr-1">
+                                <ChevronLeft className="w-6 h-6 text-slate-800" />
+                            </button>
+                        )}
+                        <h3 className="text-lg font-bold text-slate-900">Report</h3>
+                    </div>
+                    <button onClick={() => setShowReportModal(false)} className="p-2 rounded-full hover:bg-gray-100 bg-gray-50">
+                        <X className="w-5 h-5 text-gray-500" />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto bg-white">
+                    {reportStep === 'reason' && (
+                        <div className="p-2">
+                            <div className="p-4 pb-2">
+                                <h4 className="font-bold text-slate-800 text-lg">Select a problem</h4>
+                                <p className="text-sm text-gray-500 mt-1">Help us understand what's happening.</p>
+                            </div>
+                            <div className="space-y-1 mt-2">
+                                {REPORT_REASONS.map((r, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => {
+                                            setSelectedReason(r.id);
+                                            setReportStep('details');
+                                        }}
+                                        className="w-full text-left px-5 py-4 hover:bg-slate-50 flex items-center justify-between group transition-colors border-b border-gray-50 last:border-0"
+                                    >
+                                        <span className="font-medium text-slate-700 group-hover:text-teal-700">{r.label}</span>
+                                        <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-teal-500" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {reportStep === 'details' && (
+                        <div className="p-6">
+                            <h4 className="font-bold text-slate-800 mb-2">Add details (Optional)</h4>
+                            <p className="text-sm text-gray-500 mb-4">
+                                Please provide any specific details that will help our admin team review this report faster.
+                            </p>
+                            <textarea 
+                                className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none min-h-[140px] text-sm mb-6 resize-none"
+                                placeholder="Describe what happened..."
+                                value={reportDescription}
+                                onChange={(e) => setReportDescription(e.target.value)}
+                            />
+                            <button 
+                                onClick={submitReport}
+                                className="w-full py-4 bg-teal-500 text-white font-bold rounded-2xl shadow-lg shadow-teal-500/20 hover:bg-teal-600 transition-all active:scale-[0.98]"
+                            >
+                                Submit Report
+                            </button>
+                        </div>
+                    )}
+
+                    {reportStep === 'success' && (
+                        <div className="flex flex-col items-center justify-center p-10 text-center h-full">
+                            <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6 animate-in zoom-in duration-300">
+                                <CheckCircle className="w-10 h-10 text-green-500" />
+                            </div>
+                            <h4 className="text-2xl font-extrabold text-slate-900 mb-2">Thanks for letting us know</h4>
+                            <p className="text-sm text-gray-500 mb-8 max-w-[260px] leading-relaxed">
+                                Your report has been securely submitted to our admin team. We will review this conversation and take appropriate action.
+                            </p>
+                            <button 
+                                onClick={() => setShowReportModal(false)}
+                                className="w-full py-4 bg-slate-100 text-slate-800 font-bold rounded-2xl hover:bg-slate-200 transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 }

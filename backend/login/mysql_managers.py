@@ -59,6 +59,26 @@ class MySQLMatchManager:
             "status": match.status,
             "created_at": match.created_at.isoformat() + "Z",
         }
+    
+        
+    @staticmethod
+    def get_user_matches(user_email: str) -> List[str]:
+        user_email = user_email.lower()
+
+        matches = Match.objects.filter(
+            Q(user_a=user_email) | Q(user_b=user_email)
+        )
+
+        matched_users = []
+
+        for match in matches:
+            if match.user_a == user_email:
+                matched_users.append(match.user_b)
+            else:
+                matched_users.append(match.user_a)
+
+        return matched_users
+
 
 class MySQLChatManager:
 
