@@ -1,16 +1,15 @@
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
-
-// Brand Gradient
-const PRIMARY_GRADIENT = "bg-gradient-to-r from-[#0095E0] via-[#00B4D8] to-[#00C98B]";
+import { Heart } from "lucide-react"; // Icon for the active state
+import StepLayout from "../StepLayout";
+import { cn } from "@/lib/utils";
 
 interface Step2Props {
-  data: any;
-  onChange: (data: any) => void;
+  data: {
+    relationshipType: string;
+  };
+  onChange: (data: Partial<Step2Props["data"]>) => void;
   onNext: () => void;
   onBack: () => void;
-  onSkip?: () => void; // ✅ Added Skip Prop
+  onSkip?: () => void; // ✅ Skip prop included
 }
 
 const RELATIONSHIP_STATUSES = [
@@ -18,74 +17,68 @@ const RELATIONSHIP_STATUSES = [
   "Committed",
   "Broken up recently",
   "Divorced",
-  "Widowed"
+  "Widowed",
 ];
 
-export default function Step2Orientation({ data, onChange, onNext, onBack, onSkip }: Step2Props) {
-  
-  const isValid = !!data.relationshipType;
+export default function Step2Orientation({
+  data,
+  onChange,
+  onNext,
+  onBack,
+  onSkip,
+}: Step2Props) {
+  const canProceed = !!data.relationshipType;
 
   return (
-    <div className="max-w-md mx-auto py-8 px-6">
-      
-      {/* Navigation Header */}
-      <div className="flex items-center justify-between mb-6">
-        <button 
-          onClick={onBack} 
-          className="p-2 -ml-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all"
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        
-        {onSkip && (
-          <button 
-            onClick={onSkip} 
-            className="text-sm font-bold text-gray-400 hover:text-[#0095E0] transition-colors"
-          >
-            Skip
-          </button>
-        )}
-      </div>
-
-      <div className="mb-8">
-        <h2 className="text-3xl font-black text-gray-900 mb-2">Relationship Status</h2>
-        <p className="text-gray-500 text-sm">Be honest, it helps us find what you really need.</p>
-      </div>
-
-      <div className="space-y-3">
-        {RELATIONSHIP_STATUSES.map((status) => (
-          <button
-            key={status}
-            onClick={() => onChange({ relationshipType: status })}
-            className={`w-full p-5 rounded-2xl border-2 text-left font-bold text-base transition-all duration-200 flex items-center justify-between group ${
-              data.relationshipType === status
-                ? "border-[#0095E0] bg-[#0095E0]/5 text-[#0095E0] shadow-sm" // Active State
-                : "border-gray-100 bg-white text-gray-600 hover:border-gray-200 hover:bg-gray-50"
-            }`}
-          >
-            {status}
-            
-            {/* Custom Radio Circle */}
-            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-               data.relationshipType === status ? "border-[#0095E0]" : "border-gray-300 group-hover:border-gray-400"
-            }`}>
-              {data.relationshipType === status && (
-                <div className="w-2.5 h-2.5 bg-[#0095E0] rounded-full" />
+    <StepLayout
+      currentStep={2}
+      totalSteps={10}
+      title="Relationship Status"
+      subtitle="Be honest, it helps us find what you really need."
+      onNext={onNext}
+      onBack={onBack}
+      onSkip={onSkip} // ✅ Passed to Layout to render top-right button
+      canProceed={canProceed}
+    >
+      <div className="space-y-3 pt-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {RELATIONSHIP_STATUSES.map((status) => {
+          const isActive = data.relationshipType === status;
+          
+          return (
+            <button
+              key={status}
+              onClick={() => onChange({ relationshipType: status })}
+              className={cn(
+                "w-full p-5 rounded-2xl border-2 text-left font-bold text-base transition-all duration-200 flex items-center justify-between group relative overflow-hidden",
+                "hover:shadow-md hover:-translate-y-0.5", // Hover lift
+                "active:scale-[0.98]", // Click press
+                isActive
+                  ? "border-teal-500 bg-teal-50/60 text-teal-800 shadow-sm shadow-teal-500/10"
+                  : "border-slate-100 bg-white text-slate-600 hover:border-teal-200 hover:bg-slate-50"
               )}
-            </div>
-          </button>
-        ))}
-      </div>
+            >
+              <span className="relative z-10">{status}</span>
 
-      <div className="mt-12">
-        <Button
-          onClick={onNext}
-          disabled={!isValid}
-          className={`w-full h-14 rounded-full font-bold text-lg text-white shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:shadow-none ${PRIMARY_GRADIENT}`}
-        >
-          Next Step
-        </Button>
+              {/* Custom Radio Circle */}
+              <div
+                className={cn(
+                  "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 relative z-10",
+                  isActive
+                    ? "border-teal-500 bg-teal-500 text-white scale-110"
+                    : "border-slate-200 group-hover:border-teal-300"
+                )}
+              >
+                {isActive && <Heart className="w-3 h-3 fill-current" />}
+              </div>
+
+              {/* Subtle background glow for active state */}
+              {isActive && (
+                <div className="absolute inset-0 bg-gradient-to-r from-teal-500/5 to-transparent z-0" />
+              )}
+            </button>
+          );
+        })}
       </div>
-    </div>
+    </StepLayout>
   );
 }

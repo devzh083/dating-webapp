@@ -1,8 +1,8 @@
 // src/components/onboarding/steps/Step8Bio.tsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import StepLayout from "../StepLayout";
 import { OnboardingData } from "../OnboardingFlow";
-import { MessageCircle, PenLine, Sparkles, Quote } from "lucide-react";
+import { MessageCircle, PenLine, Sparkles, Quote, Edit3 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +31,24 @@ export const Step8Bio = ({
   onSkip,
 }: Step8Props) => {
   const bioCharacterLimit = 150;
+  
+  // Local state to manage if user is typing a custom starter
+  const [isCustom, setIsCustom] = useState(false);
+
+  // Check if the current starter is one of the presets
+  const isPreset = STARTERS.includes(data.conversationStarter);
+
+  // Handle custom text input
+  const handleCustomInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsCustom(true);
+    onChange({ ...data, conversationStarter: e.target.value });
+  };
+
+  // Handle preset selection
+  const handlePresetSelect = (starter: string) => {
+    setIsCustom(false);
+    onChange({ ...data, conversationStarter: starter });
+  };
 
   return (
     <StepLayout
@@ -43,7 +61,7 @@ export const Step8Bio = ({
       onSkip={onSkip}
       canProceed={data.bio.trim().length > 0 && data.conversationStarter.trim().length > 0}
     >
-      <div className="space-y-8">
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
         
         {/* Section 1: Bio / Caption */}
         <div className="space-y-4">
@@ -80,14 +98,49 @@ export const Step8Bio = ({
             <h3>Choose a Conversation Starter</h3>
           </div>
 
-          <div className="grid gap-3">
+          {/* CUSTOM INPUT FIELD */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Edit3 className={cn(
+                    "h-5 w-5 transition-colors",
+                    !isPreset && data.conversationStarter ? "text-teal-500" : "text-gray-400"
+                )} />
+            </div>
+            <input
+                type="text"
+                value={isPreset ? "" : data.conversationStarter} // Show empty if a preset is selected to avoid confusion, or keep value
+                onChange={handleCustomInput}
+                placeholder="Write your own starter..."
+                className={cn(
+                    "w-full pl-11 pr-4 py-4 rounded-xl border-2 transition-all outline-none font-medium",
+                    !isPreset && data.conversationStarter.length > 0
+                        ? "border-teal-500 bg-white ring-4 ring-teal-500/10"
+                        : "border-gray-100 bg-gray-50 focus:bg-white focus:border-teal-500"
+                )}
+            />
+             {/* Label for "Custom" state */}
+            {!isPreset && data.conversationStarter.length > 0 && (
+                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-full">
+                    Custom
+                 </span>
+            )}
+          </div>
+
+          <div className="relative flex items-center py-2">
+            <div className="flex-grow border-t border-gray-100"></div>
+            <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-medium uppercase tracking-wider">Or choose one</span>
+            <div className="flex-grow border-t border-gray-100"></div>
+          </div>
+
+          {/* PRESET LIST */}
+          <div className="grid gap-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
             {STARTERS.map((starter, index) => {
               const isSelected = data.conversationStarter === starter;
               return (
                 <motion.button
                   key={index}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => onChange({ ...data, conversationStarter: starter })}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => handlePresetSelect(starter)}
                   className={cn(
                     "relative p-4 rounded-xl text-left border-2 transition-all duration-200 group",
                     isSelected
@@ -101,7 +154,7 @@ export const Step8Bio = ({
                       isSelected ? "text-teal-600 fill-teal-600" : "text-gray-300 group-hover:text-teal-400"
                     )} />
                     <span className={cn(
-                      "text-sm font-medium leading-snug transition-colors",
+                      "text-sm font-medium leading-snug transition-colors pr-6",
                       isSelected ? "text-teal-900" : "text-gray-600"
                     )}>
                       {starter}

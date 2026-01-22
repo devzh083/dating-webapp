@@ -21,6 +21,8 @@ interface ChatUser {
   email: string;
   first_name: string | null;
   profile_photo: string | null;
+  last_message?: string;
+  unread_count?: number; // Ensure backend sends this
 }
 
 interface Message {
@@ -89,11 +91,23 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Refs
   const socketRef = useRef<WebSocket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const currentUserEmail =
     localStorage.getItem("user_email")?.toLowerCase() ?? "";
 
   const activeChat = chats.find((c) => c.chat_id === selectedChat);
+
+  /* ---------------- AUTO SCROLL ---------------- */
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, selectedChat]);
 
   /* ---------------- FETCH CHATS ---------------- */
   useEffect(() => {
@@ -112,6 +126,17 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         const chatsArray = Array.isArray(data) ? data : data.chats || [];
         setChats(chatsArray);
         setRequests(data.requests || []);
+
+        // Check global unread
+        const totalUnread = chatsArray.reduce(
+          (acc: number, chat: ChatUser) => acc + (chat.unread_count || 0),
+          0
+        );
+        if (totalUnread > 0) {
+          localStorage.setItem("has_unread_messages", "true");
+        } else {
+          localStorage.removeItem("has_unread_messages");
+        }
 
         if (chatsArray.length > 0 && chatsArray[0].user_email) {
           localStorage.setItem("user_email", chatsArray[0].user_email);
@@ -152,6 +177,29 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         );
 
         setMessages(flatMessages);
+
+        // When opening a chat, clear its unread count locally & update last message
+        if (flatMessages.length > 0) {
+          const lastMsg = flatMessages[flatMessages.length - 1].content;
+          setChats((prev) =>
+            prev.map((c) =>
+              c.chat_id === selectedChat
+                ? { ...c, last_message: lastMsg, unread_count: 0 }
+                : c
+            )
+          );
+        } else {
+           setChats((prev) =>
+            prev.map((c) =>
+              c.chat_id === selectedChat ? { ...c, unread_count: 0 } : c
+            )
+          );
+        }
+
+        // Reset global badge if no more unread
+        const hasAnyUnread = chats.some(c => (c.unread_count || 0) > 0 && c.chat_id !== selectedChat);
+        if(!hasAnyUnread) localStorage.removeItem("has_unread_messages");
+
       } catch (err) {
         console.error("LOAD MESSAGES ERROR:", err);
       }
@@ -161,25 +209,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     setIsMenuOpen(false);
   }, [selectedChat]);
 
-  /* ---------------- WEBSOCKET & READ STATUS ---------------- */
-  useEffect(() => {
-    if (selectedChat) {
-      // Mark read
-      const markRead = async () => {
-        try {
-          const token = localStorage.getItem("access_token");
-          if (token) {
-            await fetch(`http://127.0.0.1:8000/api/chats/${selectedChat}/read/`, {
-              method: "POST",
-              headers: { Authorization: `Bearer ${token}` },
-            });
-          }
-        } catch (e) { console.error(e); }
-      };
-      markRead();
-    }
-  }, [selectedChat]);
-
+  /* ---------------- WEBSOCKET ---------------- */
   useEffect(() => {
     if (!selectedChat) return;
     const token = localStorage.getItem("access_token");
@@ -199,10 +229,29 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         content: data.content,
         created_at: data.created_at ?? new Date().toISOString(),
       };
+
       setMessages((prev) => {
         const exists = prev.some((m) => m.id === incomingMessage.id);
         return exists ? prev : [...prev, incomingMessage];
       });
+
+      // Mark read immediately since chat is open
+      const markRead = async () => {
+        await fetch(`http://127.0.0.1:8000/api/chats/${selectedChat}/read/`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      };
+      markRead();
+
+      // Update sidebar list for current chat
+      setChats((prev) =>
+        prev.map((c) =>
+          c.chat_id === selectedChat
+            ? { ...c, last_message: incomingMessage.content, unread_count: 0 }
+            : c
+        )
+      );
     };
 
     return () => {
@@ -219,6 +268,15 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
     const content = messageInput;
     setMessageInput("");
+
+    // Optimistic update
+    setChats((prev) =>
+      prev.map((c) =>
+        c.chat_id === activeChat.chat_id
+          ? { ...c, last_message: content, unread_count: 0 }
+          : c
+      )
+    );
 
     try {
       await fetch(
@@ -237,7 +295,11 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     }
   };
 
-  /* ---------------- GROUP MESSAGES ---------------- */
+  /* ---------------- ACTIONS ---------------- */
+  const handleUnmatch = () => setIsMenuOpen(false);
+  const handleBlockReport = () => setIsMenuOpen(false);
+
+  /* ---------------- RENDER ---------------- */
   const groupedMessages = messages.reduce((acc, msg) => {
     if (!msg.created_at) return acc;
     const dateKey = msg.created_at.split("T")[0];
@@ -246,33 +308,24 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     return acc;
   }, {} as Record<string, Message[]>);
 
-  /* ---------------- RENDER ---------------- */
   return (
     <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
-      {/* TopBar is typically fixed. 
-         We leave it here, but the main content below needs padding-top 
-         to not slide under it. 
-      */}
-      <TopBar onLogout={onLogout} />
+      <div className="flex-none bg-white z-50 relative shadow-sm">
+        <TopBar onLogout={onLogout} />
+      </div>
 
-      {/* KEY CHANGE: added 'pt-24' (padding-top: 6rem / 96px). 
-         This pushes the chat containers down so they don't hide behind the TopBar.
-      */}
       <main className="flex-1 container mx-auto max-w-7xl pt-24 pb-6 px-4 lg:px-8 overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
           
-          {/* LEFT PANEL (Connections) */}
+          {/* LEFT PANEL */}
           <div
             className={cn(
               "lg:col-span-4 flex flex-col h-full bg-white rounded-[32px] shadow-lg border border-gray-100 overflow-hidden",
               selectedChat ? "hidden lg:flex" : "flex"
             )}
           >
-            {/* Header */}
             <div className="flex flex-col gap-4 px-6 pt-6 pb-2 flex-none bg-white z-10">
               <h1 className="text-2xl font-bold text-slate-800">Messages</h1>
-
-              {/* Search */}
               <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -280,8 +333,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                   className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl border border-transparent focus:bg-white focus:border-teal-500/30 focus:ring-4 focus:ring-teal-500/10 transition-all outline-none text-sm"
                 />
               </div>
-
-              {/* Tabs (Lowercase/Capitalized properly) */}
               <div className="flex items-center gap-1 border-b border-gray-100 pb-1">
                 {["connections", "requests", "requested"].map((t) => (
                   <button
@@ -300,7 +351,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
               </div>
             </div>
 
-            {/* List */}
             <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-200">
               {activeTab === "connections" && chats.length === 0 && !loading && (
                 <div className="flex flex-col items-center justify-center h-48 text-gray-400 text-sm">
@@ -309,51 +359,74 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
               )}
               
               {activeTab === "connections" &&
-                chats.map((chat) => (
-                  <button
-                    key={chat.chat_id}
-                    onClick={() => setSelectedChat(Number(chat.chat_id))}
-                    className={cn(
-                      "w-full flex items-center gap-4 p-3 rounded-2xl transition-all duration-200 group relative overflow-hidden text-left",
-                      selectedChat === chat.chat_id 
-                        ? "bg-teal-50/60 ring-1 ring-teal-100" 
-                        : "hover:bg-gray-50"
-                    )}
-                  >
-                    {selectedChat === chat.chat_id && (
-                        <div className="absolute left-0 top-3 bottom-3 w-1 bg-teal-500 rounded-r-full" />
-                    )}
-
-                    <div className={cn(
-                      "w-12 h-12 rounded-full overflow-hidden flex-shrink-0 border-2 transition-all",
-                      selectedChat === chat.chat_id ? "border-teal-400 shadow-sm" : "border-transparent"
-                    )}>
-                      {chat.profile_photo ? (
-                        <img src={chat.profile_photo} alt="User" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-teal-400 to-teal-600 text-white flex items-center justify-center font-bold text-lg">
-                          {(chat.first_name || chat.email)[0].toUpperCase()}
-                        </div>
+                chats.map((chat) => {
+                  const unread = chat.unread_count || 0;
+                  const isUnread = unread > 0 && chat.chat_id !== selectedChat;
+                  
+                  return (
+                    <button
+                      key={chat.chat_id}
+                      onClick={() => setSelectedChat(Number(chat.chat_id))}
+                      className={cn(
+                        "w-full flex items-center gap-4 p-3 rounded-2xl transition-all duration-200 group relative overflow-hidden text-left",
+                        selectedChat === chat.chat_id 
+                          ? "bg-teal-50/60 ring-1 ring-teal-100" 
+                          : "hover:bg-gray-50"
                       )}
-                    </div>
-                    
-                    <div className="flex flex-col items-start overflow-hidden flex-1 pl-1">
-                      <span className="font-bold text-slate-800 truncate text-[15px] w-full">
-                        {chat.first_name || chat.email}
-                      </span>
-                      <span className={cn(
-                        "text-xs truncate w-full text-left font-medium mt-0.5",
-                        selectedChat === chat.chat_id ? "text-teal-600" : "text-gray-400"
+                    >
+                      {selectedChat === chat.chat_id && (
+                          <div className="absolute left-0 top-3 bottom-3 w-1 bg-teal-500 rounded-r-full" />
+                      )}
+
+                      <div className={cn(
+                        "w-12 h-12 rounded-full overflow-hidden flex-shrink-0 border-2 transition-all relative",
+                        selectedChat === chat.chat_id ? "border-teal-400 shadow-sm" : "border-transparent"
                       )}>
-                        {selectedChat === chat.chat_id ? "Messaging..." : "Tap to chat"}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                        {chat.profile_photo ? (
+                          <img src={chat.profile_photo} alt="User" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-teal-400 to-teal-600 text-white flex items-center justify-center font-bold text-lg">
+                            {(chat.first_name || chat.email)[0].toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex flex-col items-start overflow-hidden flex-1 pl-1">
+                        <div className="flex justify-between w-full items-center">
+                            <span className={cn(
+                                "font-bold text-slate-800 truncate text-[15px]",
+                                isUnread && "text-slate-900"
+                            )}>
+                            {chat.first_name || chat.email}
+                            </span>
+                            {/* Blue dot indicator for unread messages */}
+                            {isUnread && (
+                                <div className="w-2.5 h-2.5 bg-blue-500 rounded-full mr-2 shadow-sm animate-pulse"></div>
+                            )}
+                        </div>
+                        
+                        {/* UNREAD LOGIC: Display count if unread, else last message */}
+                        <span className={cn(
+                          "text-xs truncate w-full text-left font-medium mt-0.5",
+                          selectedChat === chat.chat_id 
+                            ? "text-teal-700" 
+                            : isUnread 
+                                ? "text-blue-600 font-bold" // Blue text for unread
+                                : "text-gray-400"
+                        )}>
+                          {isUnread 
+                            ? `${unread} new message${unread > 1 ? 's' : ''}` 
+                            : (chat.last_message || "Tap to chat")
+                          }
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
             </div>
           </div>
 
-          {/* RIGHT PANEL (Chat Window) */}
+          {/* RIGHT PANEL */}
           <div
             className={cn(
               "lg:col-span-8 flex flex-col bg-white rounded-[32px] h-full shadow-lg border border-gray-100 overflow-hidden relative transition-all duration-300",
@@ -362,7 +435,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
           >
             {activeChat ? (
               <>
-                {/* Chat Header */}
                 <div className="h-20 px-6 border-b border-gray-50 flex items-center bg-white/95 backdrop-blur-sm z-20 sticky top-0 justify-between">
                   <div className="flex items-center gap-4">
                     <button
@@ -392,10 +464,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                   <div className="relative">
                     <button
                       onClick={() => setIsMenuOpen(!isMenuOpen)}
-                      className={cn(
-                          "p-2 rounded-full transition-all duration-200",
-                          isMenuOpen ? "bg-teal-50 text-teal-600" : "hover:bg-gray-50 text-gray-400 hover:text-gray-600"
-                      )}
+                      className="p-2 rounded-full hover:bg-gray-50 text-gray-400 hover:text-gray-600"
                     >
                       <MoreVertical className="w-5 h-5" />
                     </button>
@@ -404,11 +473,11 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                       <>
                         <div className="fixed inset-0 z-30 cursor-default" onClick={() => setIsMenuOpen(false)} />
                         <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-40 animate-in fade-in zoom-in-95 duration-200">
-                          <button className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-3 transition-colors">
+                          <button onClick={handleUnmatch} className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-3 transition-colors">
                             <UserX className="w-4 h-4" /> Unmatch
                           </button>
                           <div className="h-px bg-gray-100 my-1 mx-4" />
-                          <button className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-red-50 hover:text-red-600 flex items-center gap-3 transition-colors">
+                          <button onClick={handleBlockReport} className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-red-50 hover:text-red-600 flex items-center gap-3 transition-colors">
                             <Flag className="w-4 h-4" /> Block & Report
                           </button>
                         </div>
@@ -417,7 +486,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                   </div>
                 </div>
 
-                {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6 bg-white scrollbar-thin scrollbar-thumb-gray-200">
                   {Object.entries(groupedMessages).map(([date, msgs]) => (
                     <div key={date} className="space-y-6">
@@ -454,9 +522,9 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                       })}
                     </div>
                   ))}
+                  <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input Area */}
                 <div className="p-4 lg:p-6 bg-white border-t border-gray-100">
                   <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-1.5 border border-gray-200 focus-within:ring-4 focus-within:ring-teal-500/10 focus-within:border-teal-500 transition-all shadow-inner">
                     <input
