@@ -1,14 +1,16 @@
+# ws.py
+
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 channel_layer = get_channel_layer()
 
-def notify_user(user_id: int, payload: dict):
-    group = f"user_{user_id}"
+def notify_user(email: str, payload: dict):
+    group = f"user_{email.lower()}"
     async_to_sync(channel_layer.group_send)(
         group,
         {
-            "type": "match_event",
+            "type": "presence_event",
             "payload": payload,
         }
     )
