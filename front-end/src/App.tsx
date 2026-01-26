@@ -11,10 +11,13 @@ import BookingPage from "./pages/BookingPage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import OnboardingPage from "./pages/OnboardingPage";
-import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import AdminLogin from './pages/AdminLogin';
 import AdminPanel from './pages/AdminPanel';
 import { adminService } from './services/profileService';
+
+// ✅ IMPORT NEW PAGES
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
 
 // Admin Protected Route Component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
@@ -55,9 +58,7 @@ const AppInner: React.FC = () => {
       return profileExists;
     } catch (error) {
       console.error("Profile check failed:", error);
-      // token invalid or expired → force logout
       handleLogout();
-      // Don't call handleLogout here to avoid recursion
       localStorage.clear();
       setIsLoggedIn(false);
       setNeedsOnboarding(false);
@@ -68,7 +69,6 @@ const AppInner: React.FC = () => {
   /* ---------------- APP STARTUP ---------------- */
   useEffect(() => {
     const initAuth = async () => {
-      // Skip auth check for admin routes
       if (location.pathname.startsWith('/admin')) {
         setIsLoggedIn(false);
         return;
@@ -112,19 +112,13 @@ const AppInner: React.FC = () => {
   };
 
   const handleLogout = () => {
-    // Clear all auth data
     console.log("🚪 Logging out from App.tsx...");
-    
-    // Clear everything
     localStorage.clear();
     setIsLoggedIn(false);
     setNeedsOnboarding(false);
-    
-    // Navigate to root
     navigate("/", { replace: true });
   };
 
-  // Show loading only on initial load (skip for admin routes)
   if (isLoggedIn === null && !location.pathname.startsWith('/admin')) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -138,7 +132,7 @@ const AppInner: React.FC = () => {
 
   return (
     <Routes>
-      {/* ---------------- ADMIN ROUTES (SEPARATE FROM USER ROUTES) ---------------- */}
+      {/* ---------------- ADMIN ROUTES ---------------- */}
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route
         path="/admin/dashboard"
@@ -151,6 +145,11 @@ const AppInner: React.FC = () => {
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
       {/* ---------------- PUBLIC ROUTES ---------------- */}
+      
+      {/* ✅ Terms & Privacy (Available to everyone) */}
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+
       <Route
         path="/"
         element={
@@ -195,7 +194,7 @@ const AppInner: React.FC = () => {
         }
       />
 
-      {/* ---------------- PROTECTED ROUTES (REQUIRE LOGIN) ---------------- */}
+      {/* ---------------- PROTECTED ROUTES ---------------- */}
       <Route
         path="/home"
         element={
@@ -235,7 +234,6 @@ const AppInner: React.FC = () => {
         }
       />
 
-      {/* ---------------- PROFILE ROUTE ---------------- */}
       <Route
         path="/profile"
         element={
@@ -244,13 +242,11 @@ const AppInner: React.FC = () => {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <ProfilePage/>
+            <ProfilePage />
           )
         }
       />
 
-      {/* ---------------- CAFES ROUTES ---------------- */}
-      
       <Route
         path="/cafes"
         element={
@@ -276,11 +272,6 @@ const AppInner: React.FC = () => {
           )
         }
       />
-{/*       
-      <Route
-       path="/cafe-partner/register"
-        element={<CafeRegisterPage />}
-       /> */}
 
       {/* ---------------- 404 NOT FOUND ---------------- */}
       <Route path="*" element={<NotFound />} />

@@ -35,6 +35,7 @@ const ReviewCard = ({ review }: { review: typeof reviews[0] }) => (
 
 export default function ReviewCarousel() {
   return (
+    // Added 'group' class to parent to handle hover state
     <div className="w-full bg-gradient-to-b from-white to-gray-50 rounded-3xl p-8 border border-gray-100 overflow-hidden relative group">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900">Success Stories</h2>
@@ -48,7 +49,7 @@ export default function ReviewCarousel() {
         <div className="absolute top-0 bottom-0 right-0 w-20 bg-gradient-to-l from-white to-transparent z-10"></div>
 
         {/* Scrolling Content */}
-        <div className="flex animate-scroll hover:pause-scroll w-max">
+        <div className="flex animate-scroll w-max">
           {/* Duplicate list for seamless loop */}
           {[...reviews, ...reviews].map((review, index) => (
             <ReviewCard key={`${review.id}-${index}`} review={review} />
@@ -62,9 +63,10 @@ export default function ReviewCarousel() {
           100% { transform: translateX(-50%); }
         }
         .animate-scroll {
-          animation: scroll 40s linear infinite;
+          animation: scroll 60s linear infinite;
         }
-        .hover\\:pause-scroll:hover .animate-scroll {
+        /* Pause animation when the 'group' container is hovered */
+        .group:hover .animate-scroll {
           animation-play-state: paused;
         }
       `}</style>

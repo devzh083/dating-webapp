@@ -1,18 +1,49 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from django.core.cache import cache
+
 from login.mysql_managers import MySQLChatManager, MySQLMatchManager
 
 
-def user_group_name(email: str) -> str:
-    return f"user_{email.lower()}"
+# -------------------------------
+# Helpers
+# -------------------------------
+
+ONLINE_USERS_KEY = "online_users"
+
+
+def email_to_group(email: str) -> str:
+    return "user_" + email.replace("@", "_at_")
 
 
 @database_sync_to_async
 def get_chat(chat_id: int):
     return MySQLChatManager.get_chat(chat_id)
 
+
+def get_online_users() -> set:
+    return cache.get(ONLINE_USERS_KEY, set())
+
+
+def add_online_user(email: str):
+    users = get_online_users()
+    users.add(email)
+    cache.set(ONLINE_USERS_KEY, users)
+
+
+def remove_online_user(email: str):
+    users = get_online_users()
+    users.discard(email)
+    cache.set(ONLINE_USERS_KEY, users)
+
+
+# ===============================
+# NOTIFICATION CONSUMER (Presence)
+# ===============================
+
 class NotificationConsumer(AsyncWebsocketConsumer):
+
     async def connect(self):
         user = self.scope.get("user")
 
@@ -20,59 +51,83 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             await self.close(code=4401)
             return
 
-        self.user = user
-        self.group_name = user_group_name(self.user.email)
+        self.user_email = user.email.lower()
+        self.group_name = email_to_group(self.user_email)
 
-
-        # ✅ ACCEPT FIRST
-        await self.accept()
-
-        # ✅ THEN add to group
         await self.channel_layer.group_add(
             self.group_name,
             self.channel_name
         )
 
-        # 🔴 USER IS ONLINE
+        await self.accept()
+
+        # 1️⃣ Register user as online
+        add_online_user(self.user_email)
+
+        # 2️⃣ Send existing online presence to THIS user
+        await self.send_existing_presence()
+
+        # 3️⃣ Broadcast THIS user's presence
         await self.broadcast_presence(is_online=True)
 
     async def disconnect(self, close_code):
+        if hasattr(self, "user_email"):
+            remove_online_user(self.user_email)
+            await self.broadcast_presence(is_online=False)
+
         if hasattr(self, "group_name"):
             await self.channel_layer.group_discard(
                 self.group_name,
                 self.channel_name
             )
 
-        if hasattr(self, "user"):
-            await self.broadcast_presence(is_online=False)
+    # -------------------------------
+    # Presence logic
+    # -------------------------------
 
     async def broadcast_presence(self, is_online: bool):
-        """
-        Notify all matched users that this user is online/offline
-        """
-        matches = await database_sync_to_async(
+        matched_emails = await database_sync_to_async(
             MySQLMatchManager.get_user_matches
-        )(self.user.email)
+        )(self.user_email)
 
-        for matched_email in matches:
+        for email in matched_emails:
             await self.channel_layer.group_send(
-                user_group_name(matched_email),
+                email_to_group(email),
                 {
                     "type": "presence_event",
                     "payload": {
                         "type": "presence",
-                        "user_email": self.user.email.lower(),
+                        "user_email": self.user_email,
                         "is_online": is_online,
                     }
                 }
             )
 
+    async def send_existing_presence(self):
+        online_users = get_online_users()
+
+        matched_emails = await database_sync_to_async(
+            MySQLMatchManager.get_user_matches
+        )(self.user_email)
+
+        for email in matched_emails:
+            if email in online_users:
+                await self.send(text_data=json.dumps({
+                    "type": "presence",
+                    "user_email": email,
+                    "is_online": True,
+                }))
 
     async def presence_event(self, event):
         await self.send(text_data=json.dumps(event["payload"]))
 
 
+# ===============================
+# CHAT CONSUMER (Messages + Typing)
+# ===============================
+
 class ChatConsumer(AsyncWebsocketConsumer):
+
     async def connect(self):
         user = self.scope.get("user")
 
@@ -105,7 +160,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
         await self.accept()
-    
+
     async def receive(self, text_data):
         data = json.loads(text_data)
         event_type = data.get("type")
@@ -116,27 +171,30 @@ class ChatConsumer(AsyncWebsocketConsumer):
         elif event_type == "message":
             await self.handle_message(data)
 
+    # -------------------------------
+    # Typing
+    # -------------------------------
+
     async def handle_typing(self, data):
-        """
-        Broadcast typing event to other participants
-        """
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 "type": "typing_event",
                 "payload": {
                     "type": "typing",
-                    "user_id": self.user.id,
+                    "user_email": self.user.email.lower(),
                     "is_typing": data.get("is_typing", False),
                 }
             }
         )
 
     async def typing_event(self, event):
-        # Don't send typing event back to sender
-        if event["payload"]["user_id"] != self.user.id:
+        if event["payload"]["user_email"] != self.user.email.lower():
             await self.send(text_data=json.dumps(event["payload"]))
 
+    # -------------------------------
+    # Disconnect
+    # -------------------------------
 
     async def disconnect(self, close_code):
         if hasattr(self, "room_group_name"):
@@ -144,6 +202,3 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_group_name,
                 self.channel_name
             )
-
-    async def chat_message(self, event):
-        await self.send(text_data=json.dumps(event["message"]))

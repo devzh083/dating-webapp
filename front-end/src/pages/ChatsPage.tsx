@@ -11,7 +11,8 @@ import {
   X,
   ChevronRight,
   ShieldAlert,
-  CheckCircle
+  CheckCircle,
+  Loader2 // Added loader icon for better UX if needed
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,7 @@ interface ChatUser {
   profile_photo: string | null;
   last_message?: string;
   unread_count?: number;
-  is_blocked?: boolean; // New field to track local block state
+  is_blocked?: boolean; 
 }
 
 interface Message {
@@ -38,6 +39,7 @@ interface Message {
   created_at?: string;
   is_read?: boolean;
   read_at?: string | null;
+  status?: "sending" | "sent" | "error"; // Added status for UI feedback
 }
 
 interface ChatsPageProps {
@@ -46,7 +48,6 @@ interface ChatsPageProps {
 
 // ---------------- CONSTANTS ----------------
 
-// Mapping Frontend Labels to Backend Model Choices (UserReport.REPORT_REASONS)
 const REPORT_REASONS = [
   { id: 'inappropriate', label: 'Nudity or sexual activity' },
   { id: 'harassment', label: 'Hate speech or symbols' },
@@ -131,14 +132,16 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
   const activeChat = chats.find((c) => c.chat_id === selectedChat);
 
-  /* ---------------- AUTO SCROLL ---------------- */
+  /* ---------------- AUTO SCROLL FIXED ---------------- */
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, selectedChat, typingUser]);
+  }, [messages, selectedChat]);
 
   /* ---------------- 1. FETCH CHATS ---------------- */
   useEffect(() => {
@@ -156,11 +159,10 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         const data = await res.json();
         const chatsArray = Array.isArray(data) ? data : data.chats || [];
         
-        // Normalize chats and add is_blocked flag
         const normalizedChats = chatsArray.map((c: any) => ({
           ...c,
           email: (c.email || c.user_email || "").toLowerCase(),
-          is_blocked: false // Default to false unless backend provides this status
+          is_blocked: false 
         }));
 
         setChats(normalizedChats);
@@ -292,8 +294,23 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
       };
 
       setMessages((prev) => {
+        // Prevent hard duplicates by ID
         const exists = prev.some((m) => m.id === incomingMessage.id);
-        return exists ? prev : [...prev, incomingMessage];
+        if (exists) return prev;
+
+        // Dedup Optimistic Messages: 
+        // If incoming msg is from ME and matches content of a 'temp-' msg, replace it.
+        if (incomingMessage.sender === currentUserEmail) {
+            const tempMessage = prev.find(m => 
+                m.content === incomingMessage.content && 
+                m.id.toString().startsWith('temp-')
+            );
+            if (tempMessage) {
+                return prev.map(m => m.id === tempMessage.id ? incomingMessage : m);
+            }
+        }
+
+        return [...prev, incomingMessage];
       });
 
       const markRead = async () => {
@@ -331,9 +348,22 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     if (!token) return;
 
     const content = messageInput;
-    setMessageInput("");
+    setMessageInput(""); // Clear Input immediately
     sendTypingEvent(false);
 
+    // 1. OPTIMISTIC UPDATE: Add message to list immediately
+    const optimisticMessage: Message = {
+        id: `temp-${Date.now()}`,
+        sender: currentUserEmail,
+        receiver: activeChat.email,
+        content: content,
+        created_at: new Date().toISOString(),
+        is_read: false,
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+
+    // 2. Update Chat List Preview
     setChats((prev) =>
       prev.map((c) =>
         c.chat_id === activeChat.chat_id
@@ -356,6 +386,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
       );
     } catch (err) {
       console.error("SEND ERROR:", err);
+      // Optional: Remove the optimistic message here if fail
     }
   };
 
@@ -369,14 +400,12 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     if (!activeChat) return;
     const token = localStorage.getItem("access_token");
     
-    // Optimistic Update
     setChats(prev => prev.map(c => 
       c.chat_id === activeChat.chat_id ? { ...c, is_blocked: true } : c
     ));
     setShowBlockModal(false);
 
     try {
-      // Assuming you have an endpoint for this. If not, this is a placeholder.
       await fetch(`http://127.0.0.1:8000/api/users/${activeChat.match_id || 'block'}/block/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -399,15 +428,14 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     if (!activeChat) return;
     const token = localStorage.getItem("access_token");
 
-    // Construct Payload for Admin Panel
     const reportPayload = {
-      reported_user_id: activeChat.match_id, // Ensure your API expects ID or Username
+      reported_user_id: activeChat.match_id,
       reason: selectedReason,
       description: reportDescription || `Reported for: ${selectedReason}`,
     };
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/reports/create/`, { // Adjust URL to match your backend
+      const res = await fetch(`http://127.0.0.1:8000/api/reports/create/`, { 
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -420,7 +448,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         setReportStep('success');
       } else {
         console.error("Report failed");
-        setReportStep('success'); // Show success anyway for UX flow in this demo
+        setReportStep('success'); 
       }
     } catch (err) {
       console.error("Report API Error", err);
@@ -617,14 +645,12 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                       <>
                         <div className="fixed inset-0 z-30 cursor-default" onClick={() => setIsMenuOpen(false)} />
                         <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-40 animate-in fade-in zoom-in-95 duration-200">
-                          {/* 1. SEPARATE UNMATCH/BLOCK OPTION */}
                           <button onClick={handleBlockClick} className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-red-50 hover:text-red-600 flex items-center gap-3">
                             <UserX className="w-4 h-4" /> Block
                           </button>
                           
                           <div className="h-px bg-gray-100 my-1 mx-4" />
                           
-                          {/* 2. SEPARATE REPORT OPTION */}
                           <button onClick={handleReportClick} className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-3">
                             <Flag className="w-4 h-4" /> Report
                           </button>
@@ -674,7 +700,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input Area OR Blocked Message */}
+                {/* Input Area */}
                 <div className="p-4 lg:p-6 bg-white border-t border-gray-100">
                   {activeChat.is_blocked ? (
                     <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-2xl border border-gray-200 text-center">
@@ -737,9 +763,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         </div>
       </main>
 
-      {/* ================= MODALS ================= */}
-
-      {/* 1. BLOCK MODAL */}
+      {/* Modals included in structure above */}
       {showBlockModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 text-center transform transition-all scale-100 border border-gray-100">
@@ -768,12 +792,9 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         </div>
       )}
 
-      {/* 2. REPORT MODAL */}
       {showReportModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[85vh] border border-gray-100">
-                
-                {/* Header */}
                 <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
                     <div className="flex items-center gap-2">
                         {reportStep === 'details' && (
@@ -788,7 +809,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                     </button>
                 </div>
 
-                {/* Content */}
                 <div className="flex-1 overflow-y-auto bg-white">
                     {reportStep === 'reason' && (
                         <div className="p-2">
