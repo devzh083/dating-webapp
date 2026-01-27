@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import Footer from "@/components/layout/Footer"; // ✅ Imported Footer
+import Footer from "@/components/layout/Footer"; // Ensure this path is correct
 
 // --- THEME CONSTANTS ---
 const PRIMARY_GRADIENT = "bg-gradient-to-r from-[#0095E0] via-[#00B4D8] to-[#00C98B]";
@@ -48,13 +48,13 @@ const TheMatchReveal = () => {
       interval = setInterval(() => {
         setMaleIndex((prev) => (prev + 1) % MALE_PROFILES.length);
         setFemaleIndex((prev) => (prev + 1) % FEMALE_PROFILES.length);
-      }, 120); // Speed of shuffle
+      }, 250); // Slower shuffle as requested
 
-      // Stop shuffling after 2 seconds
+      // Stop shuffling after 3.5 seconds
       setTimeout(() => {
         clearInterval(interval);
         setStatus("matched");
-      }, 2000);
+      }, 3500);
     }
 
     return () => clearInterval(interval);
@@ -254,7 +254,7 @@ const Landing = () => {
             initial={{ opacity: 0, x: -20 }} 
             animate={{ opacity: 1, x: 0 }} 
             className="flex items-center gap-3 cursor-pointer"
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' } as ScrollToOptions)}
           >
             <div className={`w-10 h-10 rounded-xl ${PRIMARY_GRADIENT} flex items-center justify-center shadow-lg shadow-blue-200`}>
               <Heart className="w-5 h-5 text-white fill-white" />
@@ -287,7 +287,7 @@ const Landing = () => {
 
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center relative z-10">
           
-          {/* Left: Text */}
+          {/* inset-inline-start: Text */}
           <motion.div 
             initial={{ opacity: 0, y: 30 }} 
             animate={{ opacity: 1, y: 0 }} 
@@ -318,7 +318,7 @@ const Landing = () => {
             </div>
           </motion.div>
 
-          {/* Right: The Interactive Match Reveal */}
+          {/* inset-inline-end: The Interactive Match Reveal */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }} 
             animate={{ opacity: 1, scale: 1 }} 
@@ -358,8 +358,6 @@ const Landing = () => {
           </div>
         </div>
       </section>
-
-      {/* ✅ REMOVED CAFE SECTION HERE */}
 
       {/* SAFETY SECTION */}
       <section id="safety" className="py-24 bg-gradient-to-b from-white to-blue-50/30">

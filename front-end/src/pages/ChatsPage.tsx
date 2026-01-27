@@ -12,6 +12,8 @@ import {
   ShieldAlert,
   CheckCircle,
   Instagram,
+  ChevronRight,
+  Trash2, // ✅ Added Trash Icon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -138,14 +140,12 @@ const DenseDoodleBackground = () => (
 
 export default function ChatsPage({ onLogout }: ChatsPageProps) {
   /* ---------------- STATE ---------------- */
-  // ✅ Removed activeTab state since we only have one list now
   
   const [selectedChat, setSelectedChat] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [chats, setChats] = useState<ChatUser[]>([]);
-  // const [requests, setRequests] = useState<ChatUser[]>([]); // HIDDEN
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -160,6 +160,14 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   const [reportStep, setReportStep] = useState<'reason' | 'details' | 'success'>('reason');
   const [selectedReason, setSelectedReason] = useState<string>("");
   const [reportDescription, setReportDescription] = useState("");
+
+  // ✅ CONTEXT MENU STATE
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    messageId: number | string;
+    isSender: boolean;
+  } | null>(null);
 
   // Refs
   const socketRef = useRef<WebSocket | null>(null);
@@ -181,6 +189,38 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages, selectedChat]);
+
+  /* ---------------- CONTEXT MENU LOGIC ---------------- */
+  
+  // Close menu on click anywhere
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, []);
+
+  const handleMessageContextMenu = (e: React.MouseEvent, msg: Message) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevent bubbling
+    setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        messageId: msg.id,
+        isSender: msg.sender === currentUserEmail,
+    });
+  };
+
+  const handleDeleteForMe = () => {
+    console.log("Delete for me:", contextMenu?.messageId);
+    // TODO: Connect Backend
+    setContextMenu(null);
+  };
+
+  const handleDeleteForEveryone = () => {
+    console.log("Delete for everyone:", contextMenu?.messageId);
+    // TODO: Connect Backend
+    setContextMenu(null);
+  };
 
   /* ---------------- 1. FETCH CHATS ---------------- */
   useEffect(() => {
@@ -205,7 +245,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         }));
 
         setChats(normalizedChats);
-        // setRequests(data.requests || []); // HIDDEN
 
         const totalUnread = normalizedChats.reduce(
           (acc: number, chat: ChatUser) => acc + (chat.unread_count || 0),
@@ -748,10 +787,9 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                   </div>
                 </div>
 
-                {/* ✅ MESSAGES AREA CONTAINER - Relative to hold background */}
+                {/* ✅ MESSAGES AREA CONTAINER */}
                 <div className="flex-1 relative overflow-hidden bg-slate-50/20">
                    
-                   {/* ✅ FIXED, DENSE DOODLE BACKGROUND */}
                    <DenseDoodleBackground />
 
                    {/* ✅ SCROLLABLE CONTENT */}
@@ -775,8 +813,10 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                                         )}
                                     >
                                         <div
+                                        /* ✅ RIGHT CLICK HANDLER */
+                                        onContextMenu={(e) => handleMessageContextMenu(e, m)}
                                         className={cn(
-                                            "px-4 py-2.5 md:px-5 md:py-3.5 rounded-2xl text-sm md:text-[15px] leading-relaxed shadow-sm break-words relative",
+                                            "px-4 py-2.5 md:px-5 md:py-3.5 rounded-2xl text-sm md:text-[15px] leading-relaxed shadow-sm break-words relative cursor-pointer",
                                             isMe
                                             ? "bg-gradient-to-br from-teal-500 to-teal-600 text-white rounded-br-sm"
                                             : "bg-white text-slate-800 rounded-bl-sm border border-gray-100"
@@ -859,6 +899,36 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         </div>
       </main>
 
+      {/* ✅ RIGHT-CLICK CONTEXT MENU */}
+      {contextMenu && (
+        <div 
+            className="fixed z-[9999] bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 w-48 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+            style={{ 
+                top: Math.min(contextMenu.y, window.innerHeight - 100), 
+                left: Math.min(contextMenu.x, window.innerWidth - 200) 
+            }}
+        >
+            <button 
+                onClick={handleDeleteForMe}
+                className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+            >
+                <Trash2 className="w-4 h-4 text-gray-400" />
+                Delete for me
+            </button>
+            
+            {/* Show "Delete for everyone" only if current user is the sender */}
+            {contextMenu.isSender && (
+                 <button 
+                    onClick={handleDeleteForEveryone}
+                    className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                    Delete for everyone
+                </button>
+            )}
+        </div>
+      )}
+
       {/* ---------------- MODALS ---------------- */}
 
       {/* 1. SHORT PROFILE MODAL (New Request) */}
@@ -876,7 +946,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                </div>
 
                {/* Profile Info */}
-               <div className="px-6 pb-8 -mt-12 text-center">
+               <div className="px-6 pb-8 -mt-12 text-center relative z-10"> {/* ✅ Added relative z-10 to fix layering issue */}
                   <div className="w-24 h-24 rounded-full border-4 border-white shadow-md overflow-hidden mx-auto bg-white">
                     {activeChat.profile_photo ? (
                       <img src={activeChat.profile_photo} alt="Profile" className="w-full h-full object-cover" />

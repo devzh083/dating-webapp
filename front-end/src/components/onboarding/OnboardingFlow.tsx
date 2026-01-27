@@ -25,6 +25,7 @@ export type OnboardingData = {
   dateOfBirth: Date | null;
   gender: string;
   showGender: boolean;
+  relationshipType: string; 
   interestedIn: string[];
   distance: number;
   strictDistance: boolean;
@@ -54,6 +55,8 @@ const initialData: OnboardingData = {
   dateOfBirth: null,
   gender: "",
   showGender: false,
+  // ✅ ADDED MISSING FIELD INITIALIZATION
+  relationshipType: "", 
   interestedIn: [],
   distance: 25,
   strictDistance: false,
@@ -102,6 +105,7 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
         if (parsed.dateOfBirth) {
           parsed.dateOfBirth = new Date(parsed.dateOfBirth);
         }
+        // Ensure merged data has all required fields including relationshipType
         setData({ ...initialData, ...parsed });
       } catch (e) {
         console.error("Failed to parse onboarding data", e);
