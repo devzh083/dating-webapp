@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 // Layout Components
 import TopBar from "@/components/layout/TopBar";
-import ProgressBar from "@/components/onboarding/ProgressBar";
+// ❌ REMOVED: ProgressBar import (it's inside StepLayout now)
 
 import { useNavigate, useLocation } from "react-router-dom";
 import Step1BasicInfo from "./steps/Step1BasicInfo";
@@ -216,17 +216,12 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
   // ---------------- RENDER ----------------
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <TopBar userName={data.firstName || "User"} />
 
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 sticky top-16 bg-white z-40">
-        <div className="flex-1">
-          <ProgressBar currentStep={step} totalSteps={TOTAL_STEPS} />
-        </div>
-        <div className="ml-4 text-xs font-bold text-gray-400 uppercase tracking-wide">
-          Step {step}/{TOTAL_STEPS}
-        </div>
-      </div>
+      {/* ❌ REMOVED: The duplicate Progress Bar Header block. 
+         The individual steps (StepLayout) will now render their own UI cleanly.
+      */}
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -235,7 +230,7 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.3 }}
-          className="flex-1 overflow-y-auto"
+          className="flex-1 w-full"
         >
           {renderStep()}
         </motion.div>

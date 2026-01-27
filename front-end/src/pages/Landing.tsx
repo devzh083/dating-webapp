@@ -5,20 +5,16 @@ import {
   Shield,
   Sparkles,
   Coffee,
-  Store,
   Lock,
   Unlock,
   CheckCircle2,
-  MapPin,
   Music,
   Camera,
-  Plane,
-  Book,
-  Gamepad,
-  Eye, // ✅ Added missing import
+  Eye, 
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
+import Footer from "@/components/layout/Footer"; // ✅ Imported Footer
 
 // --- THEME CONSTANTS ---
 const PRIMARY_GRADIENT = "bg-gradient-to-r from-[#0095E0] via-[#00B4D8] to-[#00C98B]";
@@ -78,17 +74,17 @@ const TheMatchReveal = () => {
       <AnimatePresence>
         {status === "matched" && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 pointer-events-none z-0">
-             {[...Array(20)].map((_, i) => (
-               <motion.div
-                 key={i}
-                 initial={{ opacity: 1, scale: 0, x: 0, y: 0 }}
-                 animate={{ opacity: 0, scale: 1.5, x: (Math.random() - 0.5) * 700, y: (Math.random() - 0.5) * 600 }}
-                 transition={{ duration: 1.5, ease: "easeOut", delay: 0.1 }}
-                 className="absolute top-1/2 left-1/2"
-               >
-                 <Heart className="w-8 h-8 text-[#00C98B] fill-[#00C98B]" />
-               </motion.div>
-             ))}
+              {[...Array(20)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 1, scale: 0, x: 0, y: 0 }}
+                  animate={{ opacity: 0, scale: 1.5, x: (Math.random() - 0.5) * 700, y: (Math.random() - 0.5) * 600 }}
+                  transition={{ duration: 1.5, ease: "easeOut", delay: 0.1 }}
+                  className="absolute top-1/2 left-1/2"
+                >
+                  <Heart className="w-8 h-8 text-[#00C98B] fill-[#00C98B]" />
+                </motion.div>
+              ))}
           </motion.div>
         )}
       </AnimatePresence>
@@ -247,7 +243,6 @@ const safetyFeatures = [
 const Landing = () => {
   const navigate = useNavigate();
   const goToAuth = () => navigate("/login");
-  const goToPartner = () => navigate("/cafe-partner"); 
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-[#0095E0] selection:text-white">
@@ -267,9 +262,9 @@ const Landing = () => {
             <span className="text-lg font-bold text-gray-900 tracking-tight">The Dating App</span>
           </motion.div>
 
+          {/* ✅ Removed "For Cafés" Link */}
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
             <a href="#how-it-works" className="hover:text-[#0095E0] transition-colors">How it Works</a>
-            <a href="#for-cafes" className="hover:text-[#0095E0] transition-colors">For Cafés</a>
             <a href="#safety" className="hover:text-[#0095E0] transition-colors">Safety</a>
           </div>
 
@@ -364,71 +359,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* B2B SECTION (FOR CAFES) */}
-      <section id="for-cafes" className="py-24 bg-white overflow-hidden relative">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="bg-gray-900 rounded-[3rem] p-10 md:p-20 relative overflow-hidden text-center md:text-left">
-            
-            {/* Background Decor */}
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0095E0] rounded-full blur-[100px] opacity-20 translate-x-1/2 -translate-y-1/2" />
-            
-            <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
-              <div>
-                <div className="inline-flex items-center gap-2 text-[#00C98B] font-bold uppercase tracking-widest text-xs mb-4">
-                  <Store className="w-4 h-4" />
-                  For Business
-                </div>
-                <h2 className="text-4xl md:text-5xl font-black text-white mb-6">
-                  Own a Café? <br/>
-                  <span className="text-gray-400">Become a Date Spot.</span>
-                </h2>
-                <p className="text-lg text-gray-300 mb-8 leading-relaxed">
-                  Join our partner network. We recommend your café to matched couples looking for the perfect first date location. Increase footfall and become part of their story.
-                </p>
-                
-                <ul className="space-y-3 mb-8 text-gray-300">
-                  <li className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-[#00C98B]" />
-                    <span>Get listed in our "Top Picks"</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-[#00C98B]" />
-                    <span>Receive table bookings directly</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-[#00C98B]" />
-                    <span>Attract new local customers</span>
-                  </li>
-                </ul>
-
-                <Button 
-                  onClick={goToPartner}
-                  size="lg" 
-                  className="bg-white text-gray-900 hover:bg-gray-100 font-bold px-8 h-12 rounded-full"
-                >
-                  Partner with us
-                </Button>
-              </div>
-
-              {/* Visual for Cafes */}
-              <div className="relative h-80 rounded-2xl overflow-hidden shadow-2xl border border-gray-700 group">
-                <img 
-                  src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800&q=80" 
-                  alt="Cafe Interior" 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-6">
-                   <div className="bg-[#00C98B] w-fit px-3 py-1 rounded-full text-xs font-bold text-white mb-2">
-                     Recommended Spot
-                   </div>
-                   <h3 className="text-white text-xl font-bold">The Coffee House</h3>
-                   <p className="text-gray-300 text-sm">4.8 ★ • 1.2km away</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* ✅ REMOVED CAFE SECTION HERE */}
 
       {/* SAFETY SECTION */}
       <section id="safety" className="py-24 bg-gradient-to-b from-white to-blue-50/30">
@@ -485,25 +416,8 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="py-12 bg-white border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg ${PRIMARY_GRADIENT} flex items-center justify-center`}>
-              <Heart className="w-4 h-4 text-white fill-white" />
-            </div>
-            <span className="font-bold text-gray-900">The Dating App</span>
-          </div>
-          <div className="flex gap-8 text-sm font-medium text-gray-500">
-            <a href="#" className="hover:text-[#0095E0] transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-[#0095E0] transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-[#0095E0] transition-colors">Café Guidelines</a>
-          </div>
-          <div className="text-sm text-gray-400">
-            © {new Date().getFullYear()} All rights reserved.
-          </div>
-        </div>
-      </footer>
+      {/* ✅ FOOTER COMPONENT REPLACED HERE */}
+      <Footer />
 
     </div>
   );

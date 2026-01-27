@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 
+/* ---------------- EXISTING PAGES ---------------- */
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 import HomePage from "./pages/HomePage";
@@ -15,9 +16,12 @@ import AdminLogin from './pages/AdminLogin';
 import AdminPanel from './pages/AdminPanel';
 import { adminService } from './services/profileService';
 
-// ✅ IMPORT NEW PAGES
-import TermsPage from "./pages/TermsPage";
-import PrivacyPage from "./pages/PrivacyPage";
+/* ---------------- NEW FOOTER PAGES ---------------- */
+import LegalPage from './pages/footer/LegalPage';
+import AboutPage from './pages/footer/AboutPage';
+import ContactPage from './pages/footer/ContactPage';
+import CareersPage from './pages/footer/CareersPage';
+import HelpCenterPage from './pages/footer/HelpCenterPage';
 
 // Admin Protected Route Component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
@@ -36,6 +40,15 @@ const AppInner: React.FC = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  /* ---------------- ✅ SCROLL BEHAVIOR FIX ---------------- */
+  useEffect(() => {
+    // Only scroll to top if NOT on the Chats page.
+    // This prevents jarring jumps when messaging.
+    if (!location.pathname.startsWith('/chats')) {
+      window.scrollTo(0, 0);
+    }
+  }, [location.pathname]);
 
   /* ---------------- CHECK USER PROFILE ---------------- */
   const checkProfile = async (accessToken: string) => {
@@ -101,7 +114,7 @@ const AppInner: React.FC = () => {
     };
 
     initAuth();
-  }, [location.pathname]);
+  }, [location.pathname]); 
 
   const handleLoginSuccess = async () => {
     const accessToken = localStorage.getItem("access_token");
@@ -144,12 +157,28 @@ const AppInner: React.FC = () => {
       />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
-      {/* ---------------- PUBLIC ROUTES ---------------- */}
+      {/* ---------------- FOOTER / PUBLIC ROUTES ---------------- */}
       
-      {/* ✅ Terms & Privacy (Available to everyone) */}
-      <Route path="/terms" element={<TermsPage />} />
-      <Route path="/privacy" element={<PrivacyPage />} />
+      {/* Company */}
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/careers" element={<CareersPage />} />
+      <Route path="/press" element={<LegalPage type="press" />} />
+      <Route path="/blog" element={<LegalPage type="blog" />} />
 
+      {/* Support */}
+      <Route path="/help" element={<HelpCenterPage />} />
+      <Route path="/safety" element={<LegalPage type="safety" />} />
+      <Route path="/guidelines" element={<LegalPage type="guidelines" />} />
+      <Route path="/contact" element={<ContactPage />} />
+
+      {/* Legal */}
+      <Route path="/privacy" element={<LegalPage type="privacy" />} />
+      <Route path="/terms" element={<LegalPage type="terms" />} />
+      <Route path="/cookies" element={<LegalPage type="cookies" />} />
+      <Route path="/ip" element={<LegalPage type="ip" />} />
+
+
+      {/* ---------------- CORE APP ROUTES ---------------- */}
       <Route
         path="/"
         element={

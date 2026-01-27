@@ -9,13 +9,9 @@ import {
   UserX,
   ChevronLeft,
   X,
-  ChevronRight,
   ShieldAlert,
   CheckCircle,
-  Loader2,
   Instagram,
-  MapPin,
-  Briefcase
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +28,7 @@ interface ChatUser {
   last_message?: string;
   unread_count?: number;
   is_blocked?: boolean; 
-  // Mock fields for profile view - connect to backend later
+  // Mock fields for profile view
   age?: number;
   instagram_id?: string;
   bio?: string;
@@ -107,44 +103,31 @@ const formatDateLabel = (dateString: string) => {
 };
 
 // ✅ ULTRA DENSE DOODLE BACKGROUND (x15 Density)
-// Uses a smaller tile (80px) packed with icons to create a very dense texture
 const DenseDoodleBackground = () => (
   <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-[#f8fbfb]">
     <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        {/* Small tile size (80x80) creates high repetition/density */}
         <pattern id="ultra-dense-doodles" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
           <g fill="none" stroke="#0d9488" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.12">
-            
-            {/* -- CLUSTER 1 (Top Left) -- */}
-            <path d="M10 10 L 15 20 L 5 20 Z" /> {/* Pizza */}
-            <circle cx="25" cy="10" r="3" /> {/* Planet */}
-            <path d="M5 30 Q 10 25, 15 30 T 25 30" /> {/* Squiggle */}
-            <path d="M35 15 l 5 5 l -5 5 l -5 -5 Z" /> {/* Diamond */}
-
-            {/* -- CLUSTER 2 (Top Right) -- */}
-            <path d="M50 10 c -2 -2 -6 -2 -8 0 c -2 2 -2 6 0 8 l 8 8 l 8 -8 c 2 -2 2 -6 0 -8 c -2 -2 -6 -2 -8 0" transform="scale(0.5) translate(100, 20)" /> {/* Heart */}
-            <path d="M60 25 h 10 a 3 3 0 0 1 0 6 h -10 a 3 3 0 0 1 0 -6" /> {/* Hotdog */}
-            <path d="M75 10 v 10 m -5 -5 h 10" /> {/* Plus */}
-
-            {/* -- CLUSTER 3 (Bottom Left) -- */}
-            <path d="M10 50 h 10 v 8 h -10 Z M 12 50 v -2 h 2 v 2" /> {/* Camera */}
-            <path d="M30 55 l 5 5 m 0 -5 l -5 5" /> {/* X */}
-            <path d="M5 65 c 3 0 3 -6 0 -6 c -3 0 -3 6 0 6 m 6 0 c 3 0 3 -6 0 -6 c -3 0 -3 6 0 6" /> {/* Glasses */}
-
-            {/* -- CLUSTER 4 (Bottom Right) -- */}
-            <path d="M50 50 v 8 h 4 v 4 h 2 v -4 h 4 v -2 h -4 v -6 Z" /> {/* Tetris */}
-            <path d="M70 50 l 5 -8 l 5 8" /> {/* Mountain */}
-            <path d="M60 70 h 8 v 6 h -8 Z" /> {/* Gift */}
-            <path d="M45 70 q 3 -6 6 0" /> {/* Leaf */}
-
-            {/* -- FILLERS -- */}
+            <path d="M10 10 L 15 20 L 5 20 Z" />
+            <circle cx="25" cy="10" r="3" />
+            <path d="M5 30 Q 10 25, 15 30 T 25 30" />
+            <path d="M35 15 l 5 5 l -5 5 l -5 -5 Z" />
+            <path d="M50 10 c -2 -2 -6 -2 -8 0 c -2 2 -2 6 0 8 l 8 8 l 8 -8 c 2 -2 2 -6 0 -8 c -2 -2 -6 -2 -8 0" transform="scale(0.5) translate(100, 20)" />
+            <path d="M60 25 h 10 a 3 3 0 0 1 0 6 h -10 a 3 3 0 0 1 0 -6" />
+            <path d="M75 10 v 10 m -5 -5 h 10" />
+            <path d="M10 50 h 10 v 8 h -10 Z M 12 50 v -2 h 2 v 2" />
+            <path d="M30 55 l 5 5 m 0 -5 l -5 5" />
+            <path d="M5 65 c 3 0 3 -6 0 -6 c -3 0 -3 6 0 6 m 6 0 c 3 0 3 -6 0 -6 c -3 0 -3 6 0 6" />
+            <path d="M50 50 v 8 h 4 v 4 h 2 v -4 h 4 v -2 h -4 v -6 Z" />
+            <path d="M70 50 l 5 -8 l 5 8" />
+            <path d="M60 70 h 8 v 6 h -8 Z" />
+            <path d="M45 70 q 3 -6 6 0" />
             <circle cx="40" cy="40" r="1" fill="#0d9488" stroke="none" opacity="0.4" />
             <circle cx="10" cy="40" r="0.5" fill="#0d9488" stroke="none" opacity="0.4" />
             <circle cx="70" cy="35" r="1" fill="#0d9488" stroke="none" opacity="0.4" />
             <path d="M20 5 L 22 8" strokeWidth="0.5" />
             <path d="M65 65 L 68 62" strokeWidth="0.5" />
-
           </g>
         </pattern>
       </defs>
@@ -155,16 +138,14 @@ const DenseDoodleBackground = () => (
 
 export default function ChatsPage({ onLogout }: ChatsPageProps) {
   /* ---------------- STATE ---------------- */
-  const [activeTab, setActiveTab] = useState<
-    "connections" | "requests" | "requested"
-  >("connections");
-
+  // ✅ Removed activeTab state since we only have one list now
+  
   const [selectedChat, setSelectedChat] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [chats, setChats] = useState<ChatUser[]>([]);
-  const [requests, setRequests] = useState<ChatUser[]>([]);
+  // const [requests, setRequests] = useState<ChatUser[]>([]); // HIDDEN
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -175,7 +156,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   // Modals State
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false); // ✅ NEW STATE FOR PROFILE MODAL
+  const [showProfileModal, setShowProfileModal] = useState(false); 
   const [reportStep, setReportStep] = useState<'reason' | 'details' | 'success'>('reason');
   const [selectedReason, setSelectedReason] = useState<string>("");
   const [reportDescription, setReportDescription] = useState("");
@@ -223,9 +204,8 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
           is_blocked: c.is_blocked || false,
         }));
 
-
         setChats(normalizedChats);
-        setRequests(data.requests || []);
+        // setRequests(data.requests || []); // HIDDEN
 
         const totalUnread = normalizedChats.reduce(
           (acc: number, chat: ChatUser) => acc + (chat.unread_count || 0),
@@ -594,34 +574,22 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                   className="w-full pl-10 pr-4 py-2.5 md:py-3 bg-gray-50 rounded-2xl border border-transparent focus:bg-white focus:border-teal-500/30 focus:ring-4 focus:ring-teal-500/10 transition-all outline-none text-sm"
                 />
               </div>
-              <div className="flex items-center gap-1 border-b border-gray-100 pb-1 overflow-x-auto scrollbar-hide">
-                {["connections", "requests", "requested"].map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setActiveTab(t as any)}
-                    className={cn(
-                      "px-3 py-2 text-xs md:text-sm font-medium capitalize transition-all duration-200 rounded-lg whitespace-nowrap",
-                      activeTab === t 
-                        ? "text-teal-600 bg-teal-50" 
-                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                    )}
-                  >
-                    {t}
-                  </button>
-                ))}
+              
+              {/* ✅ REMOVED TABS (Only Connections shown by default) */}
+              <div className="pb-1">
+                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-2">Recent Chats</p>
               </div>
             </div>
 
             {/* Chat List */}
             <div className="flex-1 overflow-y-auto px-2 md:px-4 py-2 space-y-1 md:space-y-2 scrollbar-thin scrollbar-thumb-gray-200">
-              {activeTab === "connections" && chats.length === 0 && !loading && (
+              {chats.length === 0 && !loading && (
                 <div className="flex flex-col items-center justify-center h-48 text-gray-400 text-sm">
                   <p>No connections yet.</p>
                 </div>
               )}
               
-              {activeTab === "connections" &&
-                chats.map((chat) => {
+              {chats.map((chat) => {
                   const unread = chat.unread_count || 0;
                   const isUnread = unread > 0 && chat.chat_id !== selectedChat;
                   
@@ -753,10 +721,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                     {isMenuOpen && (
                       <>
                         <div className="fixed inset-0 z-30 cursor-default" onClick={() => setIsMenuOpen(false)} />
-                        {/* <div className="absolute right-0 top-full mt-2 w-48 md:w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-40 animate-in fade-in zoom-in-95 duration-200">
-                          <button onClick={handleBlockClick} className="w-full text-left px-4 py-3 text-sm font-medium text-slate-700 hover:bg-red-50 hover:text-red-600 flex items-center gap-3">
-                            <UserX className="w-4 h-4" /> Block
-                          </button> */}
                         <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-40 animate-in fade-in zoom-in-95 duration-200">
                           {activeChat.is_blocked ? (
                             <button
@@ -774,7 +738,6 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                             </button>
                           )}
 
-                          
                           <div className="h-px bg-gray-100 my-1 mx-4" />
                           <button onClick={handleReportClick} className="w-full text-left px-4 py-3 text-sm font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-3">
                             <Flag className="w-4 h-4" /> Report
@@ -932,7 +895,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
 
                   {/* INSTAGRAM ID SECTION (Requested) */}
                   <div className="bg-gradient-to-r from-pink-50 to-orange-50 rounded-xl p-3 mb-6 border border-pink-100 flex items-center justify-between">
-                     <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
                         <div className="bg-white p-1.5 rounded-lg shadow-sm">
                            <Instagram className="w-5 h-5 text-pink-500" />
                         </div>
@@ -942,26 +905,26 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                              {activeChat.instagram_id || "@not_shared"}
                            </p>
                         </div>
-                     </div>
-                     {!activeChat.instagram_id && (
-                       <span className="text-xs text-gray-400 italic">Hidden</span>
-                     )}
+                      </div>
+                      {!activeChat.instagram_id && (
+                        <span className="text-xs text-gray-400 italic">Hidden</span>
+                      )}
                   </div>
 
                   {/* About Section (Mock) */}
                   <div className="text-left space-y-3">
-                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">About</h4>
-                     <p className="text-sm text-gray-600 leading-relaxed italic">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">About</h4>
+                      <p className="text-sm text-gray-600 leading-relaxed italic">
                         "{activeChat.bio || "The world doesnt make any sense to me, Why should I say things that do?"}"
-                     </p>
-                     
-                     <div className="flex flex-wrap gap-2 mt-3">
-                        {(activeChat.interests || ["Comedy", "Mountains", "Action"]).map((tag, i) => (
-                           <span key={i} className="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-lg uppercase">
-                              {tag}
-                           </span>
-                        ))}
-                     </div>
+                      </p>
+                      
+                      <div className="flex flex-wrap gap-2 mt-3">
+                         {(activeChat.interests || ["Comedy", "Mountains", "Action"]).map((tag, i) => (
+                            <span key={i} className="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-lg uppercase">
+                               {tag}
+                            </span>
+                         ))}
+                      </div>
                   </div>
                </div>
             </div>
