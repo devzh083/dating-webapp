@@ -5,7 +5,7 @@ from django.core.cache import cache
 
 from login.mysql_managers import MySQLChatManager, MySQLMatchManager
 from login.models import BlockedUser
-
+from django.db.models import Q
 
 # -------------------------------
 # Helpers
