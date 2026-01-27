@@ -112,7 +112,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   const [loading, setLoading] = useState(true);
 
   // Presence & Typing State
-  const [typingUser, setTypingUser] = useState<boolean>(false);
+  const [typingUser, setTypingUser] = useState<string | null>(null);
   const [isOnlineMap, setIsOnlineMap] = useState<Record<string, boolean>>({});
   
   // Modals State
@@ -262,7 +262,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     };
 
     loadMessages();
-    setTypingUser(false);
+    setTypingUser("");
     setIsMenuOpen(false);
   }, [selectedChat]);
 
@@ -281,9 +281,14 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
       const data = JSON.parse(event.data);
 
       if (data.type === "typing") {
-        setTypingUser(data.is_typing);
+        if (data.is_typing) {
+          setTypingUser(data.user_email);
+        } else {
+          setTypingUser(null);
+        }
         return;
       }
+
 
       const incomingMessage: Message = {
         id: data.id ?? crypto.randomUUID(),
@@ -342,28 +347,28 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     socketRef.current.send(JSON.stringify({ type: "typing", is_typing: isTyping }));
   };
 
-  const sendMessage = async () => {
+  const sendMessage = () => {
     if (!messageInput.trim() || !activeChat || activeChat.is_blocked) return;
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
 
     const content = messageInput;
-    setMessageInput(""); // Clear Input immediately
+    setMessageInput("");
     sendTypingEvent(false);
 
-    // 1. OPTIMISTIC UPDATE: Add message to list immediately
+    // 🔑 unique client id for optimistic replacement
+    const clientId = `temp-${Date.now()}`;
+
+    // 1️⃣ OPTIMISTIC UI UPDATE
     const optimisticMessage: Message = {
-        id: `temp-${Date.now()}`,
-        sender: currentUserEmail,
-        receiver: activeChat.email,
-        content: content,
-        created_at: new Date().toISOString(),
-        is_read: false,
+      id: clientId,
+      sender: currentUserEmail,
+      receiver: activeChat.email,
+      content,
+      created_at: new Date().toISOString(),
+      is_read: false,
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
 
-    // 2. Update Chat List Preview
     setChats((prev) =>
       prev.map((c) =>
         c.chat_id === activeChat.chat_id
@@ -372,23 +377,18 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
       )
     );
 
-    try {
-      await fetch(
-        `http://127.0.0.1:8000/api/chats/${activeChat.chat_id}/send/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ content }),
-        }
+    // 2️⃣ SEND MESSAGE VIA WEBSOCKET (🔥 THIS IS THE LINE 🔥)
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(
+        JSON.stringify({
+          type: "message",
+          content,
+          client_id: clientId,
+        })
       );
-    } catch (err) {
-      console.error("SEND ERROR:", err);
-      // Optional: Remove the optimistic message here if fail
     }
   };
+
 
   /* ---- BLOCK LOGIC ---- */
   const handleBlockClick = () => {
@@ -622,11 +622,11 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                                     ? "text-teal-600" 
                                     : "text-gray-400"
                         )}>
-                            {typingUser 
-                                ? "Typing..." 
-                                : isOnlineMap[activeChat.email?.toLowerCase()] 
-                                    ? "Active Now" 
-                                    : "Offline"
+                            {typingUser === activeChat.email
+                              ? "Typing..."
+                              : isOnlineMap[activeChat.email?.toLowerCase()]
+                                ? "Active Now"
+                                : "Offline"
                             }
                         </span>
                     </div>

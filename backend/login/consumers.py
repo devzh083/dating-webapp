@@ -128,6 +128,39 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
 class ChatConsumer(AsyncWebsocketConsumer):
 
+    async def handle_message(self, data):
+        content = data.get("content", "").strip()
+        if not content:
+            return
+
+        sender = self.user.email.lower()
+        chat = await get_chat(self.chat_id)
+
+        receiver = next(
+            email for email in chat["participants"] if email != sender
+        )
+
+        await database_sync_to_async(
+            MySQLChatManager.add_message
+        )(self.chat_id, sender, receiver, content)
+
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "chat_message",
+                "payload": {
+                    "type": "message",
+                    "sender": sender,
+                    "receiver": receiver,
+                    "content": content,
+                },
+            }
+        )
+
+    async def chat_message(self, event):
+        await self.send(text_data=json.dumps(event["payload"]))
+
+
     async def connect(self):
         user = self.scope.get("user")
 
