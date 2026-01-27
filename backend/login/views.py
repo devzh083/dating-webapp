@@ -22,6 +22,8 @@ from math import radians, sin, cos, asin, sqrt
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from admin_panel.models import UserReport
+from login.serializers import CreateUserReportSerializer
 from login.models import Match
 
 from config.firebase import db
@@ -1082,3 +1084,45 @@ class MarkChatReadView(APIView):
         )
 
         return Response({"status": "ok"}, status=status.HTTP_200_OK)
+
+class CreateUserReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CreateUserReportSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        reported_user = User.objects.get(
+            id=serializer.validated_data['reported_user_id']
+        )
+
+        # Prevent self-reporting
+        if reported_user == request.user:
+            return Response(
+                {"error": "You cannot report yourself"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Optional: prevent duplicate pending reports
+        if UserReport.objects.filter(
+            reporter=request.user,
+            reported_user=reported_user,
+            status='pending'
+        ).exists():
+            return Response(
+                {"error": "You already reported this user"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        report = UserReport.objects.create(
+            reporter=request.user,
+            reported_user=reported_user,
+            reason=serializer.validated_data['reason'],
+            description=serializer.validated_data['description'],
+        )
+
+        return Response(
+            {"message": "Report submitted successfully"},
+            status=status.HTTP_201_CREATED
+        )

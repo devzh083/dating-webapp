@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import Match, Message
+from admin_panel.models import UserReport
+from django.contrib.auth.models import User
 
 class MatchSerializer(serializers.ModelSerializer):
     partner = serializers.SerializerMethodField()
@@ -46,3 +48,15 @@ class MessageSerializer(serializers.ModelSerializer):
         if request and request.user:
             return obj.sender == request.user
         return False
+    
+class CreateUserReportSerializer(serializers.ModelSerializer):
+    reported_user_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = UserReport
+        fields = ['reported_user_id', 'reason', 'description']
+
+    def validate_reported_user_id(self, value):
+        if not User.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Reported user does not exist")
+        return value

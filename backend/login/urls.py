@@ -46,4 +46,5 @@ urlpatterns = [
     path("users/block/", views.BlockUserView.as_view()),
     path("users/unblock/", views.UnblockUserView.as_view()),
 
+    path('reports/', views.CreateUserReportView.as_view(), name='create-report'),
 ]
