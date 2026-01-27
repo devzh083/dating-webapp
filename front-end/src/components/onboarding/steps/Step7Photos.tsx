@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import StepLayout from "../StepLayout";
 import { OnboardingData } from "../OnboardingFlow";
-import { Camera, Plus, X } from "lucide-react";
+import { Camera, Trash2, Upload, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
@@ -14,8 +14,6 @@ interface Step7Props {
   onSkip: () => void;
 }
 
-const MAX_PHOTOS = 4;
-
 const Step7Photos: React.FC<Step7Props> = ({
   data,
   onChange,
@@ -23,22 +21,22 @@ const Step7Photos: React.FC<Step7Props> = ({
   onBack,
   onSkip,
 }) => {
-  const [photos, setPhotos] = useState<string[]>(data.photos || []);
+  // We only care about the first photo for the profile pic
+  const [photo, setPhoto] = useState<string | null>(
+    data.photos && data.photos.length > 0 ? data.photos[0] : null
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Sync with parent data when it changes (important for edit mode)
+  // Sync with parent data
   useEffect(() => {
-    setPhotos(data.photos || []);
+    if (data.photos && data.photos.length > 0) {
+      setPhoto(data.photos[0]);
+    }
   }, [data.photos]);
 
   const handleFile = async (file: File | null) => {
     if (!file) return;
-    if (photos.length >= MAX_PHOTOS) {
-      setUploadError("Maximum 4 photos allowed");
-      setTimeout(() => setUploadError(null), 3000);
-      return;
-    }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
@@ -48,7 +46,7 @@ const Step7Photos: React.FC<Step7Props> = ({
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
       setUploadError("Invalid file type. Only JPEG, PNG, and WebP are allowed.");
       setTimeout(() => setUploadError(null), 3000);
@@ -79,9 +77,9 @@ const Step7Photos: React.FC<Step7Props> = ({
       const json = await res.json();
       const url = json.url as string;
 
-      const next = [...photos, url];
-      setPhotos(next);
-      onChange({ photos: next });
+      setPhoto(url);
+      // We overwrite the photos array to contain ONLY this new photo
+      onChange({ photos: [url] });
     } catch (e: any) {
       console.error("Error uploading photo:", e);
       setUploadError(e.message || "Failed to upload photo");
@@ -91,153 +89,131 @@ const Step7Photos: React.FC<Step7Props> = ({
     }
   };
 
-  const removePhoto = (indexToRemove: number) => {
-    const next = photos.filter((_, idx) => idx !== indexToRemove);
-    setPhotos(next);
-    onChange({ photos: next });
+  const removePhoto = () => {
+    setPhoto(null);
+    onChange({ photos: [] });
+  };
+
+  const handleContinue = () => {
+    // Logic is handled in state; simply trigger next
+    onNext();
   };
 
   return (
     <StepLayout
       currentStep={7}
       totalSteps={10}
-      title="Add your best photos"
-      subtitle="Upload 4 photos to complete your profile. First photo will be your main profile picture."
+      title="Add a Profile Photo"
+      subtitle="Put a face to the name! This will be your main profile picture."
       onBack={onBack}
-      onNext={onNext}
+      onNext={handleContinue}
       onSkip={onSkip}
-      canProceed={photos.length > 0}
+      // Always allowed to proceed because it is optional
+      canProceed={true} 
+      nextLabel={photo ? "Looks good, Continue" : "Continue"}
     >
-      <div className="space-y-6">
+      <div className="flex flex-col items-center space-y-8 py-4">
+        
         {/* Upload Error Message */}
         {uploadError && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="bg-red-50 border border-red-200 rounded-xl p-4"
+            className="w-full bg-red-50 border border-red-200 rounded-xl p-3 text-center"
           >
             <p className="text-sm text-red-600 font-medium">{uploadError}</p>
           </motion.div>
         )}
 
-        {/* Uploading Indicator */}
-        {uploading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-teal-50 border border-teal-200 rounded-xl p-4"
+        {/* Circular Profile Uploader */}
+        <div className="relative group">
+          
+          {/* Animated Ring during upload */}
+          {uploading && (
+            <div className="absolute inset-0 rounded-full border-4 border-teal-500 border-t-transparent animate-spin z-10" />
+          )}
+
+          <div
+            className={cn(
+              "w-48 h-48 rounded-full overflow-hidden border-4 relative shadow-lg transition-all duration-300",
+              photo ? "border-teal-500" : "border-gray-200 bg-gray-50 hover:border-teal-300"
+            )}
           >
-            <div className="flex items-center gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-500"></div>
-              <p className="text-sm text-teal-700 font-medium">Uploading photo...</p>
+            {photo ? (
+              <img
+                src={photo}
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors">
+                <div className="p-4 bg-teal-50 text-teal-600 rounded-full mb-3">
+                  <User className="w-8 h-8" />
+                </div>
+                <span className="text-sm font-semibold text-gray-500">Upload Photo</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) =>
+                    handleFile(e.target.files ? e.target.files[0] : null)
+                  }
+                  disabled={uploading}
+                />
+              </label>
+            )}
+
+            {/* Overlay Actions (Only when photo exists) */}
+            {photo && !uploading && (
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                {/* Replace Button */}
+                <label className="p-3 bg-white/20 backdrop-blur-sm rounded-full text-white cursor-pointer hover:bg-white/40 transition-colors" title="Change Photo">
+                  <Camera className="w-5 h-5" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) =>
+                      handleFile(e.target.files ? e.target.files[0] : null)
+                    }
+                  />
+                </label>
+                {/* Remove Button */}
+                <button
+                  onClick={removePhoto}
+                  className="p-3 bg-red-500/80 backdrop-blur-sm rounded-full text-white hover:bg-red-600 transition-colors"
+                  title="Remove Photo"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Edit Icon Badge (if photo exists and not hovering) */}
+          {photo && !uploading && (
+            <div className="absolute bottom-2 right-2 bg-teal-500 text-white p-2 rounded-full border-4 border-white shadow-sm group-hover:opacity-0 transition-opacity">
+              <Camera className="w-4 h-4" />
             </div>
-          </motion.div>
+          )}
+        </div>
+
+        {/* Section to Proceed Without Photo */}
+        {!photo && (
+          <div className="text-center space-y-4 w-full">
+            <p className="text-sm text-gray-500 max-w-xs mx-auto">
+              A profile photo helps you make better connections, but it's not required right now.
+            </p>
+            
+            <button
+              onClick={onNext}
+              className="w-full py-3 rounded-xl border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900 transition-all active:scale-[0.99]"
+            >
+              Proceed without profile pic
+            </button>
+          </div>
         )}
 
-        {/* Photo Grid */}
-        <div className="grid grid-cols-2 gap-4">
-          {Array.from({ length: MAX_PHOTOS }).map((_, index) => {
-            const photoUrl = photos[index];
-            const isMain = index === 0;
-            const isFilled = !!photoUrl;
-
-            return (
-              <div key={index} className="relative aspect-square">
-                {isFilled ? (
-                  // FILLED STATE (Image with Delete Button)
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="relative h-full w-full rounded-2xl overflow-hidden border-2 border-gray-200 shadow-sm group"
-                  >
-                    <img
-                      src={photoUrl}
-                      alt={`User photo ${index + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                    
-                    {/* Delete Button - Shows on Hover */}
-                    <button
-                      onClick={() => removePhoto(index)}
-                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 hover:scale-110 shadow-lg z-10"
-                      title="Delete photo"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-
-                    {/* Main Badge */}
-                    {isMain && (
-                      <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/70 to-transparent py-3 flex justify-center">
-                        <span className="text-xs font-bold text-white uppercase tracking-wider px-3 py-1 bg-teal-500 rounded-full">
-                          Main
-                        </span>
-                      </div>
-                    )}
-                  </motion.div>
-                ) : (
-                  // EMPTY STATE (Upload Button)
-                  <label
-                    className={cn(
-                      "h-full w-full flex flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all cursor-pointer",
-                      uploading && "opacity-50 cursor-not-allowed pointer-events-none",
-                      isMain
-                        ? "border-teal-300 bg-teal-50 hover:bg-teal-100/50 hover:border-teal-400"
-                        : "border-gray-200 hover:border-teal-200 hover:bg-gray-50"
-                    )}
-                  >
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp"
-                      className="hidden"
-                      onChange={(e) =>
-                        handleFile(e.target.files ? e.target.files[0] : null)
-                      }
-                      disabled={uploading}
-                    />
-
-                    <div
-                      className={cn(
-                        "rounded-full p-3 mb-2 transition-all",
-                        isMain
-                          ? "bg-white text-teal-500 shadow-sm"
-                          : "text-gray-400"
-                      )}
-                    >
-                      {isMain ? (
-                        <Camera className="w-6 h-6" />
-                      ) : (
-                        <Plus className="w-6 h-6" />
-                      )}
-                    </div>
-
-                    <span
-                      className={cn(
-                        "text-sm font-medium",
-                        isMain ? "text-teal-700" : "text-gray-400"
-                      )}
-                    >
-                      {isMain ? "Main Photo" : "Add Photo"}
-                    </span>
-                  </label>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Tips Section */}
-        <div className="bg-teal-50 rounded-xl p-4 border border-teal-100">
-          <p className="text-sm font-semibold text-teal-900 mb-2">
-            📸 Photo Tips
-          </p>
-          <ul className="text-xs text-teal-700 space-y-1.5">
-            <li>• Clear face photos get more matches</li>
-            <li>• First photo becomes your main profile picture</li>
-            <li>• Hover over photos to delete them</li>
-            <li>• Max file size: 5MB (JPEG, PNG, WebP)</li>
-          </ul>
-        </div>
       </div>
     </StepLayout>
   );

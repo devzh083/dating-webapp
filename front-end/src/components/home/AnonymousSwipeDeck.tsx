@@ -36,9 +36,11 @@ const AnonymousSwipeDeck = ({
 
   const x = useMotionValue(0);
 
-  const rotate = useTransform(x, [-200, 200], [-5, 5]);
+  // --- 100% RESTORED ANIMATION LOGIC ---
+  const rotate = useTransform(x, [-200, 200], [-8, 8]); 
   const opacity = useTransform(x, [-400, -200, 0, 200, 400], [0, 1, 1, 1, 0]);
 
+  // Background Card Animations
   const bgScale = useTransform(x, [-200, 0, 200], [1, 0.95, 1]);
   const bgOpacity = useTransform(x, [-200, 0, 200], [1, 0.5, 1]);
   const bgOverlayOpacity = useTransform(x, [-200, 0, 200], [0, 0.4, 0]);
@@ -132,8 +134,12 @@ const AnonymousSwipeDeck = ({
         </div>
       </div>
 
-      {/* Card Stack - Taller on mobile to fit the vertical card layout */}
-      <div className="relative h-[580px] md:h-[400px] w-full perspective-1000">
+      {/* CARD CONTAINER HEIGHT: 
+         - h-[500px] for Mobile: Fits stacked content perfectly without huge gaps.
+         - md:h-[400px] for Desktop: Retains the compact horizontal look.
+      */}
+      <div className="relative h-[500px] md:h-[400px] w-full perspective-1000">
+        
         {/* Background Card */}
         {nextProfile && (
           <motion.div
@@ -142,9 +148,10 @@ const AnonymousSwipeDeck = ({
             className="absolute inset-0 z-0"
           >
             <AnonymousProfileCard profile={nextProfile} />
+            {/* Depth Overlay */}
             <motion.div
               style={{ opacity: bgOverlayOpacity }}
-              className="absolute inset-0 bg-white/50 rounded-[2rem] md:rounded-[40px] pointer-events-none"
+              className="absolute inset-0 bg-white/50 rounded-[2.5rem] md:rounded-[40px] pointer-events-none"
             />
           </motion.div>
         )}

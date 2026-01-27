@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Heart } from "lucide-react"; 
+import { Heart, Send, PenLine } from "lucide-react"; 
 
 /* ---------------- COMPONENTS ---------------- */
 import TopBar from "@/components/layout/TopBar";
@@ -11,7 +11,6 @@ import AnonymousSwipeDeck from "@/components/home/AnonymousSwipeDeck";
 import ReviewCarousel from "@/components/home/ReviewCarousel";
 import SecurityBanner from "@/components/home/SecurityBanner";
 import ProfileCompletion from "@/components/home/ProfileCompletion";
-// ✅ IMPORT THE NEW BANNER
 import ExpertTipsBanner from "@/components/home/ExpertTipsBanner";
 import MatchModal from "@/components/match/MatchModal";
 
@@ -58,6 +57,10 @@ const HomePage = ({ onLogout }: HomePageProps) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("User");
+
+  // Story Submission State
+  const [storyText, setStoryText] = useState("");
+  const [submittingStory, setSubmittingStory] = useState(false);
 
   // Match Modal State
   const [showMatchModal, setShowMatchModal] = useState(false);
@@ -150,7 +153,6 @@ const HomePage = ({ onLogout }: HomePageProps) => {
           );
 
           if (!res.ok) {
-            // Fallback
             setMatchProfile({
               id: data.from_email,
               firstName: data.from_email.split("@")[0],
@@ -226,10 +228,50 @@ const HomePage = ({ onLogout }: HomePageProps) => {
     navigate("/chats");
   };
 
+  /* -------- SUBMIT STORY HANDLER -------- */
+  const handleSubmitStory = async () => {
+    if (!storyText.trim()) {
+      toast.error("Please write your story first!");
+      return;
+    }
+
+    setSubmittingStory(true);
+
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        toast.error("Please sign in to submit a story");
+        return;
+      }
+
+      // Endpoint to receive the story review
+      const res = await fetch("http://127.0.0.1:8000/api/reviews/submit/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content: storyText }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Submission failed");
+      }
+
+      toast.success("Story submitted for approval! Thank you ❤️");
+      setStoryText(""); // Clear input
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to submit story. Please try again.");
+    } finally {
+      setSubmittingStory(false);
+    }
+  };
+
   /* ================= RENDER ================= */
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white pt-20">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white pt-16 md:pt-20">
       <TopBar userName={userName} onLogout={onLogout} />
 
       {/* Match Modal Overlay */}
@@ -241,28 +283,22 @@ const HomePage = ({ onLogout }: HomePageProps) => {
         />
       )}
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
+      {/* Responsive Container */}
+      <main className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
         
         {/* 1. Hero Section */}
-        <div className="text-center mb-8 sm:mb-12 lg:mb-16">
-          <h1 className="text-3xl sm:text-4xl lg:text-6xl font-black text-gray-900 mb-3 sm:mb-4 leading-tight tracking-tight">
-            Find Your Vibe, <span className="text-teal-500">{userName}</span>
+        <div className="text-center mb-8 md:mb-16">
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-gray-900 mb-2 md:mb-4 leading-tight tracking-tight px-2">
+            Find Your Vibe, <span className="text-teal-500 block md:inline">{userName}</span>
           </h1>
-          <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-sm md:text-xl text-gray-600 max-w-2xl mx-auto px-4">
             Connect based on personality first. Authentic connections start here.
           </p>
         </div>
 
-        {/* 2. Profile Completion Alert (Only visible if incomplete) */}
-        <div className="max-w-3xl mx-auto mb-8">
-          <ProfileCompletion />
-        </div>
-
-        {/* 3. Swipe Deck Section */}
-        <div className="mb-12 sm:mb-16 lg:mb-20 max-w-4xl mx-auto">
+        {/* 2. Swipe Deck Section (MOVED UP) */}
+        <div className="mb-12 md:mb-20 max-w-4xl mx-auto">
           <div className="relative">
-            {/* Decorative background blob */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-gradient-to-r from-teal-200/20 to-purple-200/20 blur-3xl rounded-full pointer-events-none -z-10" />
             
             {loading ? (
@@ -288,35 +324,40 @@ const HomePage = ({ onLogout }: HomePageProps) => {
           </div>
         </div>
 
-        {/* 4. Stats Bar */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-4 lg:gap-8 mb-12 sm:mb-16 lg:mb-20 max-w-4xl mx-auto">
+        {/* 3. Stats Grid */}
+        <div className="grid grid-cols-3 gap-2 md:gap-8 mb-12 md:mb-16 max-w-4xl mx-auto">
           {[
             { label: "Active Users", value: "10K+" },
             { label: "Matches Made", value: "50K+" },
             { label: "Success Rate", value: "92%" }
           ].map((stat, i) => (
-            <div key={i} className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 text-center border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-2xl sm:text-3xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-teal-500 mb-1 sm:mb-2">
+            <div key={i} className="bg-white rounded-xl md:rounded-3xl p-3 md:p-8 text-center border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+              <div className="text-xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-teal-500 mb-1 md:mb-2">
                 {stat.value}
               </div>
-              <div className="text-xs sm:text-sm text-gray-500 font-medium">{stat.label}</div>
+              <div className="text-[10px] md:text-sm text-gray-500 font-medium">{stat.label}</div>
             </div>
           ))}
         </div>
 
-        {/* 5. Info Banners Grid (Replacing Sidebar) */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto mb-16">
+        {/* 4. Profile Completion Alert (RESTRUCTURED: Moved below Swipe Deck/Stats) */}
+        <div className="max-w-3xl mx-auto mb-16 md:mb-20">
+          <ProfileCompletion />
+        </div>
+
+        {/* 5. Info Banners Grid (Stack on Mobile, Grid on Desktop) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-w-5xl mx-auto mb-16">
           <div className="h-full">
             <NearbyBanner />
           </div>
-          <div className="h-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-rose-500 rounded-2xl p-1 shadow-xl">
-             <div className="w-full h-full bg-white/10 backdrop-blur-sm rounded-xl p-6 text-white">
+          <div className="h-full flex items-center justify-center bg-gradient-to-br from-orange-500 to-rose-500 rounded-[24px] p-1 shadow-xl">
+             <div className="w-full h-full bg-white/10 backdrop-blur-sm rounded-[20px] p-1 text-white">
                 <PremiumBanner /> 
              </div>
           </div>
         </div>
 
-        {/* ✅ 6. Expert Tips Section */}
+        {/* 6. Expert Tips Section */}
         <div className="max-w-5xl mx-auto mb-16 sm:mb-20">
           <ExpertTipsBanner />
         </div>
@@ -326,17 +367,67 @@ const HomePage = ({ onLogout }: HomePageProps) => {
           <ReviewCarousel />
         </div>
 
-        {/* 8. Security Section */}
+        {/* 8. NEW: WRITE YOUR SUCCESS STORY SECTION */}
+        <div className="max-w-3xl mx-auto mb-16 sm:mb-24 px-2">
+          <div className="bg-gradient-to-br from-white to-teal-50/50 rounded-[32px] p-6 md:p-10 shadow-lg border border-teal-100 relative overflow-hidden">
+             
+             {/* Decorative Background Icon */}
+             <PenLine className="absolute top-6 right-6 w-24 h-24 text-teal-100/50 -rotate-12 pointer-events-none opacity-50 md:opacity-100" />
+
+             <div className="relative z-10">
+               <div className="flex items-center gap-3 mb-4">
+                 <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 shrink-0">
+                    <Heart className="w-5 h-5 fill-current" />
+                 </div>
+                 <h2 className="text-xl md:text-3xl font-black text-gray-900 leading-tight">Found your person?</h2>
+               </div>
+               
+               <p className="text-gray-600 mb-6 text-sm md:text-base max-w-lg">
+                 Share your success story with us! Once approved by our team, your story will be featured here to inspire others.
+               </p>
+
+               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:border-teal-500 transition-all">
+                 <textarea
+                    className="w-full p-4 rounded-xl outline-none min-h-[120px] bg-transparent resize-none text-gray-700 placeholder:text-gray-400 text-sm md:text-base"
+                    placeholder="Tell us how you met... (e.g., 'We matched on The Dating App and our first date was...')"
+                    value={storyText}
+                    onChange={(e) => setStoryText(e.target.value)}
+                 />
+                 <div className="flex justify-end p-2 border-t border-gray-100 mt-2">
+                   <button
+                      onClick={handleSubmitStory}
+                      disabled={submittingStory || !storyText.trim()}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-teal-500 text-white rounded-xl font-bold text-sm hover:bg-teal-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-lg shadow-teal-200 w-full md:w-auto justify-center"
+                   >
+                      {submittingStory ? (
+                        <>Sending...</>
+                      ) : (
+                        <>
+                          Submit Story <Send className="w-4 h-4" />
+                        </>
+                      )}
+                   </button>
+                 </div>
+               </div>
+               
+               <p className="text-xs text-gray-400 mt-3 text-center">
+                 By submitting, you agree to let us share your story on our platform.
+               </p>
+             </div>
+          </div>
+        </div>
+
+        {/* 9. Security Section */}
         <div className="max-w-5xl mx-auto mb-12 sm:mb-16">
           <SecurityBanner />
         </div>
 
-        {/* 9. Footer Section */}
-        <footer className="bg-gray-900 text-white rounded-3xl p-8 sm:p-12 mb-8">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-12">
+        {/* 10. Footer Section */}
+        <footer className="bg-gray-900 text-white rounded-[32px] p-8 md:p-12 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
             <div>
-              <h4 className="font-bold mb-4 text-lg">Company</h4>
-              <ul className="space-y-3 text-gray-400 text-sm">
+              <h4 className="font-bold mb-4 text-sm md:text-lg">Company</h4>
+              <ul className="space-y-2 text-gray-400 text-xs md:text-sm">
                 <li className="hover:text-white cursor-pointer transition-colors">About Us</li>
                 <li className="hover:text-white cursor-pointer transition-colors">Careers</li>
                 <li className="hover:text-white cursor-pointer transition-colors">Press</li>
@@ -344,8 +435,8 @@ const HomePage = ({ onLogout }: HomePageProps) => {
               </ul>
             </div>
             <div>
-              <h4 className="font-bold mb-4 text-lg">Support</h4>
-              <ul className="space-y-3 text-gray-400 text-sm">
+              <h4 className="font-bold mb-4 text-sm md:text-lg">Support</h4>
+              <ul className="space-y-2 text-gray-400 text-xs md:text-sm">
                 <li className="hover:text-white cursor-pointer transition-colors">Help Center</li>
                 <li className="hover:text-white cursor-pointer transition-colors">Safety Center</li>
                 <li className="hover:text-white cursor-pointer transition-colors">Guidelines</li>
@@ -353,8 +444,8 @@ const HomePage = ({ onLogout }: HomePageProps) => {
               </ul>
             </div>
             <div>
-              <h4 className="font-bold mb-4 text-lg">Legal</h4>
-              <ul className="space-y-3 text-gray-400 text-sm">
+              <h4 className="font-bold mb-4 text-sm md:text-lg">Legal</h4>
+              <ul className="space-y-2 text-gray-400 text-xs md:text-sm">
                 <li className="hover:text-white cursor-pointer transition-colors">Privacy Policy</li>
                 <li className="hover:text-white cursor-pointer transition-colors">Terms of Service</li>
                 <li className="hover:text-white cursor-pointer transition-colors">Cookie Policy</li>
@@ -362,8 +453,8 @@ const HomePage = ({ onLogout }: HomePageProps) => {
               </ul>
             </div>
             <div>
-              <h4 className="font-bold mb-4 text-lg">Social</h4>
-              <ul className="space-y-3 text-gray-400 text-sm">
+              <h4 className="font-bold mb-4 text-sm md:text-lg">Social</h4>
+              <ul className="space-y-2 text-gray-400 text-xs md:text-sm">
                 <li className="hover:text-white cursor-pointer transition-colors">Instagram</li>
                 <li className="hover:text-white cursor-pointer transition-colors">Twitter / X</li>
                 <li className="hover:text-white cursor-pointer transition-colors">Facebook</li>
@@ -371,7 +462,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-500">
+          <div className="border-t border-gray-800 pt-8 text-center text-xs md:text-sm text-gray-500">
             <p className="mb-2">© 2026 The Dating App. All rights reserved.</p>
             <p>Made with ❤️ for genuine connections.</p>
           </div>
