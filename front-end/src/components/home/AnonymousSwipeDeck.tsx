@@ -114,26 +114,26 @@ const AnonymousSwipeDeck = ({
   return (
     <div className="relative w-full mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 px-4">
+      <div className="flex items-center justify-between mb-4 px-2 md:px-4">
         <div>
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+          <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">
             Discover
           </h2>
-          <p className="text-xs font-medium text-gray-400 mt-0.5">
+          <p className="text-[10px] md:text-xs font-medium text-gray-400 mt-0.5">
             Connect based on vibes
           </p>
         </div>
         <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
-          <span className="relative flex h-2.5 w-2.5">
+          <span className="relative flex h-2 w-2 md:h-2.5 md:w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500" />
+            <span className="relative inline-flex rounded-full h-2 w-2 md:h-2.5 md:w-2.5 bg-teal-500" />
           </span>
-          <span className="text-xs font-bold text-gray-700">6 online</span>
+          <span className="text-[10px] md:text-xs font-bold text-gray-700">6 online</span>
         </div>
       </div>
 
-      {/* Card Stack */}
-      <div className="relative h-[400px] w-full">
+      {/* Card Stack - Taller on mobile to fit the vertical card layout */}
+      <div className="relative h-[580px] md:h-[400px] w-full perspective-1000">
         {/* Background Card */}
         {nextProfile && (
           <motion.div
@@ -144,7 +144,7 @@ const AnonymousSwipeDeck = ({
             <AnonymousProfileCard profile={nextProfile} />
             <motion.div
               style={{ opacity: bgOverlayOpacity }}
-              className="absolute inset-0 bg-white/50 rounded-[40px] pointer-events-none"
+              className="absolute inset-0 bg-white/50 rounded-[2rem] md:rounded-[40px] pointer-events-none"
             />
           </motion.div>
         )}
@@ -174,21 +174,21 @@ const AnonymousSwipeDeck = ({
       </div>
 
       {/* Controls */}
-      <div className="mt-4 flex items-center justify-center gap-8">
+      <div className="mt-4 flex items-center justify-center gap-6 md:gap-8">
         <button
           onClick={() => triggerSwipe("left")}
           disabled={isDragging}
-          className="w-14 h-14 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 hover:scale-110 shadow-lg transition-all disabled:opacity-50"
+          className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 hover:scale-110 shadow-lg transition-all disabled:opacity-50"
         >
-          <X className="w-6 h-6" strokeWidth={3} />
+          <X className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
         </button>
 
         <button
           onClick={() => triggerSwipe("right")}
           disabled={isDragging}
-          className="w-16 h-16 flex items-center justify-center rounded-full bg-gradient-to-r from-teal-400 to-teal-500 text-white shadow-2xl shadow-teal-200 hover:scale-110 transition-all disabled:opacity-50"
+          className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center rounded-full bg-gradient-to-r from-teal-400 to-teal-500 text-white shadow-2xl shadow-teal-200 hover:scale-110 transition-all disabled:opacity-50"
         >
-          <Heart className="w-7 h-7 fill-current" strokeWidth={3} />
+          <Heart className="w-6 h-6 md:w-7 md:h-7 fill-current" strokeWidth={3} />
         </button>
       </div>
     </div>
