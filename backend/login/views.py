@@ -835,6 +835,35 @@ def profile_similarity(u, v, distance_km, max_dist_km):
     )
     return base + dist_weight * s_dist
 
+def serialize_profile(profile: UserProfile) -> dict:
+    return {
+        "id": profile.user.id,
+        "email": profile.user.email,
+        "username": profile.user.username,
+        "first_name": profile.first_name,
+        "age": profile.age,
+        "gender": profile.gender,
+        "distance": profile.distance,
+        "lifestyle": {
+            "drinking": profile.drinking,
+            "smoking": profile.smoking,
+            "workout": profile.workout,
+            "pets": profile.pets,
+        },
+        "communication": {
+            "style": profile.communication_style,
+            "response_pace": profile.response_pace,
+        },
+        "interests": profile.interests,
+        "location": profile.location,
+        "photos": profile.photos,
+        "bio": profile.bio,
+        "conversation_starter": profile.conversation_starter,
+        "verified": profile.verified,
+        "premium": profile.premium,
+        "last_active": profile.last_active,
+    }
+
 
 class MatchRecommendationsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -858,37 +887,34 @@ class MatchRecommendationsView(APIView):
         else:
             return Response({"detail": "Invalid gender"}, status=400)
 
-        others = UserProfile.objects.select_related("user").filter(
-            gender=target_gender_db,
-            account_status="active"
-        ).exclude(user=me_profile.user)
+        others = (
+            UserProfile.objects
+            .select_related("user")
+            .filter(gender=target_gender_db, account_status="active")
+            .exclude(user=me_profile.user)
+        )
 
+        me_data = serialize_profile(me_profile)
         results = []
 
         for other_profile in others:
-            other = normalize_mysql_profile(other_profile)
+            other_data = serialize_profile(other_profile)
 
-            sim = profile_similarity(
-                normalize_mysql_profile(me_profile),
-                other,
+            similarity = profile_similarity(
+                me_data,
+                other_data,
                 None,
                 None
             )
 
             results.append({
-                "email": other["email"],
-                "similarity": round(sim * 100, 1),
-                "profile": {
-                    "first_name": other_profile.first_name,
-                    "gender": other_profile.gender,
-                    "interests": other_profile.interests,
-                    "photos": other_profile.photos,
-                    "bio": other_profile.bio,
-                }
+                "similarity": round(similarity * 100, 1),
+                "profile": other_data
             })
 
         results.sort(key=lambda x: x["similarity"], reverse=True)
         return Response(results)
+
 
 # class LikeProfileView(APIView):
 #     permission_classes = [IsAuthenticated]

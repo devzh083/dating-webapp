@@ -23,9 +23,9 @@ interface MatchApiResponse {
   similarity: number;
   distance_km: null;
   profile: {
-    firstName: string;
-    tagline?: string;
-    starter?: string;
+    first_name: string;
+    bio?: string;
+    conversation_starter?: string;
     interests: string[];
   };
 }
@@ -104,13 +104,13 @@ const HomePage = ({ onLogout }: HomePageProps) => {
         setProfiles(
           data.map((item, i) => ({
             id: item.email || `p-${i}`,
-            firstName: item.profile.firstName,
+            firstName: item.profile.first_name,
             selfDescription:
-              item.profile.tagline ||
-              item.profile.firstName ||
+              item.profile.bio ||
+              item.profile.first_name ||
               "No description available",
             conversationHook:
-              item.profile.starter || "Tell me about yourself!",
+              item.profile.conversation_starter || "Tell me about yourself!",
             vibeTags: getRandomInterests(item.profile.interests),
           }))
         );

@@ -71,7 +71,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         # 1️⃣ Register user as online
-        await add_online_user(self.user_email)
+        add_online_user(self.user_email)
 
         # 2️⃣ Send existing online presence to THIS user
         await self.send_existing_presence()
@@ -81,7 +81,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         if hasattr(self, "user_email"):
-            await remove_online_user(self.user_email)
+            remove_online_user(self.user_email)
             await self.broadcast_presence(is_online=False)
 
         if hasattr(self, "group_name"):
@@ -113,7 +113,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             )
 
     async def send_existing_presence(self):
-        online_users = await get_online_users()
+        online_users = get_online_users()
 
         matched_emails = await database_sync_to_async(
             MySQLMatchManager.get_user_matches
