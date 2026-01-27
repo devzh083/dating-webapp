@@ -25,7 +25,7 @@ from rest_framework.permissions import IsAuthenticated
 from login.models import Match
 
 from config.firebase import db
-from .models import FirebaseProfileManager, clean_firestore_data
+from .models import BlockedUser, FirebaseProfileManager, clean_firestore_data
 from google.cloud import firestore
 
 from rest_framework.views import APIView
@@ -63,6 +63,12 @@ def send_otp_email(email, otp):
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER)
     send_mail(subject, message, from_email, [email])
     cache.set(f"login_otp_{email}", otp, timeout=300)
+
+def is_blocked(sender, receiver):
+    return BlockedUser.objects.filter(
+        blocker=receiver,
+        blocked=sender
+    ).exists()
 
 
 # ---------- Auth / Profile Views ----------
@@ -814,27 +820,37 @@ class LikeProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from_email = request.user.username
+        from_email = request.user.username.lower()
         to_email = request.data.get("to_email")
 
         if not to_email:
-            return Response({"error": "to_email is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "to_email is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        result = FirebaseLikeManager.send_like(from_email=from_email, to_email=to_email)
+        result = FirebaseLikeManager.send_like(
+            from_email=from_email,
+            to_email=to_email
+        )
 
-        # No cleaning needed - create_match returns clean data
         if result.get("status") == "matched":
             match = result.get("match")
-            try:
-                to_user = User.objects.get(username=to_email)
-                notify_user(to_user.id, {
-                    "type": "MATCH_CREATED",
-                    "match_id": match["match_id"],
-                    "chat_id": match["chat_id"],
-                    "from_email": from_email,
-                })
-            except User.DoesNotExist:
-                pass
+
+            # 🔔 Notify BOTH users
+            notify_user(from_email, {
+                "type": "MATCH_CREATED",
+                "match_id": match["match_id"],
+                "chat_id": match["chat_id"],
+                "from_email": to_email,
+            })
+
+            notify_user(to_email, {
+                "type": "MATCH_CREATED",
+                "match_id": match["match_id"],
+                "chat_id": match["chat_id"],
+                "from_email": from_email,
+            })
 
         return Response(result, status=status.HTTP_200_OK)
 
@@ -907,6 +923,17 @@ class MatchedChatsView(APIView):
             else:
                 other_email = match.user_a
 
+            # ✅ Block checks (MUST be inside loop)
+            is_blocked_by_me = BlockedUser.objects.filter(
+                blocker=my_email,
+                blocked=other_email
+            ).exists()
+
+            is_blocked_me = BlockedUser.objects.filter(
+                blocker=other_email,
+                blocked=my_email
+            ).exists()
+
             profile = FirebaseProfileManager.get_profile(other_email) or {}
 
             chats.append({
@@ -922,6 +949,9 @@ class MatchedChatsView(APIView):
                     if profile.get("photos")
                     else None
                 ),
+                # ✅ expose block info to frontend
+                "blocked_by_me": is_blocked_by_me,
+                "blocked_me": is_blocked_me,
             })
 
         return Response(chats, status=status.HTTP_200_OK)
@@ -948,7 +978,8 @@ class ChatMessagesView(APIView):
         messages = MySQLChatManager.get_messages(chat_id)
 
         return Response(messages, status=status.HTTP_200_OK)
-    
+
+
 class SendChatMessageView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -956,24 +987,25 @@ class SendChatMessageView(APIView):
         sender = request.user.username.lower()
         content = request.data.get("content")
 
-        if not content:
-            return Response(
-                {"detail": "Message content required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         chat = MySQLChatManager.get_chat(chat_id)
         if not chat or sender not in chat["participants"]:
+            return Response({"detail": "Forbidden"}, status=403)
+
+        receiver = next(e for e in chat["participants"] if e != sender)
+
+        # 🚫 BLOCK CHECK (THIS IS THE KEY)
+        is_blocked = BlockedUser.objects.filter(
+            Q(blocker=receiver, blocked=sender) |
+            Q(blocker=sender, blocked=receiver)
+        ).exists()
+
+        if is_blocked:
             return Response(
-                {"detail": "Forbidden"},
+                {"detail": "You cannot send messages to this user"},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        receiver = next(
-            email for email in chat["participants"] if email != sender
-        )
-
-        # 1️⃣ Persist message
+        # ✅ ONLY NOW create & broadcast
         MySQLChatManager.add_message(
             chat_id=chat_id,
             sender=sender,
@@ -981,7 +1013,6 @@ class SendChatMessageView(APIView):
             content=content
         )
 
-        # 2️⃣ Broadcast to WebSocket group
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f"chat_{chat_id}",
@@ -995,10 +1026,41 @@ class SendChatMessageView(APIView):
             }
         )
 
-        return Response(
-            {"status": "sent"},
-            status=status.HTTP_201_CREATED
+        return Response({"status": "sent"}, status=201)
+
+class BlockUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        blocker = request.user.username.lower()
+        blocked = request.data.get("email")
+
+        if not blocked:
+            return Response(
+                {"detail": "Blocked email required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        BlockedUser.objects.get_or_create(
+            blocker=blocker,
+            blocked=blocked.lower()
         )
+
+        return Response({"status": "blocked"}, status=status.HTTP_200_OK)
+
+class UnblockUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        blocker = request.user.username.lower()
+        blocked = request.data.get("email")
+
+        BlockedUser.objects.filter(
+            blocker=blocker,
+            blocked=blocked.lower()
+        ).delete()
+
+        return Response({"status": "unblocked"}, status=status.HTTP_200_OK)
 
 
 class MarkChatReadView(APIView):

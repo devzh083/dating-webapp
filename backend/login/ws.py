@@ -6,11 +6,11 @@ from channels.layers import get_channel_layer
 channel_layer = get_channel_layer()
 
 def notify_user(email: str, payload: dict):
-    group = f"user_{email.lower()}"
+    group = "user_" + email.lower().replace("@", "_at_")
     async_to_sync(channel_layer.group_send)(
         group,
         {
-            "type": "presence_event",
+            "type": "notification_event",
             "payload": payload,
         }
     )

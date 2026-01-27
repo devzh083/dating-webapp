@@ -219,9 +219,10 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
         
         const normalizedChats = chatsArray.map((c: any) => ({
           ...c,
-          email: (c.email || c.user_email || "").toLowerCase(),
-          is_blocked: false 
+          email: c.email.toLowerCase(),
+          is_blocked: c.is_blocked || false,
         }));
+
 
         setChats(normalizedChats);
         setRequests(data.requests || []);
@@ -456,21 +457,63 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   const confirmBlock = async () => {
     if (!activeChat) return;
     const token = localStorage.getItem("access_token");
-    
-    setChats(prev => prev.map(c => 
-      c.chat_id === activeChat.chat_id ? { ...c, is_blocked: true } : c
-    ));
+
+    // Optimistic UI
+    setChats(prev =>
+      prev.map(c =>
+        c.chat_id === activeChat.chat_id
+          ? { ...c, is_blocked: true }
+          : c
+      )
+    );
+
     setShowBlockModal(false);
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/users/${activeChat.match_id || 'block'}/block/`, {
+      await fetch("http://127.0.0.1:8000/api/users/block/", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: activeChat.email,
+        }),
       });
     } catch (err) {
       console.error("Block API Error", err);
     }
   };
+
+  const confirmUnblock = async () => {
+    if (!activeChat) return;
+    const token = localStorage.getItem("access_token");
+
+    // Optimistic UI
+    setChats(prev =>
+      prev.map(c =>
+        c.chat_id === activeChat.chat_id
+          ? { ...c, is_blocked: false }
+          : c
+      )
+    );
+
+    try {
+      await fetch("http://127.0.0.1:8000/api/users/unblock/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: activeChat.email,
+        }),
+      });
+    } catch (err) {
+      console.error("Unblock API Error", err);
+    }
+  };
+
 
   /* ---- REPORT LOGIC ---- */
   const handleReportClick = () => {
@@ -710,10 +753,28 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
                     {isMenuOpen && (
                       <>
                         <div className="fixed inset-0 z-30 cursor-default" onClick={() => setIsMenuOpen(false)} />
-                        <div className="absolute right-0 top-full mt-2 w-48 md:w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-40 animate-in fade-in zoom-in-95 duration-200">
+                        {/* <div className="absolute right-0 top-full mt-2 w-48 md:w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-40 animate-in fade-in zoom-in-95 duration-200">
                           <button onClick={handleBlockClick} className="w-full text-left px-4 py-3 text-sm font-medium text-slate-700 hover:bg-red-50 hover:text-red-600 flex items-center gap-3">
                             <UserX className="w-4 h-4" /> Block
-                          </button>
+                          </button> */}
+                        <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-40 animate-in fade-in zoom-in-95 duration-200">
+                          {activeChat.is_blocked ? (
+                            <button
+                              onClick={confirmUnblock}
+                              className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-green-50 hover:text-green-600 flex items-center gap-3"
+                            >
+                              <ShieldAlert className="w-4 h-4" /> Unblock
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleBlockClick}
+                              className="w-full text-left px-5 py-3 text-sm font-medium text-slate-700 hover:bg-red-50 hover:text-red-600 flex items-center gap-3"
+                            >
+                              <UserX className="w-4 h-4" /> Block
+                            </button>
+                          )}
+
+                          
                           <div className="h-px bg-gray-100 my-1 mx-4" />
                           <button onClick={handleReportClick} className="w-full text-left px-4 py-3 text-sm font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-3">
                             <Flag className="w-4 h-4" /> Report

@@ -385,3 +385,10 @@ class Match(models.Model):
     class Meta:
         unique_together = ("user_a", "user_b")
 
+class BlockedUser(models.Model):
+    blocker = models.EmailField(db_index=True)
+    blocked = models.EmailField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("blocker", "blocked")

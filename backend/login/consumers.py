@@ -4,6 +4,7 @@ from channels.db import database_sync_to_async
 from django.core.cache import cache
 
 from login.mysql_managers import MySQLChatManager, MySQLMatchManager
+from login.models import BlockedUser
 
 
 # -------------------------------
@@ -11,6 +12,14 @@ from login.mysql_managers import MySQLChatManager, MySQLMatchManager
 # -------------------------------
 
 ONLINE_USERS_KEY = "online_users"
+
+@database_sync_to_async
+def is_blocked(sender: str, receiver: str) -> bool:
+    return BlockedUser.objects.filter(
+        blocker=receiver,
+        blocked=sender
+    ).exists()
+
 
 
 def email_to_group(email: str) -> str:
@@ -120,6 +129,10 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def presence_event(self, event):
         await self.send(text_data=json.dumps(event["payload"]))
+    
+    async def notification_event(self, event):
+        await self.send(text_data=json.dumps(event["payload"]))
+
 
 
 # ===============================
@@ -140,10 +153,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
             email for email in chat["participants"] if email != sender
         )
 
+        # 🚫 BLOCK CHECK
+        if await is_blocked(sender, receiver):
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "You are blocked by this user"
+            }))
+            return
+
+        # ✅ Persist message
         await database_sync_to_async(
             MySQLChatManager.add_message
         )(self.chat_id, sender, receiver, content)
 
+        # ✅ Broadcast
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -156,6 +179,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 },
             }
         )
+
+    def receive(self, text_data):
+        data = json.loads(text_data)
+        sender = self.scope["user"].username.lower()
+        receiver = self.other_user
+
+        if BlockedUser.objects.filter(
+            Q(blocker=receiver, blocked=sender) |
+            Q(blocker=sender, blocked=receiver)
+        ).exists():
+            return  # 🚫 SILENT DROP (no bubble)
+
+        self.save_and_broadcast(data)
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps(event["payload"]))
@@ -209,17 +245,29 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # -------------------------------
 
     async def handle_typing(self, data):
+        sender = self.user.email.lower()
+        chat = await get_chat(self.chat_id)
+
+        receiver = next(
+            email for email in chat["participants"] if email != sender
+        )
+
+        # 🚫 BLOCK CHECK
+        if await is_blocked(sender, receiver):
+            return
+
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 "type": "typing_event",
                 "payload": {
                     "type": "typing",
-                    "user_email": self.user.email.lower(),
+                    "user_email": sender,
                     "is_typing": data.get("is_typing", False),
                 }
             }
         )
+
 
     async def typing_event(self, event):
         if event["payload"]["user_email"] != self.user.email.lower():
