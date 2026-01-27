@@ -47,6 +47,9 @@ from .models import FirebaseAuthManager, FirebaseProfileManager
 from login.mysql_managers import MySQLChatManager, MySQLLikeManager as FirebaseLikeManager
 from login.mysql_managers import MySQLMatchManager as FirebaseMatchManager
 from login.mysql_managers import MySQLChatManager as FirebaseChatManager
+from profiles.models import UserProfile
+from django.db.models import Q
+
 
 
 from .models_photos import UserPhoto  # <-- your ImageField model
@@ -60,10 +63,144 @@ def generate_otp(length=6):
 
 
 def send_otp_email(email, otp):
-    subject = "Your login OTP"
-    message = f"Your OTP for login is: {otp}. It is valid for 5 minutes."
+    subject = f"The Dating App: your sign-in code"
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER)
-    send_mail(subject, message, from_email, [email])
+    
+    # Format OTP digits with spaces (e.g., "1234" becomes "1 2 3 4")
+    otp_digits = ' '.join(list(str(otp)))
+    
+    # ---------------- HTML TEMPLATE (Netflix-style) ----------------
+    # Clean, minimal design with focus on the OTP code
+    # Uses your brand colors: #0095E0 (Blue) -> #00C98B (Teal)
+    
+    html_message = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Your Sign-In Code</title>
+    </head>
+    <body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; background-color: #ffffff;">
+        
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; width: 100%;">
+            <tr>
+                <td align="center" style="padding: 40px 20px;">
+                    
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin: 0 auto;">
+                        
+                        <!-- Header -->
+                        <tr>
+                            <td style="padding: 0 0 30px 0; text-align: left;">
+                                <h1 style="margin: 0; font-size: 28px; font-weight: 700; background: linear-gradient(90deg, #0095E0 0%, #00C98B 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                                    The Dating App
+                                </h1>
+                            </td>
+                        </tr>
+
+                        <!-- Main Content -->
+                        <tr>
+                            <td style="padding: 0 0 30px 0;">
+                                <h2 style="margin: 0 0 20px 0; color: #000000; font-size: 24px; font-weight: 700; line-height: 1.3;">
+                                    Enter this code to sign in
+                                </h2>
+                                
+                                <!-- OTP Code Display (Netflix-style) -->
+                                <div style="margin: 30px 0; text-align: left;">
+                                    <span style="display: inline-block; color: #000000; font-size: 48px; font-weight: 700; letter-spacing: 12px; padding: 20px 0;">
+                                        {otp_digits}
+                                    </span>
+                                </div>
+
+                                <p style="margin: 0 0 20px 0; color: #000000; font-size: 16px; line-height: 1.5;">
+                                    Enter the code above on your device to sign in to The Dating App.
+                                </p>
+
+                                <p style="margin: 0 0 20px 0; color: #000000; font-size: 16px; line-height: 1.5;">
+                                    This code will expire in <strong>5 minutes</strong>.
+                                </p>
+
+                                <p style="margin: 0 0 20px 0; color: #737373; font-size: 14px; line-height: 1.5;">
+                                    If you didn't send this request, you can ignore this email or review your recent device activity.
+                                </p>
+
+                                <p style="margin: 0; color: #737373; font-size: 14px; line-height: 1.5;">
+                                    To help security, please don't share this code with anyone.
+                                </p>
+                            </td>
+                        </tr>
+
+                        <!-- Signature -->
+                        <tr>
+                            <td style="padding: 20px 0 40px 0;">
+                                <p style="margin: 0; color: #000000; font-size: 16px; font-weight: 600;">
+                                    The Dating App team
+                                </p>
+                            </td>
+                        </tr>
+
+                        <!-- Footer Links -->
+                        <tr>
+                            <td style="padding: 20px 0 0 0; border-top: 1px solid #e6e6e6;">
+                                <p style="margin: 0 0 15px 0; color: #737373; font-size: 13px; line-height: 1.6;">
+                                    <a href="#" style="color: #0095E0; text-decoration: none;">Help Centre</a> | 
+                                    <a href="#" style="color: #0095E0; text-decoration: none;">Terms of Use</a> | 
+                                    <a href="#" style="color: #0095E0; text-decoration: none;">Privacy</a>
+                                </p>
+                                
+                                <p style="margin: 0; color: #737373; font-size: 11px; line-height: 1.5;">
+                                    This message was emailed to {email} by The Dating App.
+                                </p>
+                                
+                                <p style="margin: 10px 0 0 0; color: #737373; font-size: 11px; line-height: 1.5;">
+                                    Made with ❤️ in Hyderabad
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    # Create plain text version for older email clients
+    plain_message = f"""
+The Dating App
+
+Enter this code to sign in
+
+{otp_digits}
+
+Enter the code above on your device to sign in to The Dating App.
+
+This code will expire in 5 minutes.
+
+If you didn't send this request, you can ignore this email or review your recent device activity.
+
+To help security, please don't share this code with anyone.
+
+The Dating App team
+
+---
+Help Centre | Terms of Use | Privacy
+
+This message was emailed to {email} by The Dating App.
+Made with ❤️ in Hyderabad
+    """.strip()
+
+    # Send the email
+    send_mail(
+        subject=subject,
+        message=plain_message,
+        from_email=from_email,
+        recipient_list=[email],
+        html_message=html_message
+    )
+
+    # Cache the OTP
     cache.set(f"login_otp_{email}", otp, timeout=300)
 
 def is_blocked(sender, receiver):
@@ -612,12 +749,16 @@ WEIGHTS = {
 def normalize_gender(label: str | None) -> str | None:
     if not label:
         return None
-    label = label.lower()
-    if label.startswith("man"):
+
+    label = label.lower().strip()
+
+    if label in ("male", "man", "m"):
         return "man"
-    if label.startswith("woman") or label.startswith("female"):
+
+    if label in ("female", "woman", "f"):
         return "woman"
-    return label  # fallback
+
+    return None  # reject invalid values
 
 
 def normalize_interested_in(values):
@@ -632,42 +773,32 @@ def normalize_interested_in(values):
     return out
 
 
-def normalize_profile(raw: dict) -> dict:
-    """Convert Firestore schema -> algorithm schema."""
-    if not raw:
-        return {}
-
-    gender = normalize_gender(raw.get("gender"))
-    interested_in = normalize_interested_in(raw.get("interestedIn", []))
-
+def normalize_mysql_profile(profile: UserProfile) -> dict:
     return {
-        "email": raw.get("email"),
-        "gender": gender,
-        "interested_in_genders": interested_in,
-
-        # arrays
-        "sexual_orientation": raw.get("orientation", []),
-        "preferred_connect": raw.get("communicationStyle", []),
-        "interests": raw.get("interests", []),
-
-        # single string -> list
-        "relationship_goals": [raw["relationshipType"]] if raw.get("relationshipType") else [],
+        "email": profile.user.email or profile.user.username,
+        "gender": normalize_gender(profile.gender),
 
         # lifestyle
-        "drinking": raw.get("drinking"),
-        "smoking": raw.get("smoking"),
-        "workout": raw.get("workout"),
-        "pets": raw.get("pets"),
+        "drinking": profile.drinking,
+        "smoking": profile.smoking,
+        "workout": profile.workout,
+        "pets": profile.pets,
 
-        # communication pace
-        "response_pace": raw.get("responsePace"),
+        # communication
+        "preferred_connect": profile.communication_style or [],
+        "response_pace": profile.response_pace,
 
-        # distance - keep numeric if present
-        "max_distance_km": raw.get("distance"),
-        # geo coords (only if you later add them)
-        "lat": raw.get("lat"),
-        "lng": raw.get("lng"),
+        # interests
+        "interests": profile.interests or [],
+
+        # distance
+        "max_distance_km": profile.distance,
+
+        # geo (future)
+        "lat": None,
+        "lng": None,
     }
+
 
 
 def profile_similarity(u, v, distance_km, max_dist_km):
@@ -709,77 +840,56 @@ class MatchRecommendationsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        # email may be in email or username depending on your user model
-        email = getattr(request.user, "email", None) or getattr(request.user, "username", None)
-        if not email:
-            return Response({"detail": "Authenticated user has no email associated"}, status=400)
+        email = request.user.email or request.user.username
 
-        raw_me = FirebaseProfileManager.get_profile(email)
-        if not raw_me:
-            return Response({"detail": "Profile not found for this email"}, status=404)
+        try:
+            me_profile = UserProfile.objects.select_related("user").get(
+                Q(user__email=email) | Q(user__username=email)
+            )
+        except UserProfile.DoesNotExist:
+            return Response({"detail": "Profile not found"}, status=404)
 
-        me = normalize_profile(raw_me)
-        my_gender = me.get("gender")
-        my_interested_in = me.get("interested_in_genders")
+        my_gender = normalize_gender(me_profile.gender)
 
-        if not my_gender or not my_interested_in:
-            return Response({"detail": "Preference data incomplete on your profile"}, status=400)
+        if my_gender == "woman":
+            target_gender_db = "Man"
+        elif my_gender == "man":
+            target_gender_db = "Woman"
+        else:
+            return Response({"detail": "Invalid gender"}, status=400)
 
-        # if you don't yet store lat/lng, distance_km will be None below
-        my_lat = me.get("lat")
-        my_lng = me.get("lng")
-        my_max_dist = me.get("max_distance_km")
-
-        # Firestore query: others who are interested in my gender
-        query = db.collection("Profile").where("interestedIn", "array_contains_any", ["Men", "Women"])
-        docs = list(query.stream())
+        others = UserProfile.objects.select_related("user").filter(
+            gender=target_gender_db,
+            account_status="active"
+        ).exclude(user=me_profile.user)
 
         results = []
-        liked_emails = get_liked_emails(email)
-        for doc in docs:
-            raw_other = doc.to_dict() or {}
-            other = normalize_profile(raw_other)
-            other_email = other.get("email")
 
-            if not other_email or other_email == email:
-                continue
-            if other_email in liked_emails:
-                continue
+        for other_profile in others:
+            other = normalize_mysql_profile(other_profile)
 
-            # mutual interest: I like their gender & they like mine
-            other_gender = other.get("gender")
-            if not other_gender or other_gender not in my_interested_in:
-                continue
-            if my_gender not in other.get("interested_in_genders", []):
-                continue
-
-            # distance (optional if lat/lng present)
-            lat2, lng2 = other.get("lat"), other.get("lng")
-            if my_lat is not None and my_lng is not None and lat2 is not None and lng2 is not None:
-                d_km = haversine_km(my_lat, my_lng, lat2, lng2)
-                max_dist = min(my_max_dist or d_km, other.get("max_distance_km") or d_km)
-                if my_max_dist and d_km > max_dist:
-                    continue
-            else:
-                d_km = None
-                max_dist = None
-
-            sim = profile_similarity(me, other, d_km, max_dist)
-            # if sim < 0.60:
-            #     continue
-
-            results.append(
-                {
-                    "email": other_email,
-                    "similarity": round(sim * 100, 1),
-                    "distance_km": round(d_km, 1) if d_km is not None else None,
-                    "profile": raw_other,  # return original Firestore shape
-                }
+            sim = profile_similarity(
+                normalize_mysql_profile(me_profile),
+                other,
+                None,
+                None
             )
+
+            results.append({
+                "email": other["email"],
+                "similarity": round(sim * 100, 1),
+                "profile": {
+                    "first_name": other_profile.first_name,
+                    "gender": other_profile.gender,
+                    "interests": other_profile.interests,
+                    "photos": other_profile.photos,
+                    "bio": other_profile.bio,
+                }
+            })
 
         results.sort(key=lambda x: x["similarity"], reverse=True)
         return Response(results)
-    
+
 # class LikeProfileView(APIView):
 #     permission_classes = [IsAuthenticated]
 
