@@ -10,6 +10,7 @@ from django.conf import settings
 from django.shortcuts import redirect
 from django.core.mail import send_mail
 from django.core.cache import cache
+from .models import Match, Like
 
 import urllib.parse
 import requests
@@ -865,11 +866,18 @@ def serialize_profile(profile: UserProfile) -> dict:
     }
 
 
+
+
+
+
 class MatchRecommendationsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        email = request.user.email or request.user.username
+        # ----------------------------------
+        # 1. Identify current user
+        # ----------------------------------
+        email = (request.user.email or request.user.username).lower()
 
         try:
             me_profile = UserProfile.objects.select_related("user").get(
@@ -878,22 +886,77 @@ class MatchRecommendationsView(APIView):
         except UserProfile.DoesNotExist:
             return Response({"detail": "Profile not found"}, status=404)
 
+        # ----------------------------------
+        # 2. Gender preference
+        # ----------------------------------
         my_gender = normalize_gender(me_profile.gender)
 
-        if my_gender == "woman":
-            target_gender_db = "Man"
-        elif my_gender == "man":
+        if my_gender == "man":
             target_gender_db = "Woman"
+        elif my_gender == "woman":
+            target_gender_db = "Man"
         else:
             return Response({"detail": "Invalid gender"}, status=400)
 
+        # ----------------------------------
+        # 3. Fetch MATCHED users
+        # ----------------------------------
+        matched_qs = Match.objects.filter(
+            Q(user_a=email) | Q(user_b=email),
+            status="active"
+        ).values_list("user_a", "user_b")
+
+        matched_emails = set()
+        for a, b in matched_qs:
+            matched_emails.add(a.lower())
+            matched_emails.add(b.lower())
+
+        matched_emails.discard(email)
+
+        # ----------------------------------
+        # 4. Fetch LIKED users
+        # ----------------------------------
+        liked_emails = set(
+            Like.objects.filter(from_email=email)
+            .values_list("to_email", flat=True)
+        )
+
+        # ----------------------------------
+        # 5. Fetch BLOCKED users
+        # ----------------------------------
+        blocked_emails = set(
+            BlockedUser.objects.filter(blocker=email)
+            .values_list("blocked", flat=True)
+        )
+
+        # ----------------------------------
+        # 6. Build candidate queryset
+        # ----------------------------------
         others = (
             UserProfile.objects
             .select_related("user")
-            .filter(gender=target_gender_db, account_status="active")
+            .filter(
+                gender=target_gender_db,
+                account_status="active"
+            )
             .exclude(user=me_profile.user)
+            .exclude(
+                Q(user__email__in=matched_emails) |
+                Q(user__username__in=matched_emails)
+            )
+            .exclude(
+                Q(user__email__in=liked_emails) |
+                Q(user__username__in=liked_emails)
+            )
+            .exclude(
+                Q(user__email__in=blocked_emails) |
+                Q(user__username__in=blocked_emails)
+            )
         )
 
+        # ----------------------------------
+        # 7. Similarity scoring
+        # ----------------------------------
         me_data = serialize_profile(me_profile)
         results = []
 
@@ -914,7 +977,6 @@ class MatchRecommendationsView(APIView):
 
         results.sort(key=lambda x: x["similarity"], reverse=True)
         return Response(results)
-
 
 # class LikeProfileView(APIView):
 #     permission_classes = [IsAuthenticated]
@@ -958,7 +1020,7 @@ class LikeProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from_email = request.user.username.lower()
+        from_email = request.user.email.lower()
         to_email = request.data.get("to_email")
 
         if not to_email:
@@ -972,10 +1034,10 @@ class LikeProfileView(APIView):
             to_email=to_email
         )
 
+        # 🔔 If matched → notify both users
         if result.get("status") == "matched":
-            match = result.get("match")
+            match = result["match"]
 
-            # 🔔 Notify BOTH users
             notify_user(from_email, {
                 "type": "MATCH_CREATED",
                 "match_id": match["match_id"],
@@ -990,15 +1052,14 @@ class LikeProfileView(APIView):
                 "from_email": from_email,
             })
 
-        return Response(result, status=status.HTTP_200_OK)
+            # 🔥 VERY IMPORTANT: flatten response for frontend
+            return Response({
+                "status": "matched",
+                "match_id": match["match_id"],
+                "chat_id": match["chat_id"],
+            }, status=status.HTTP_200_OK)
 
-def get_liked_emails(email: str) -> set[str]:
-    likes = (
-        db.collection("likes")
-        .where("from_email", "==", email)
-        .stream()
-    )
-    return {doc.to_dict().get("to_email") for doc in likes}
+        return Response(result, status=status.HTTP_200_OK)
 
 
 
