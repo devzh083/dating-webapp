@@ -2,6 +2,48 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from profiles.models import UserProfile
 from .models import UserReport, AdminAction
+from .models import PremiumPlan, PremiumFeature
+
+
+class PremiumPlanSerializer(serializers.ModelSerializer):
+    """Serializer for Premium Plans"""
+    
+    class Meta:
+        model = PremiumPlan
+        fields = [
+            'plan_id', 'name', 'duration', 'plan_type', 'price', 
+            'original_price', 'price_per_month', 'discount_text',
+            'icon', 'color', 'gradient', 'popular', 'features',
+            'active', 'display_order', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def validate_price(self, value):
+        """Ensure price is positive"""
+        if value <= 0:
+            raise serializers.ValidationError("Price must be greater than 0")
+        return value
+    
+    def validate(self, data):
+        """Validate that original_price is greater than price if provided"""
+        if data.get('original_price') and data.get('price'):
+            if data['original_price'] <= data['price']:
+                raise serializers.ValidationError(
+                    "Original price must be greater than current price"
+                )
+        return data
+
+
+class PremiumFeatureSerializer(serializers.ModelSerializer):
+    """Serializer for Premium Features"""
+    
+    class Meta:
+        model = PremiumFeature
+        fields = [
+            'id', 'title', 'description', 'icon', 
+            'active', 'display_order', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
 
 
 class UserSerializer(serializers.ModelSerializer):

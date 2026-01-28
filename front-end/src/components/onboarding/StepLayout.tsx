@@ -33,11 +33,11 @@ export default function StepLayout({
   showBack = true,
 }: StepLayoutProps) {
   return (
-    <div className="min-h-screen w-full bg-[#f5fbff] flex items-center justify-center">
+    <div className="min-h-screen w-full bg-[#f5fbff] flex items-center justify-center pt-20">
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-sm flex flex-col max-h-[90vh]">
         
         {/* HEADER */}
-        <header className="sticky top-0 z-10 bg-white border-b border-gray-200 rounded-t-2xl">
+        <header className="bg-white border-b border-gray-200 rounded-t-2xl">
           <div className="px-10 pt-6 pb-4">
             <div className="flex items-center justify-between mb-4">
               {showBack ? (

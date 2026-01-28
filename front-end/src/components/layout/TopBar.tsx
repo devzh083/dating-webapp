@@ -1,5 +1,5 @@
 import { Home, MessageCircle, Bell, Heart, Sparkles } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import ProfileDropdown from "./ProfileDropdown";
 
@@ -14,6 +14,7 @@ const PRIMARY_GRADIENT =
 
 export default function TopBar({ userName = "User", onLogout }: TopBarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const navItems = [
     { icon: Home, label: "Home", path: "/home" },
@@ -72,9 +73,10 @@ export default function TopBar({ userName = "User", onLogout }: TopBarProps) {
 
       {/* 3. RIGHT: Actions & Profile */}
       <div className="flex items-center justify-end gap-3 w-[200px]">
-        {/* "Get Plus" Button */}
+        {/* "Get Plus" Button - Now links to Premium page */}
         <button
-          className={`hidden md:flex items-center gap-1.5 px-4 py-1.5 rounded-full ${PRIMARY_GRADIENT} text-white text-xs font-bold shadow-md hover:shadow-lg hover:brightness-110 transition-all`}
+          onClick={() => navigate('/premium')}
+          className={`hidden md:flex items-center gap-1.5 px-4 py-1.5 rounded-full ${PRIMARY_GRADIENT} text-white text-xs font-bold shadow-md hover:shadow-lg hover:brightness-110 transition-all cursor-pointer`}
         >
           <Sparkles className="w-3 h-3 fill-white" />
           <span>Get Plus</span>

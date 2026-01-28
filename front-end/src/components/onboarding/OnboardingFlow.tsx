@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from "framer-motion";
 
 // Layout Components
 import TopBar from "@/components/layout/TopBar";
-import ProgressBar from "@/components/onboarding/ProgressBar";
 
 import { useNavigate, useLocation } from "react-router-dom";
 import Step1BasicInfo from "./steps/Step1BasicInfo";
@@ -212,15 +211,6 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <TopBar userName={data.firstName || "User"} />
-
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 sticky top-16 bg-white z-40">
-        <div className="flex-1">
-          <ProgressBar currentStep={step} totalSteps={TOTAL_STEPS} />
-        </div>
-        <div className="ml-4 text-xs font-bold text-gray-400 uppercase tracking-wide">
-          Step {step}/{TOTAL_STEPS}
-        </div>
-      </div>
 
       <AnimatePresence mode="wait">
         <motion.div

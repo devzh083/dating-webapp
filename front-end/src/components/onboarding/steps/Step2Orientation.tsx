@@ -1,16 +1,11 @@
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
-
-// Brand Gradient
-const PRIMARY_GRADIENT = "bg-gradient-to-r from-[#0095E0] via-[#00B4D8] to-[#00C98B]";
+import StepLayout from "../StepLayout";
 
 interface Step2Props {
   data: any;
   onChange: (data: any) => void;
   onNext: () => void;
   onBack: () => void;
-  onSkip?: () => void; // ✅ Added Skip Prop
+  onSkip?: () => void;
 }
 
 const RELATIONSHIP_STATUSES = [
@@ -26,33 +21,19 @@ export default function Step2Orientation({ data, onChange, onNext, onBack, onSki
   const isValid = !!data.relationshipType;
 
   return (
-    <div className="max-w-md mx-auto py-8 px-6">
-      
-      {/* Navigation Header */}
-      <div className="flex items-center justify-between mb-6">
-        <button 
-          onClick={onBack} 
-          className="p-2 -ml-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all"
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        
-        {onSkip && (
-          <button 
-            onClick={onSkip} 
-            className="text-sm font-bold text-gray-400 hover:text-[#0095E0] transition-colors"
-          >
-            Skip
-          </button>
-        )}
-      </div>
-
-      <div className="mb-8">
-        <h2 className="text-3xl font-black text-gray-900 mb-2">Relationship Status</h2>
-        <p className="text-gray-500 text-sm">Be honest, it helps us find what you really need.</p>
-      </div>
-
-      <div className="space-y-3">
+    <StepLayout
+      currentStep={2}
+      totalSteps={10}
+      title="Relationship Status"
+      subtitle="Be honest, it helps us find what you really need."
+      onNext={onNext}
+      onBack={onBack}
+      onSkip={onSkip}
+      canProceed={isValid}
+      showBack={true}
+      nextLabel="Next Step"
+    >
+      <div className="space-y-3 pt-4">
         {RELATIONSHIP_STATUSES.map((status) => (
           <button
             key={status}
@@ -76,16 +57,6 @@ export default function Step2Orientation({ data, onChange, onNext, onBack, onSki
           </button>
         ))}
       </div>
-
-      <div className="mt-12">
-        <Button
-          onClick={onNext}
-          disabled={!isValid}
-          className={`w-full h-14 rounded-full font-bold text-lg text-white shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:shadow-none ${PRIMARY_GRADIENT}`}
-        >
-          Next Step
-        </Button>
-      </div>
-    </div>
+    </StepLayout>
   );
 }

@@ -12,9 +12,9 @@ import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
-import AdminLogin from './pages/AdminLogin';
 import AdminPanel from './pages/AdminPanel';
 import { adminService } from './services/profileService';
+import PremiumPage from './pages/Premiumpage';
 
 // Admin Protected Route Component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
@@ -139,7 +139,6 @@ const AppInner: React.FC = () => {
   return (
     <Routes>
       {/* ---------------- ADMIN ROUTES (SEPARATE FROM USER ROUTES) ---------------- */}
-      <Route path="/admin/login" element={<AdminLogin />} />
       <Route
         path="/admin/dashboard"
         element={
@@ -281,6 +280,7 @@ const AppInner: React.FC = () => {
        path="/cafe-partner/register"
         element={<CafeRegisterPage />}
        /> */}
+      <Route path="/premium" element={<PremiumPage />} />
 
       {/* ---------------- 404 NOT FOUND ---------------- */}
       <Route path="*" element={<NotFound />} />
