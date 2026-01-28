@@ -1,27 +1,26 @@
-// src/pages/OnboardingPage.tsx
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import TopBar from "@/components/layout/TopBar";
-import OnboardingFlow, { OnboardingData } from "@/components/onboarding/OnboardingFlow";
+import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 
 type OnboardingPageProps = {
-  onComplete?: () => void; // App will pass this
+  onComplete?: () => void;
+  onLogout?: () => void;
 };
 
-const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
+const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete, onLogout }) => {
   const navigate = useNavigate();
 
   const handleFinish = () => {
-    // let App update its state
+    // 1. Update App state immediately
     onComplete?.();
 
-    // final navigation to home
+    // 2. Navigate to home
     navigate("/home", { replace: true });
   };
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <OnboardingFlow onComplete={handleFinish} />
+      <OnboardingFlow onComplete={handleFinish} onLogout={onLogout} />
     </div>
   );
 };

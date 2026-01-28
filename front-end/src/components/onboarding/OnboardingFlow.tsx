@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-
-// Layout Components
 import TopBar from "@/components/layout/TopBar";
-// ❌ REMOVED: ProgressBar import (it's inside StepLayout now)
-
 import { useNavigate, useLocation } from "react-router-dom";
 import Step1BasicInfo from "./steps/Step1BasicInfo";
 import Step2Orientation from "./steps/Step2Orientation";
@@ -18,14 +14,12 @@ import Step9Social from "./steps/Step9Social";
 import Step10Review from "./steps/Step10Review";
 import { profileService } from "../../services/profileService";
 
-// ---------------- TYPES ----------------
-
 export type OnboardingData = {
   firstName: string;
   dateOfBirth: Date | null;
   gender: string;
   showGender: boolean;
-  relationshipType: string; 
+  relationshipType: string;
   interestedIn: string[];
   distance: number;
   strictDistance: boolean;
@@ -55,8 +49,7 @@ const initialData: OnboardingData = {
   dateOfBirth: null,
   gender: "",
   showGender: false,
-  // ✅ ADDED MISSING FIELD INITIALIZATION
-  relationshipType: "", 
+  relationshipType: "",
   interestedIn: [],
   distance: 25,
   strictDistance: false,
@@ -83,9 +76,13 @@ const initialData: OnboardingData = {
 
 const TOTAL_STEPS = 10;
 
-// ---------------- COMPONENT ----------------
-
-export default function OnboardingFlow({ onComplete }: { onComplete?: () => void }) {
+export default function OnboardingFlow({ 
+  onComplete, 
+  onLogout 
+}: { 
+  onComplete?: () => void; 
+  onLogout?: () => void; 
+}) {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<OnboardingData>(initialData);
   const [isSaving, setIsSaving] = useState(false);
@@ -95,8 +92,6 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ---------------- LOCAL STORAGE ----------------
-
   useEffect(() => {
     const savedData = localStorage.getItem("onboardingData");
     if (savedData) {
@@ -105,7 +100,6 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
         if (parsed.dateOfBirth) {
           parsed.dateOfBirth = new Date(parsed.dateOfBirth);
         }
-        // Ensure merged data has all required fields including relationshipType
         setData({ ...initialData, ...parsed });
       } catch (e) {
         console.error("Failed to parse onboarding data", e);
@@ -116,8 +110,6 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
   useEffect(() => {
     localStorage.setItem("onboardingData", JSON.stringify(data));
   }, [data]);
-
-  // ---------------- LOAD EXISTING PROFILE ----------------
 
   useEffect(() => {
     loadExistingProfile();
@@ -139,8 +131,6 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
     }
   };
 
-  // ---------------- STEP CONTROL ----------------
-
   const setStepData = (patch: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...patch }));
   };
@@ -159,17 +149,12 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
     goNext();
   };
 
-  // ---------------- FINAL SAVE ----------------
-
   const saveProfileAndFinish = async () => {
     try {
       setIsSaving(true);
       setError(null);
-
       await profileService.saveProfile(data);
-
       localStorage.removeItem("onboardingData");
-
       if (onComplete) {
         onComplete();
       } else {
@@ -183,49 +168,24 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
     }
   };
 
-  // ---------------- STEP RENDER ----------------
-
   const renderStep = () => {
     switch (step) {
-      case 1:
-        return <Step1BasicInfo data={data} onChange={setStepData} onNext={goNext} onSkip={handleSkip} />;
-      case 2:
-        return <Step2Orientation data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 3:
-        return <Step3Lifestyle data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 4:
-        return <Step4Communication data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 5:
-        return <Step5Interests data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 6:
-        return <Step6Location data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 7:
-        return <Step7Photos data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 8:
-        return <Step8Bio data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 9:
-        return <Step9Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      default:
-        return (
-          <Step10Review
-            data={data}
-            onNext={saveProfileAndFinish}
-            onBack={goBack}
-            onSkip={handleSkip}
-          />
-        );
+      case 1: return <Step1BasicInfo data={data} onChange={setStepData} onNext={goNext} onSkip={handleSkip} />;
+      case 2: return <Step2Orientation data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 3: return <Step3Lifestyle data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 4: return <Step4Communication data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 5: return <Step5Interests data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 6: return <Step6Location data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 7: return <Step7Photos data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 8: return <Step8Bio data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 9: return <Step9Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      default: return <Step10Review data={data} onNext={saveProfileAndFinish} onBack={goBack} onSkip={handleSkip} />;
     }
   };
 
-  // ---------------- RENDER ----------------
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <TopBar userName={data.firstName || "User"} />
-
-      {/* ❌ REMOVED: The duplicate Progress Bar Header block. 
-         The individual steps (StepLayout) will now render their own UI cleanly.
-      */}
+      <TopBar userName={data.firstName || "User"} onLogout={onLogout} />
 
       <AnimatePresence mode="wait">
         <motion.div
