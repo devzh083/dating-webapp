@@ -49,14 +49,7 @@ class MessageSerializer(serializers.ModelSerializer):
             return obj.sender == request.user
         return False
     
-class CreateUserReportSerializer(serializers.ModelSerializer):
-    reported_user_id = serializers.IntegerField(write_only=True)
-
-    class Meta:
-        model = UserReport
-        fields = ['reported_user_id', 'reason', 'description']
-
-    def validate_reported_user_id(self, value):
-        if not User.objects.filter(id=value).exists():
-            raise serializers.ValidationError("Reported user does not exist")
-        return value
+class CreateUserReportSerializer(serializers.Serializer):
+    chat_id = serializers.IntegerField()
+    reason = serializers.CharField()
+    description = serializers.CharField(required=False)

@@ -542,38 +542,41 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
     setSelectedReason("");
     setShowReportModal(true);
   };
+const submitReport = async () => {
+  if (!activeChat) return;
+  const token = localStorage.getItem("access_token");
 
-  const submitReport = async () => {
-    if (!activeChat) return;
-    const token = localStorage.getItem("access_token");
+  const reportPayload = {
+    chat_id: activeChat.chat_id, // ✅ FIXED
+    reason: selectedReason,
+    description: reportDescription || `Reported for: ${selectedReason}`,
+  };
 
-    const reportPayload = {
-      reported_user_id: activeChat.match_id,
-      reason: selectedReason,
-      description: reportDescription || `Reported for: ${selectedReason}`,
-    };
+  console.log("Report payload:", reportPayload);
 
-    try {
-      const res = await fetch(`http://127.0.0.1:8000/api/reports/`, { 
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(reportPayload),
-      });
+  try {
+    const res = await fetch("http://127.0.0.1:8000/api/reports/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(reportPayload),
+    });
 
-      if (res.ok) {
-        setReportStep('success');
-      } else {
-        console.error("Report failed");
-        setReportStep('success'); 
-      }
-    } catch (err) {
-      console.error("Report API Error", err);
+    if (res.ok) {
+      setReportStep("success");
+    } else {
+      const err = await res.json();
+      console.error("Report failed:", err);
       setReportStep('success');
     }
-  };
+  } catch (err) {
+    console.error("Report API Error", err);
+    setReportStep('success');
+  }
+};
+
 
   /* ---------------- RENDER HELPERS ---------------- */
   const groupedMessages = messages.reduce((acc, msg) => {
