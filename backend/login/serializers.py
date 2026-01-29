@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import Match, Message
+from admin_panel.models import UserReport
+from django.contrib.auth.models import User
 
 class MatchSerializer(serializers.ModelSerializer):
     partner = serializers.SerializerMethodField()
@@ -46,3 +48,8 @@ class MessageSerializer(serializers.ModelSerializer):
         if request and request.user:
             return obj.sender == request.user
         return False
+    
+class CreateUserReportSerializer(serializers.Serializer):
+    chat_id = serializers.IntegerField()
+    reason = serializers.CharField()
+    description = serializers.CharField(required=False)

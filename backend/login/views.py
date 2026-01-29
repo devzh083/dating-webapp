@@ -10,6 +10,7 @@ from django.conf import settings
 from django.shortcuts import redirect
 from django.core.mail import send_mail
 from django.core.cache import cache
+from .models import Match, Like
 
 import urllib.parse
 import requests
@@ -22,10 +23,12 @@ from math import radians, sin, cos, asin, sqrt
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from admin_panel.models import UserReport
+from login.serializers import CreateUserReportSerializer
 from login.models import Match
 
 from config.firebase import db
-from .models import FirebaseProfileManager, clean_firestore_data
+from .models import BlockedUser, FirebaseProfileManager, clean_firestore_data
 from google.cloud import firestore
 
 from rest_framework.views import APIView
@@ -45,6 +48,9 @@ from .models import FirebaseAuthManager, FirebaseProfileManager
 from login.mysql_managers import MySQLChatManager, MySQLLikeManager as FirebaseLikeManager
 from login.mysql_managers import MySQLMatchManager as FirebaseMatchManager
 from login.mysql_managers import MySQLChatManager as FirebaseChatManager
+from profiles.models import UserProfile
+from django.db.models import Q
+
 
 
 from .models_photos import UserPhoto  # <-- your ImageField model
@@ -58,11 +64,151 @@ def generate_otp(length=6):
 
 
 def send_otp_email(email, otp):
-    subject = "Your login OTP"
-    message = f"Your OTP for login is: {otp}. It is valid for 5 minutes."
+    subject = f"The Dating App: your sign-in code"
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER)
-    send_mail(subject, message, from_email, [email])
+    
+    # Format OTP digits with spaces (e.g., "1234" becomes "1 2 3 4")
+    otp_digits = ' '.join(list(str(otp)))
+    
+    # ---------------- HTML TEMPLATE (Netflix-style) ----------------
+    # Clean, minimal design with focus on the OTP code
+    # Uses your brand colors: #0095E0 (Blue) -> #00C98B (Teal)
+    
+    html_message = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Your Sign-In Code</title>
+    </head>
+    <body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; background-color: #ffffff;">
+        
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; width: 100%;">
+            <tr>
+                <td align="center" style="padding: 40px 20px;">
+                    
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin: 0 auto;">
+                        
+                        <!-- Header -->
+                        <tr>
+                            <td style="padding: 0 0 30px 0; text-align: left;">
+                                <h1 style="margin: 0; font-size: 28px; font-weight: 700; background: linear-gradient(90deg, #0095E0 0%, #00C98B 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                                    The Dating App
+                                </h1>
+                            </td>
+                        </tr>
+
+                        <!-- Main Content -->
+                        <tr>
+                            <td style="padding: 0 0 30px 0;">
+                                <h2 style="margin: 0 0 20px 0; color: #000000; font-size: 24px; font-weight: 700; line-height: 1.3;">
+                                    Enter this code to sign in
+                                </h2>
+                                
+                                <!-- OTP Code Display (Netflix-style) -->
+                                <div style="margin: 30px 0; text-align: left;">
+                                    <span style="display: inline-block; color: #000000; font-size: 48px; font-weight: 700; letter-spacing: 12px; padding: 20px 0;">
+                                        {otp_digits}
+                                    </span>
+                                </div>
+
+                                <p style="margin: 0 0 20px 0; color: #000000; font-size: 16px; line-height: 1.5;">
+                                    Enter the code above on your device to sign in to The Dating App.
+                                </p>
+
+                                <p style="margin: 0 0 20px 0; color: #000000; font-size: 16px; line-height: 1.5;">
+                                    This code will expire in <strong>5 minutes</strong>.
+                                </p>
+
+                                <p style="margin: 0 0 20px 0; color: #737373; font-size: 14px; line-height: 1.5;">
+                                    If you didn't send this request, you can ignore this email or review your recent device activity.
+                                </p>
+
+                                <p style="margin: 0; color: #737373; font-size: 14px; line-height: 1.5;">
+                                    To help security, please don't share this code with anyone.
+                                </p>
+                            </td>
+                        </tr>
+
+                        <!-- Signature -->
+                        <tr>
+                            <td style="padding: 20px 0 40px 0;">
+                                <p style="margin: 0; color: #000000; font-size: 16px; font-weight: 600;">
+                                    The Dating App team
+                                </p>
+                            </td>
+                        </tr>
+
+                        <!-- Footer Links -->
+                        <tr>
+                            <td style="padding: 20px 0 0 0; border-top: 1px solid #e6e6e6;">
+                                <p style="margin: 0 0 15px 0; color: #737373; font-size: 13px; line-height: 1.6;">
+                                    <a href="#" style="color: #0095E0; text-decoration: none;">Help Centre</a> | 
+                                    <a href="#" style="color: #0095E0; text-decoration: none;">Terms of Use</a> | 
+                                    <a href="#" style="color: #0095E0; text-decoration: none;">Privacy</a>
+                                </p>
+                                
+                                <p style="margin: 0; color: #737373; font-size: 11px; line-height: 1.5;">
+                                    This message was emailed to {email} by The Dating App.
+                                </p>
+                                
+                                <p style="margin: 10px 0 0 0; color: #737373; font-size: 11px; line-height: 1.5;">
+                                    Made with ❤️ in Hyderabad
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    # Create plain text version for older email clients
+    plain_message = f"""
+The Dating App
+
+Enter this code to sign in
+
+{otp_digits}
+
+Enter the code above on your device to sign in to The Dating App.
+
+This code will expire in 5 minutes.
+
+If you didn't send this request, you can ignore this email or review your recent device activity.
+
+To help security, please don't share this code with anyone.
+
+The Dating App team
+
+---
+Help Centre | Terms of Use | Privacy
+
+This message was emailed to {email} by The Dating App.
+Made with ❤️ in Hyderabad
+    """.strip()
+
+    # Send the email
+    send_mail(
+        subject=subject,
+        message=plain_message,
+        from_email=from_email,
+        recipient_list=[email],
+        html_message=html_message
+    )
+
+    # Cache the OTP
     cache.set(f"login_otp_{email}", otp, timeout=300)
+
+def is_blocked(sender, receiver):
+    return BlockedUser.objects.filter(
+        blocker=receiver,
+        blocked=sender
+    ).exists()
 
 
 # ---------- Auth / Profile Views ----------
@@ -611,12 +757,16 @@ WEIGHTS = {
 def normalize_gender(label: str | None) -> str | None:
     if not label:
         return None
-    label = label.lower()
-    if label.startswith("man"):
+
+    label = label.lower().strip()
+
+    if label in ("male", "man", "m"):
         return "man"
-    if label.startswith("woman") or label.startswith("female"):
+
+    if label in ("female", "woman", "f"):
         return "woman"
-    return label  # fallback
+
+    return None  # reject invalid values
 
 
 def normalize_interested_in(values):
@@ -631,42 +781,32 @@ def normalize_interested_in(values):
     return out
 
 
-def normalize_profile(raw: dict) -> dict:
-    """Convert Firestore schema -> algorithm schema."""
-    if not raw:
-        return {}
-
-    gender = normalize_gender(raw.get("gender"))
-    interested_in = normalize_interested_in(raw.get("interestedIn", []))
-
+def normalize_mysql_profile(profile: UserProfile) -> dict:
     return {
-        "email": raw.get("email"),
-        "gender": gender,
-        "interested_in_genders": interested_in,
-
-        # arrays
-        "sexual_orientation": raw.get("orientation", []),
-        "preferred_connect": raw.get("communicationStyle", []),
-        "interests": raw.get("interests", []),
-
-        # single string -> list
-        "relationship_goals": [raw["relationshipType"]] if raw.get("relationshipType") else [],
+        "email": profile.user.email or profile.user.username,
+        "gender": normalize_gender(profile.gender),
 
         # lifestyle
-        "drinking": raw.get("drinking"),
-        "smoking": raw.get("smoking"),
-        "workout": raw.get("workout"),
-        "pets": raw.get("pets"),
+        "drinking": profile.drinking,
+        "smoking": profile.smoking,
+        "workout": profile.workout,
+        "pets": profile.pets,
 
-        # communication pace
-        "response_pace": raw.get("responsePace"),
+        # communication
+        "preferred_connect": profile.communication_style or [],
+        "response_pace": profile.response_pace,
 
-        # distance - keep numeric if present
-        "max_distance_km": raw.get("distance"),
-        # geo coords (only if you later add them)
-        "lat": raw.get("lat"),
-        "lng": raw.get("lng"),
+        # interests
+        "interests": profile.interests or [],
+
+        # distance
+        "max_distance_km": profile.distance,
+
+        # geo (future)
+        "lat": None,
+        "lng": None,
     }
+
 
 
 def profile_similarity(u, v, distance_km, max_dist_km):
@@ -703,82 +843,148 @@ def profile_similarity(u, v, distance_km, max_dist_km):
     )
     return base + dist_weight * s_dist
 
+def serialize_profile(profile: UserProfile) -> dict:
+    return {
+        "id": profile.user.id,
+        "email": profile.user.email,
+        "username": profile.user.username,
+        "first_name": profile.first_name,
+        "age": profile.age,
+        "gender": profile.gender,
+        "distance": profile.distance,
+        "lifestyle": {
+            "drinking": profile.drinking,
+            "smoking": profile.smoking,
+            "workout": profile.workout,
+            "pets": profile.pets,
+        },
+        "communication": {
+            "style": profile.communication_style,
+            "response_pace": profile.response_pace,
+        },
+        "interests": profile.interests,
+        "location": profile.location,
+        "photos": profile.photos,
+        "bio": profile.bio,
+        "conversation_starter": profile.conversation_starter,
+        "verified": profile.verified,
+        "premium": profile.premium,
+        "last_active": profile.last_active,
+    }
+
+
+
+
+
 
 class MatchRecommendationsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        # email may be in email or username depending on your user model
-        email = getattr(request.user, "email", None) or getattr(request.user, "username", None)
-        if not email:
-            return Response({"detail": "Authenticated user has no email associated"}, status=400)
+        # ----------------------------------
+        # 1. Identify current user
+        # ----------------------------------
+        email = (request.user.email or request.user.username).lower()
 
-        raw_me = FirebaseProfileManager.get_profile(email)
-        if not raw_me:
-            return Response({"detail": "Profile not found for this email"}, status=404)
-
-        me = normalize_profile(raw_me)
-        my_gender = me.get("gender")
-        my_interested_in = me.get("interested_in_genders")
-
-        if not my_gender or not my_interested_in:
-            return Response({"detail": "Preference data incomplete on your profile"}, status=400)
-
-        # if you don't yet store lat/lng, distance_km will be None below
-        my_lat = me.get("lat")
-        my_lng = me.get("lng")
-        my_max_dist = me.get("max_distance_km")
-
-        # Firestore query: others who are interested in my gender
-        query = db.collection("Profile").where("interestedIn", "array_contains_any", ["Men", "Women"])
-        docs = list(query.stream())
-
-        results = []
-        liked_emails = get_liked_emails(email)
-        for doc in docs:
-            raw_other = doc.to_dict() or {}
-            other = normalize_profile(raw_other)
-            other_email = other.get("email")
-
-            if not other_email or other_email == email:
-                continue
-            if other_email in liked_emails:
-                continue
-
-            # mutual interest: I like their gender & they like mine
-            other_gender = other.get("gender")
-            if not other_gender or other_gender not in my_interested_in:
-                continue
-            if my_gender not in other.get("interested_in_genders", []):
-                continue
-
-            # distance (optional if lat/lng present)
-            lat2, lng2 = other.get("lat"), other.get("lng")
-            if my_lat is not None and my_lng is not None and lat2 is not None and lng2 is not None:
-                d_km = haversine_km(my_lat, my_lng, lat2, lng2)
-                max_dist = min(my_max_dist or d_km, other.get("max_distance_km") or d_km)
-                if my_max_dist and d_km > max_dist:
-                    continue
-            else:
-                d_km = None
-                max_dist = None
-
-            sim = profile_similarity(me, other, d_km, max_dist)
-            # if sim < 0.60:
-            #     continue
-
-            results.append(
-                {
-                    "email": other_email,
-                    "similarity": round(sim * 100, 1),
-                    "distance_km": round(d_km, 1) if d_km is not None else None,
-                    "profile": raw_other,  # return original Firestore shape
-                }
+        try:
+            me_profile = UserProfile.objects.select_related("user").get(
+                Q(user__email=email) | Q(user__username=email)
             )
+        except UserProfile.DoesNotExist:
+            return Response({"detail": "Profile not found"}, status=404)
+
+        # ----------------------------------
+        # 2. Gender preference
+        # ----------------------------------
+        my_gender = normalize_gender(me_profile.gender)
+
+        if my_gender == "man":
+            target_gender_db = "Woman"
+        elif my_gender == "woman":
+            target_gender_db = "Man"
+        else:
+            return Response({"detail": "Invalid gender"}, status=400)
+
+        # ----------------------------------
+        # 3. Fetch MATCHED users
+        # ----------------------------------
+        matched_qs = Match.objects.filter(
+            Q(user_a=email) | Q(user_b=email),
+            status="active"
+        ).values_list("user_a", "user_b")
+
+        matched_emails = set()
+        for a, b in matched_qs:
+            matched_emails.add(a.lower())
+            matched_emails.add(b.lower())
+
+        matched_emails.discard(email)
+
+        # ----------------------------------
+        # 4. Fetch LIKED users
+        # ----------------------------------
+        liked_emails = set(
+            Like.objects.filter(from_email=email)
+            .values_list("to_email", flat=True)
+        )
+
+        # ----------------------------------
+        # 5. Fetch BLOCKED users
+        # ----------------------------------
+        blocked_emails = set(
+            BlockedUser.objects.filter(blocker=email)
+            .values_list("blocked", flat=True)
+        )
+
+        # ----------------------------------
+        # 6. Build candidate queryset
+        # ----------------------------------
+        others = (
+            UserProfile.objects
+            .select_related("user")
+            .filter(
+                gender=target_gender_db,
+                account_status="active"
+            )
+            .exclude(user=me_profile.user)
+            .exclude(
+                Q(user__email__in=matched_emails) |
+                Q(user__username__in=matched_emails)
+            )
+            .exclude(
+                Q(user__email__in=liked_emails) |
+                Q(user__username__in=liked_emails)
+            )
+            .exclude(
+                Q(user__email__in=blocked_emails) |
+                Q(user__username__in=blocked_emails)
+            )
+        )
+
+        # ----------------------------------
+        # 7. Similarity scoring
+        # ----------------------------------
+        me_data = serialize_profile(me_profile)
+        results = []
+
+        for other_profile in others:
+            other_data = serialize_profile(other_profile)
+
+            similarity = profile_similarity(
+                me_data,
+                other_data,
+                None,
+                None
+            )
+
+            results.append({
+                "similarity": round(similarity * 100, 1),
+                "profile": other_data
+            })
 
         results.sort(key=lambda x: x["similarity"], reverse=True)
         return Response(results)
-    
+
 # class LikeProfileView(APIView):
 #     permission_classes = [IsAuthenticated]
 
@@ -821,37 +1027,46 @@ class LikeProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from_email = request.user.username
+        from_email = request.user.email.lower()
         to_email = request.data.get("to_email")
 
         if not to_email:
-            return Response({"error": "to_email is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "to_email is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        result = FirebaseLikeManager.send_like(from_email=from_email, to_email=to_email)
+        result = FirebaseLikeManager.send_like(
+            from_email=from_email,
+            to_email=to_email
+        )
 
-        # No cleaning needed - create_match returns clean data
+        # 🔔 If matched → notify both users
         if result.get("status") == "matched":
-            match = result.get("match")
-            try:
-                to_user = User.objects.get(username=to_email)
-                notify_user(to_user.id, {
-                    "type": "MATCH_CREATED",
-                    "match_id": match["match_id"],
-                    "chat_id": match["chat_id"],
-                    "from_email": from_email,
-                })
-            except User.DoesNotExist:
-                pass
+            match = result["match"]
+
+            notify_user(from_email, {
+                "type": "MATCH_CREATED",
+                "match_id": match["match_id"],
+                "chat_id": match["chat_id"],
+                "from_email": to_email,
+            })
+
+            notify_user(to_email, {
+                "type": "MATCH_CREATED",
+                "match_id": match["match_id"],
+                "chat_id": match["chat_id"],
+                "from_email": from_email,
+            })
+
+            # 🔥 VERY IMPORTANT: flatten response for frontend
+            return Response({
+                "status": "matched",
+                "match_id": match["match_id"],
+                "chat_id": match["chat_id"],
+            }, status=status.HTTP_200_OK)
 
         return Response(result, status=status.HTTP_200_OK)
-
-def get_liked_emails(email: str) -> set[str]:
-    likes = (
-        db.collection("likes")
-        .where("from_email", "==", email)
-        .stream()
-    )
-    return {doc.to_dict().get("to_email") for doc in likes}
 
 
 
@@ -914,6 +1129,17 @@ class MatchedChatsView(APIView):
             else:
                 other_email = match.user_a
 
+            # ✅ Block checks (MUST be inside loop)
+            is_blocked_by_me = BlockedUser.objects.filter(
+                blocker=my_email,
+                blocked=other_email
+            ).exists()
+
+            is_blocked_me = BlockedUser.objects.filter(
+                blocker=other_email,
+                blocked=my_email
+            ).exists()
+
             profile = FirebaseProfileManager.get_profile(other_email) or {}
 
             chats.append({
@@ -929,6 +1155,9 @@ class MatchedChatsView(APIView):
                     if profile.get("photos")
                     else None
                 ),
+                # ✅ expose block info to frontend
+                "blocked_by_me": is_blocked_by_me,
+                "blocked_me": is_blocked_me,
             })
 
         return Response(chats, status=status.HTTP_200_OK)
@@ -955,17 +1184,18 @@ class ChatMessagesView(APIView):
         messages = MySQLChatManager.get_messages(chat_id)
 
         return Response(messages, status=status.HTTP_200_OK)
-    
+
+
 class SendChatMessageView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, chat_id):
         sender = request.user.username.lower()
-        content = request.data.get("content")
+        content = request.data.get("content", "").strip()
 
         if not content:
             return Response(
-                {"detail": "Message content required"},
+                {"detail": "Message content cannot be empty"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -976,11 +1206,24 @@ class SendChatMessageView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        receiver = next(
-            email for email in chat["participants"] if email != sender
-        )
+        receiver = next(e for e in chat["participants"] if e != sender)
 
-        # 1️⃣ Persist message
+        # 🚫 BLOCK CHECK — ABSOLUTE GATE
+        if BlockedUser.objects.filter(
+            Q(blocker=receiver, blocked=sender) |
+            Q(blocker=sender, blocked=receiver)
+        ).exists():
+            return Response(
+                {
+                    "detail": "You cannot send messages to this user",
+                    "blocked": True
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 🔒 NO CODE ABOVE THIS LINE MUST HAVE SIDE EFFECTS
+
+        # ✅ Safe to persist
         MySQLChatManager.add_message(
             chat_id=chat_id,
             sender=sender,
@@ -988,7 +1231,7 @@ class SendChatMessageView(APIView):
             content=content
         )
 
-        # 2️⃣ Broadcast to WebSocket group
+        # ✅ Safe to broadcast
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f"chat_{chat_id}",
@@ -1002,10 +1245,41 @@ class SendChatMessageView(APIView):
             }
         )
 
-        return Response(
-            {"status": "sent"},
-            status=status.HTTP_201_CREATED
+        return Response({"status": "sent"}, status=status.HTTP_201_CREATED)
+
+class BlockUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        blocker = request.user.username.lower()
+        blocked = request.data.get("email")
+
+        if not blocked:
+            return Response(
+                {"detail": "Blocked email required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        BlockedUser.objects.get_or_create(
+            blocker=blocker,
+            blocked=blocked.lower()
         )
+
+        return Response({"status": "blocked"}, status=status.HTTP_200_OK)
+
+class UnblockUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        blocker = request.user.username.lower()
+        blocked = request.data.get("email")
+
+        BlockedUser.objects.filter(
+            blocker=blocker,
+            blocked=blocked.lower()
+        ).delete()
+
+        return Response({"status": "unblocked"}, status=status.HTTP_200_OK)
 
 
 class MarkChatReadView(APIView):
@@ -1027,3 +1301,60 @@ class MarkChatReadView(APIView):
         )
 
         return Response({"status": "ok"}, status=status.HTTP_200_OK)
+
+class CreateUserReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CreateUserReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        chat_id = serializer.validated_data["chat_id"]
+
+        match = Match.objects.filter(chat_id=chat_id).first()
+        if not match:
+            return Response(
+                {"error": "Invalid chat"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # identify reported user via email
+        if request.user.email == match.user_a:
+            reported_email = match.user_b
+        elif request.user.email == match.user_b:
+            reported_email = match.user_a
+        else:
+            return Response(
+                {"error": "You are not part of this chat"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        reported_user = User.objects.get(email=reported_email)
+
+        if reported_user == request.user:
+            return Response(
+                {"error": "You cannot report yourself"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if UserReport.objects.filter(
+            reporter=request.user,
+            reported_user=reported_user,
+            status="pending"
+        ).exists():
+            return Response(
+                {"error": "You already reported this user"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        UserReport.objects.create(
+            reporter=request.user,
+            reported_user=reported_user,
+            reason=serializer.validated_data["reason"],
+            description=serializer.validated_data.get("description", "")
+        )
+
+        return Response(
+            {"message": "Report submitted successfully"},
+            status=status.HTTP_201_CREATED
+        )

@@ -277,3 +277,48 @@ body {
   border-radius: 50%;
   padding: 2px;
 }
+
+.datepicker {
+  background-color: white !important; /* Fixes transparency */
+  border: 1px solid #e5e7eb !important; /* gray-200 */
+  border-radius: 0.75rem !important; /* rounded-xl */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important; /* shadow-xl */
+  padding: 10px !important;
+  z-index: 9999 !important; /* Forces it above everything */
+  font-family: inherit !important;
+}
+
+/* Fix grid layout if broken */
+.datepicker-grid {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+}
+
+/* Header Styling */
+.datepicker-controls {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 8px !important;
+}
+
+/* Day Hover Colors (Teal) */
+.datepicker-cell:hover:not(.disabled) {
+  background-color: #f0fdfa !important; /* teal-50 */
+  color: #0d9488 !important; /* teal-600 */
+  border-radius: 0.5rem !important;
+}
+
+/* Selected Day Color (Teal) */
+.datepicker-cell.selected,
+.datepicker-cell.selected:hover {
+  background-color: #14b8a6 !important; /* teal-500 */
+  color: white !important;
+  font-weight: 600 !important;
+  border-radius: 0.5rem !important;
+}
+
+/* Today's Date */
+.datepicker-cell.focused:not(.selected) {
+  background-color: #f3f4f6 !important; /* gray-100 */
+}

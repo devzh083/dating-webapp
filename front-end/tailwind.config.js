@@ -3,7 +3,9 @@ export default {
   darkMode: ["class"],
   content: [
     "./index.html",
-    "./src/**/*.{ts,tsx}"
+    "./src/**/*.{ts,tsx}",
+    // ✅ 1. Add this line so Tailwind sees the Datepicker classes
+    "./node_modules/flowbite/**/*.js"
   ],
   theme: {
     container: {
@@ -49,5 +51,8 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // ✅ 2. Add the Flowbite plugin here to load the styles
+    require('flowbite/plugin')
+  ],
 };

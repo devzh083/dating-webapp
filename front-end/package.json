@@ -45,6 +45,8 @@
     "dotenv": "^17.2.3",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^12.6.0",
+    "flowbite": "^4.0.1",
+    "flowbite-datepicker": "^2.0.0",
     "framer-motion": "^12.23.26",
     "input-otp": "^1.4.2",
     "jwt-decode": "^4.0.0",

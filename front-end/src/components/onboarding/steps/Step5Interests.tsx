@@ -64,8 +64,6 @@ const interestCategories = [
   },
 ] as const;
 
-const MAX_INTERESTS = 10;
-
 export const Step5Interests = ({
   data,
   onChange,
@@ -73,24 +71,26 @@ export const Step5Interests = ({
   onBack,
   onSkip,
 }: Step5Props) => {
+  
   const toggleInterest = (interest: string) => {
     const current = data.interests;
     if (current.includes(interest)) {
+      // Remove interest
       onChange({ ...data, interests: current.filter((i) => i !== interest) });
-    } else if (current.length < MAX_INTERESTS) {
+    } else {
+      // Add interest (No limit check)
       onChange({ ...data, interests: [...current, interest] });
     }
   };
 
   const selectedCount = data.interests.length;
-  const isAtLimit = selectedCount >= MAX_INTERESTS;
 
   return (
     <StepLayout
       currentStep={5}
       totalSteps={7}
       title="What are you into?"
-      subtitle="Pick your top interests to help find better matches"
+      subtitle="Pick your interests to help find better matches"
       onBack={onBack}
       onNext={onNext}
       onSkip={onSkip}
@@ -98,36 +98,21 @@ export const Step5Interests = ({
       <div className="space-y-6">
         {/* Sticky Counter Header */}
         <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm pb-4 pt-1 border-b border-gray-50 -mx-10 px-10">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-1">
             <span className="text-sm font-medium text-gray-500">
-              Select up to {MAX_INTERESTS}
+              Select all that apply
             </span>
-            <motion.span
+            <motion.div
               key={selectedCount}
               initial={{ scale: 1.2 }}
-              animate={{ 
-                scale: 1, 
-                color: isAtLimit ? "#ef4444" : "#111827" 
-              }}
-              className="text-sm font-bold text-gray-900"
+              animate={{ scale: 1 }}
+              className="flex items-center gap-1.5"
             >
-              {selectedCount}/{MAX_INTERESTS}
-            </motion.span>
-          </div>
-
-          {/* The Visual Dashes (Local Counter from Video) */}
-          <div className="flex gap-1.5 h-1.5 w-full">
-            {Array.from({ length: MAX_INTERESTS }).map((_, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "flex-1 rounded-full transition-all duration-300",
-                  index < selectedCount 
-                    ? "bg-teal-400"  // Filled state (Teal)
-                    : "bg-gray-100"  // Empty state
-                )}
-              />
-            ))}
+              <span className="text-sm font-bold text-teal-600">
+                {selectedCount}
+              </span>
+              <span className="text-sm font-medium text-gray-400">selected</span>
+            </motion.div>
           </div>
         </div>
 
@@ -148,10 +133,6 @@ export const Step5Interests = ({
                     label={interest}
                     selected={data.interests.includes(interest)}
                     onClick={() => toggleInterest(interest)}
-                    className={cn(
-                        // Add opacity if limit reached and item not selected
-                        !data.interests.includes(interest) && isAtLimit && "opacity-40 cursor-not-allowed hover:border-gray-200"
-                    )}
                   />
                 ))}
               </div>
