@@ -24,7 +24,7 @@ import HelpCenterPage from './pages/footer/HelpCenterPage';
 
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const isAdmin = adminService.isAdmin();
-  if (!isAdmin) return <Navigate to="/admin/login" replace />;
+  if (!isAdmin) return <Navigate to="/login" replace />; // ✅ Changed to /login
   return <>{children}</>;
 };
 
@@ -124,7 +124,8 @@ const AppInner: React.FC = () => {
 
   return (
     <Routes>
-      <Route path="/admin/login" element={<AdminLogin />} />
+      {/* ✅ Admin login merged into main LoginPage - routes commented out */}
+      {/* <Route path="/admin/login" element={<AdminLogin />} /> */}
       <Route path="/admin/dashboard" element={<AdminRoute><AdminPanel /></AdminRoute>} />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
