@@ -1,24 +1,196 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, AllowAny
+from .permissions import IsAdminUser
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from django.db.models import Q, Count, Sum, QuerySet
 from django.utils import timezone
 from datetime import timedelta
-from .models import UserReport, AdminAction
+from .models import UserReport, AdminAction, PremiumPlan, PremiumFeature, ExpertTip
 from profiles.models import UserProfile
 from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate
-from .models import PremiumPlan, PremiumFeature
-from .serializers import PremiumPlanSerializer, PremiumFeatureSerializer
 from .serializers import (
     UserProfileSerializer, UserReportSerializer, 
-    AdminActionSerializer, UserActionSerializer
+    AdminActionSerializer, UserActionSerializer,
+    PremiumPlanSerializer, PremiumFeatureSerializer,
+    ExpertTipSerializer
 )
+from rest_framework import generics
+from .models import Review
+from .serializers import ReviewSerializer, ApprovedReviewSerializer
+
+from rest_framework.permissions import IsAuthenticated
+
+class SubmitReviewView(APIView):
+    """Public endpoint for authenticated users to submit reviews"""
+    permission_classes = [IsAuthenticated]  # Only requires login, not admin
+    
+    def post(self, request):
+        try:
+            text = request.data.get('text', '').strip()
+            rating = request.data.get('rating', 5)
+            
+            # Validation
+            if not text:
+                return Response(
+                    {'error': 'Review text is required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if len(text) < 50:
+                return Response(
+                    {'error': 'Review must be at least 50 characters'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not (1 <= rating <= 5):
+                return Response(
+                    {'error': 'Rating must be between 1 and 5'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # ✅ FIXED: Create review WITHOUT username field
+            # The username is automatically derived from user.username in the ReviewSerializer
+            review = Review.objects.create(
+                user=request.user,
+                text=text,
+                rating=rating,
+                status='pending'  # All new reviews start as pending
+            )
+            
+            return Response(
+                {
+                    'message': 'Review submitted successfully! It will be visible after admin approval.',
+                    'review': ReviewSerializer(review).data
+                },
+                status=status.HTTP_201_CREATED
+            )
+            
+        except Exception as e:
+            import traceback
+            print("Review submission error:", traceback.format_exc())  # Debug logging
+            return Response(
+                {'error': f'Failed to submit review: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+class ApprovedReviewsView(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = ApprovedReviewSerializer
+    
+    def get_queryset(self):
+        return Review.objects.filter(status='approved').order_by('-created_at')
+
+# Admin endpoints
+class AdminReviewsListView(generics.ListAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = ReviewSerializer
+    
+    def get_queryset(self):
+        queryset = Review.objects.all()
+        
+        # Filters
+        status_filter = self.request.query_params.get('status')
+        if status_filter and status_filter != 'all':
+            queryset = queryset.filter(status=status_filter)
+            
+        rating_filter = self.request.query_params.get('rating')
+        if rating_filter and rating_filter != 'all':
+            queryset = queryset.filter(rating=int(rating_filter))
+            
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(text__icontains=search)
+            
+        return queryset
+
+class AdminReviewDetailView(generics.RetrieveDestroyAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = ReviewSerializer
+    queryset = Review.objects.all()
+
+class ApproveReviewView(APIView):
+    permission_classes = [IsAdminUser]
+    
+    def post(self, request, pk):
+        try:
+            review = Review.objects.get(pk=pk)
+            review.status = 'approved'
+            review.reviewed_by = request.user
+            review.reviewed_at = timezone.now()
+            review.admin_notes = request.data.get('admin_notes', '')
+            review.save()
+            
+            return Response({
+                'message': 'Review approved successfully',
+                'review': ReviewSerializer(review).data
+            })
+        except Review.DoesNotExist:
+            return Response(
+                {'error': 'Review not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+class RejectReviewView(APIView):
+    permission_classes = [IsAdminUser]
+    
+    def post(self, request, pk):
+        try:
+            review = Review.objects.get(pk=pk)
+            review.status = 'rejected'
+            review.reviewed_by = request.user
+            review.reviewed_at = timezone.now()
+            review.admin_notes = request.data.get('admin_notes', '')
+            review.save()
+            
+            return Response({
+                'message': 'Review rejected successfully',
+                'review': ReviewSerializer(review).data
+            })
+        except Review.DoesNotExist:
+            return Response(
+                {'error': 'Review not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+class BulkApproveReviewsView(APIView):
+    permission_classes = [IsAdminUser]
+    
+    def post(self, request):
+        review_ids = request.data.get('review_ids', [])
+        
+        reviews = Review.objects.filter(id__in=review_ids)
+        approved_count = reviews.update(
+            status='approved',
+            reviewed_by=request.user,
+            reviewed_at=timezone.now()
+        )
+        
+        return Response({
+            'message': f'{approved_count} review(s) approved',
+            'approved_count': approved_count
+        })
+
+class BulkRejectReviewsView(APIView):
+    permission_classes = [IsAdminUser]
+    
+    def post(self, request):
+        review_ids = request.data.get('review_ids', [])
+        
+        reviews = Review.objects.filter(id__in=review_ids)
+        rejected_count = reviews.update(
+            status='rejected',
+            reviewed_by=request.user,
+            reviewed_at=timezone.now()
+        )
+        
+        return Response({
+            'message': f'{rejected_count} review(s) rejected',
+            'rejected_count': rejected_count
+        })
 
 
 class PremiumManagementViewSet(viewsets.ModelViewSet):
@@ -28,9 +200,9 @@ class PremiumManagementViewSet(viewsets.ModelViewSet):
     queryset = PremiumPlan.objects.all()
     lookup_field = 'plan_id'
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[PremiumPlan]:  # ✅ Added type hint
         """Get queryset with optional filtering"""
-        request = self.request
+        request: Request = self.request  # ✅ Type annotation
         queryset = PremiumPlan.objects.all()
         
         # Filter by active status
@@ -120,9 +292,9 @@ class PremiumFeatureViewSet(viewsets.ModelViewSet):
     serializer_class = PremiumFeatureSerializer
     queryset = PremiumFeature.objects.all()
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[PremiumFeature]:  # ✅ Added type hint
         """Get queryset with optional filtering"""
-        request = self.request
+        request: Request = self.request  # ✅ Type annotation
         queryset = PremiumFeature.objects.all()
         
         # Filter by active status
@@ -799,3 +971,116 @@ class AdminLoginView(APIView):
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_premium_plans(request):
+    """Public endpoint for fetching active premium plans (no auth required)"""
+    try:
+        plans = PremiumPlan.objects.filter(active=True).order_by('display_order', 'price')
+        serializer = PremiumPlanSerializer(plans, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch plans: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_premium_features(request):
+    """Public endpoint for fetching active premium features (no auth required)"""
+    try:
+        features = PremiumFeature.objects.filter(active=True).order_by('display_order')
+        serializer = PremiumFeatureSerializer(features, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch features: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+class ExpertTipViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing expert tips (admin only)"""
+    permission_classes = [IsAdminUser]
+    serializer_class = ExpertTipSerializer
+    queryset = ExpertTip.objects.all()
+    
+    def get_queryset(self) -> QuerySet[ExpertTip]:  # ✅ Added type hint
+        """Get queryset with optional filtering"""
+        request: Request = self.request  # ✅ Type annotation
+        queryset = ExpertTip.objects.all()
+        
+        # Filter by active status
+        active = request.query_params.get('active', None)
+        if active is not None:
+            queryset = queryset.filter(active=active.lower() == 'true')
+        
+        return queryset.order_by('display_order', '-created_at')
+    
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, pk=None):
+        """Toggle tip active status"""
+        try:
+            tip = self.get_object()
+            tip.active = not tip.active
+            tip.save()
+            
+            return Response({
+                'message': f'Tip {"activated" if tip.active else "deactivated"} successfully',
+                'tip': ExpertTipSerializer(tip).data
+            })
+        except ExpertTip.DoesNotExist:
+            return Response(
+                {'error': 'Tip not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['post'])
+    def reorder(self, request):
+        """Reorder tips"""
+        try:
+            orders = request.data.get('orders', [])  # [{id: 1, order: 0}, ...]
+            
+            for item in orders:
+                tip_id = item.get('id')
+                order = item.get('order')
+                
+                if tip_id and order is not None:
+                    ExpertTip.objects.filter(id=tip_id).update(display_order=order)
+            
+            return Response({'message': 'Tips reordered successfully'})
+        except Exception as e:
+            return Response(
+                {'error': f'Reorder failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_expert_tips(request):
+    """Public endpoint for fetching active expert tips (no auth required)"""
+    try:
+        # Get limit from query params (default 3)
+        limit = request.query_params.get('limit', None)
+        
+        tips = ExpertTip.objects.filter(active=True).order_by('display_order', '-created_at')
+        
+        if limit:
+            try:
+                limit = int(limit)
+                tips = tips[:limit]
+            except ValueError:
+                pass
+        
+        serializer = ExpertTipSerializer(tips, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch expert tips: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

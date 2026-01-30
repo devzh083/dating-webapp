@@ -3,6 +3,38 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from profiles.models import UserProfile  # Import UserProfile from profiles app
 
+class Review(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
+    rating = models.IntegerField(choices=[(i, i) for i in range(1, 6)])  # 1-5 stars
+    text = models.TextField(max_length=500)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    # Admin review tracking
+    reviewed_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='reviewed_reviews'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    admin_notes = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"{self.user.username} - {self.rating} stars - {self.status}"
+
 
 class PremiumPlan(models.Model):
     """Model for managing premium subscription plans"""
@@ -164,3 +196,70 @@ class AdminAction(models.Model):
     class Meta:
         db_table = 'admin_actions'
         ordering = ['-created_at']
+
+class ExpertTip(models.Model):
+    """Model for managing expert tips displayed on the platform"""
+    
+    ICON_CHOICES = [
+        ('message-circle', 'Message Circle'),
+        ('target', 'Target'),
+        ('sparkles', 'Sparkles'),
+        ('lightbulb', 'Lightbulb'),
+        ('heart', 'Heart'),
+        ('star', 'Star'),
+        ('zap', 'Zap'),
+        ('users', 'Users'),
+        ('trending-up', 'Trending Up'),
+    ]
+    
+    COLOR_CHOICES = [
+        ('text-blue-500', 'Blue'),
+        ('text-rose-500', 'Rose'),
+        ('text-amber-500', 'Amber'),
+        ('text-violet-500', 'Violet'),
+        ('text-green-500', 'Green'),
+        ('text-purple-500', 'Purple'),
+        ('text-pink-500', 'Pink'),
+        ('text-teal-500', 'Teal'),
+    ]
+    
+    BG_CHOICES = [
+        ('bg-blue-50', 'Blue'),
+        ('bg-rose-50', 'Rose'),
+        ('bg-amber-50', 'Amber'),
+        ('bg-violet-50', 'Violet'),
+        ('bg-green-50', 'Green'),
+        ('bg-purple-50', 'Purple'),
+        ('bg-pink-50', 'Pink'),
+        ('bg-teal-50', 'Teal'),
+    ]
+    
+    # Expert Information
+    name = models.CharField(max_length=100, help_text="Expert's name")
+    role = models.CharField(max_length=100, help_text="Expert's role/title")
+    image = models.URLField(
+        max_length=500, 
+        help_text="URL to expert's profile image (e.g., https://i.pravatar.cc/150?img=11)"
+    )
+    
+    # Tip Content
+    tip = models.TextField(help_text="The expert tip text")
+    
+    # Styling
+    icon = models.CharField(max_length=20, choices=ICON_CHOICES, default='lightbulb')
+    icon_color = models.CharField(max_length=20, choices=COLOR_CHOICES, default='text-blue-500')
+    bg_color = models.CharField(max_length=20, choices=BG_CHOICES, default='bg-blue-50')
+    
+    # Metadata
+    active = models.BooleanField(default=True, help_text="Whether this tip is displayed")
+    display_order = models.IntegerField(default=0, help_text="Order in which tips appear (lower = first)")
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['display_order', '-created_at']
+        verbose_name = 'Expert Tip'
+        verbose_name_plural = 'Expert Tips'
+    
+    def __str__(self):
+        return f"{self.name} - {self.role}"

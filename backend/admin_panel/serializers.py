@@ -2,7 +2,32 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from profiles.models import UserProfile
 from .models import UserReport, AdminAction
-from .models import PremiumPlan, PremiumFeature
+from .models import PremiumPlan, PremiumFeature, ExpertTip
+from .models import Review
+
+class ReviewSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    reviewed_by_username = serializers.CharField(
+        source='reviewed_by.username', 
+        read_only=True, 
+        allow_null=True
+    )
+    
+    class Meta:
+        model = Review
+        fields = [
+            'id', 'user', 'username', 'rating', 'text', 'status',
+            'created_at', 'reviewed_at', 'reviewed_by', 
+            'reviewed_by_username', 'admin_notes'
+        ]
+        read_only_fields = ['user', 'reviewed_by', 'reviewed_at']
+
+class ApprovedReviewSerializer(serializers.ModelSerializer):
+    """Simplified serializer for public reviews - doesn't expose usernames"""
+    
+    class Meta:
+        model = Review
+        fields = ['id', 'rating', 'text', 'created_at']
 
 
 class PremiumPlanSerializer(serializers.ModelSerializer):
@@ -24,14 +49,14 @@ class PremiumPlanSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Price must be greater than 0")
         return value
     
-    def validate(self, data):
+    def validate(self, attrs):  # ✅ CHANGED from 'data' to 'attrs'
         """Validate that original_price is greater than price if provided"""
-        if data.get('original_price') and data.get('price'):
-            if data['original_price'] <= data['price']:
+        if attrs.get('original_price') and attrs.get('price'):
+            if attrs['original_price'] <= attrs['price']:
                 raise serializers.ValidationError(
                     "Original price must be greater than current price"
                 )
-        return data
+        return attrs  # ✅ CHANGED from 'data' to 'attrs'
 
 
 class PremiumFeatureSerializer(serializers.ModelSerializer):
@@ -120,4 +145,23 @@ class UserActionSerializer(serializers.Serializer):
         """Validate that the action is allowed"""
         if value not in dict(self.ACTION_CHOICES):
             raise serializers.ValidationError(f"Invalid action: {value}")
+        return value
+
+
+class ExpertTipSerializer(serializers.ModelSerializer):
+    """Serializer for Expert Tips"""
+    
+    class Meta:
+        model = ExpertTip
+        fields = [
+            'id', 'name', 'role', 'image', 'tip', 
+            'icon', 'icon_color', 'bg_color',
+            'active', 'display_order', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def validate_image(self, value):
+        """Validate that image URL is valid"""
+        if not value.startswith(('http://', 'https://')):
+            raise serializers.ValidationError("Image must be a valid URL starting with http:// or https://")
         return value

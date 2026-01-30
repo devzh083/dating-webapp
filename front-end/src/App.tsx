@@ -13,7 +13,9 @@ import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import AdminPanel from './pages/AdminPanel';
-import { adminService, profileService } from './services/profileService'; // ✅ Imported profileService
+import PremiumPage from './pages/Premiumpage';
+import { adminService, profileService } from './services/profileService'; 
+
 
 // Footer Pages
 import LegalPage from './pages/footer/LegalPage';
@@ -171,6 +173,16 @@ const AppInner: React.FC = () => {
             />
           ) : <Navigate to="/" replace />
         }
+      />
+
+      {/* ✅ Premium Page Route - accessible to logged-in users */}
+      <Route 
+        path="/premium" 
+        element={
+          !isLoggedIn ? <Navigate to="/" replace /> : 
+          needsOnboarding ? <Navigate to="/onboarding" replace /> : 
+          <PremiumPage />
+        } 
       />
 
       <Route path="/home" element={!isLoggedIn ? <Navigate to="/" replace /> : needsOnboarding ? <Navigate to="/onboarding" replace /> : <HomePage onLogout={handleLogout} />} />
