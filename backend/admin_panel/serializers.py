@@ -1,78 +1,82 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from profiles.models import UserProfile
-from .models import UserReport, AdminAction
-from .models import PremiumPlan, PremiumFeature, ExpertTip
-from .models import Review
+from .models import UserReport, AdminAction, PremiumPlan, PremiumFeature, ExpertTip, Review, AdminRole
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REVIEW SERIALIZERS
+# ─────────────────────────────────────────────────────────────────────────────
 
 class ReviewSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     reviewed_by_username = serializers.CharField(
-        source='reviewed_by.username', 
-        read_only=True, 
-        allow_null=True
+        source='reviewed_by.username', read_only=True, allow_null=True
     )
-    
+
     class Meta:
         model = Review
         fields = [
             'id', 'user', 'username', 'rating', 'text', 'status',
-            'created_at', 'reviewed_at', 'reviewed_by', 
+            'created_at', 'reviewed_at', 'reviewed_by',
             'reviewed_by_username', 'admin_notes'
         ]
         read_only_fields = ['user', 'reviewed_by', 'reviewed_at']
 
+
 class ApprovedReviewSerializer(serializers.ModelSerializer):
-    """Simplified serializer for public reviews - doesn't expose usernames"""
-    
     class Meta:
         model = Review
         fields = ['id', 'rating', 'text', 'created_at']
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# PREMIUM SERIALIZERS
+# ─────────────────────────────────────────────────────────────────────────────
+
 class PremiumPlanSerializer(serializers.ModelSerializer):
-    """Serializer for Premium Plans"""
-    
     class Meta:
         model = PremiumPlan
         fields = [
-            'plan_id', 'name', 'duration', 'plan_type', 'price', 
+            'plan_id', 'name', 'duration', 'plan_type', 'price',
             'original_price', 'price_per_month', 'discount_text',
             'icon', 'color', 'gradient', 'popular', 'features',
             'active', 'display_order', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
-    
+
     def validate_price(self, value):
-        """Ensure price is positive"""
         if value <= 0:
             raise serializers.ValidationError("Price must be greater than 0")
         return value
-    
-    def validate(self, attrs):  # ✅ CHANGED from 'data' to 'attrs'
-        """Validate that original_price is greater than price if provided"""
+
+    def validate(self, attrs):
         if attrs.get('original_price') and attrs.get('price'):
             if attrs['original_price'] <= attrs['price']:
                 raise serializers.ValidationError(
                     "Original price must be greater than current price"
                 )
-        return attrs  # ✅ CHANGED from 'data' to 'attrs'
+        return attrs
 
 
 class PremiumFeatureSerializer(serializers.ModelSerializer):
-    """Serializer for Premium Features"""
-    
     class Meta:
         model = PremiumFeature
         fields = [
-            'id', 'title', 'description', 'icon', 
+            'id', 'title', 'description', 'icon',
             'active', 'display_order', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# USER / REPORT / ACTION SERIALIZERS
+# ─────────────────────────────────────────────────────────────────────────────
+
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for User model"""
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'date_joined', 'is_active']
@@ -80,15 +84,14 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    """Admin-focused serializer for UserProfile with nested User data"""
     user = UserSerializer(read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.CharField(source='user.email', read_only=True)
-    
+
     class Meta:
         model = UserProfile
         fields = [
-            'user', 'username', 'email', 'phone', 'gender', 'age', 
+            'user', 'username', 'email', 'phone', 'gender', 'age',
             'location', 'status', 'account_status', 'join_date', 'last_active',
             'active_time', 'matches', 'messages', 'photo_count', 'reports',
             'profile_complete', 'verified', 'premium', 'first_name',
@@ -98,15 +101,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class UserReportSerializer(serializers.ModelSerializer):
-    """Serializer for UserReport with reporter and reported user details"""
     reporter_username = serializers.CharField(source='reporter.username', read_only=True)
     reported_username = serializers.CharField(source='reported_user.username', read_only=True)
     reviewed_by_username = serializers.CharField(source='reviewed_by.username', read_only=True, allow_null=True)
-    
+
     class Meta:
         model = UserReport
         fields = [
-            'id', 'reporter', 'reporter_username', 'reported_user', 
+            'id', 'reporter', 'reporter_username', 'reported_user',
             'reported_username', 'reason', 'description', 'status',
             'created_at', 'reviewed_at', 'reviewed_by', 'reviewed_by_username',
             'admin_notes'
@@ -115,10 +117,9 @@ class UserReportSerializer(serializers.ModelSerializer):
 
 
 class AdminActionSerializer(serializers.ModelSerializer):
-    """Serializer for AdminAction with admin and target user details"""
     admin_username = serializers.CharField(source='admin.username', read_only=True)
     target_username = serializers.CharField(source='target_user.username', read_only=True)
-    
+
     class Meta:
         model = AdminAction
         fields = [
@@ -129,39 +130,238 @@ class AdminActionSerializer(serializers.ModelSerializer):
 
 
 class UserActionSerializer(serializers.Serializer):
-    """Serializer for validating user action requests"""
     ACTION_CHOICES = [
-        ('suspend', 'Suspend'),
-        ('ban', 'Ban'),
-        ('activate', 'Activate'),
-        ('delete', 'Delete'),
-        ('verify', 'Verify'),
+        ('suspend', 'Suspend'), ('ban', 'Ban'), ('activate', 'Activate'),
+        ('delete', 'Delete'), ('verify', 'Verify'),
     ]
-    
     action = serializers.ChoiceField(choices=ACTION_CHOICES, required=True)
     reason = serializers.CharField(required=False, allow_blank=True, max_length=500)
-    
+
     def validate_action(self, value):
-        """Validate that the action is allowed"""
         if value not in dict(self.ACTION_CHOICES):
             raise serializers.ValidationError(f"Invalid action: {value}")
         return value
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# EXPERT TIP SERIALIZER
+# ─────────────────────────────────────────────────────────────────────────────
+
 class ExpertTipSerializer(serializers.ModelSerializer):
-    """Serializer for Expert Tips"""
-    
     class Meta:
         model = ExpertTip
         fields = [
-            'id', 'name', 'role', 'image', 'tip', 
+            'id', 'name', 'role', 'image', 'tip',
             'icon', 'icon_color', 'bg_color',
             'active', 'display_order', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
-    
+
     def validate_image(self, value):
-        """Validate that image URL is valid"""
         if not value.startswith(('http://', 'https://')):
             raise serializers.ValidationError("Image must be a valid URL starting with http:// or https://")
         return value
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADMIN ROLE SERIALIZERS - WITH SOFT DELETE SUPPORT
+# ─────────────────────────────────────────────────────────────────────────────
+
+VALID_SECTIONS = {'overview', 'users', 'reports', 'analytics', 'premium', 'expert-tips', 'reviews'}
+VALID_LEVELS = {'none', 'view', 'edit'}
+
+
+class AdminRoleSerializer(serializers.ModelSerializer):
+    """
+    Full read/write serializer for AdminRole with soft delete support.
+    """
+    # Read-only flattened fields from the linked User
+    email = serializers.CharField(source='user.email', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    
+    # Password tracking fields
+    initial_password = serializers.CharField(read_only=True, required=False, allow_null=True)
+    password_changed = serializers.BooleanField(read_only=True, required=False)
+    last_login = serializers.DateTimeField(read_only=True, allow_null=True)
+    
+    # ✅ NEW: Soft delete tracking
+    deleted_at = serializers.DateTimeField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = AdminRole
+        fields = [
+            'id',
+            'email',
+            'username',
+            'role_name',
+            'is_super_admin',
+            'is_active',
+            'permissions',
+            'invite_token',
+            'invite_accepted',
+            'created_at',
+            'last_login',
+            'initial_password',
+            'password_changed',
+            'deleted_at',          # ✅ NEW: Track deletion time
+        ]
+        read_only_fields = [
+            'id',
+            'email',
+            'username',
+            'is_super_admin',
+            'invite_token',
+            'invite_accepted',
+            'created_at',
+            'last_login',
+            'initial_password',
+            'password_changed',
+            'deleted_at',
+        ]
+
+    def validate_permissions(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('permissions must be a JSON object.')
+        for key, level in value.items():
+            if key not in VALID_SECTIONS:
+                raise serializers.ValidationError(f'Unknown section: "{key}".')
+            if level not in VALID_LEVELS:
+                raise serializers.ValidationError(
+                    f'Invalid level "{level}" for section "{key}". Use: none, view, edit.'
+                )
+        # Fill in any missing sections as 'none'
+        for section in VALID_SECTIONS:
+            value.setdefault(section, 'none')
+        return value
+
+
+class AdminRoleCreateSerializer(serializers.Serializer):
+    """
+    Write-only serializer for creating new admin accounts.
+    
+    ✅ SOFT DELETE: Only checks for ACTIVE users, allowing reuse of 
+    usernames/emails from soft-deleted accounts.
+    """
+    email = serializers.EmailField(required=True)
+    username = serializers.CharField(required=True, max_length=150)
+    role_name = serializers.CharField(required=True, max_length=100)
+    permissions = serializers.DictField(required=True)
+
+    def validate_username(self, value):
+        """
+        ✅ SOFT DELETE: Only check for ACTIVE users with this username.
+        
+        Inactive (soft-deleted) users are excluded from uniqueness check,
+        allowing the username to be reused.
+        """
+        # Check if any ACTIVE user has this username
+        active_user_exists = User.objects.filter(
+            username=value,
+            is_active=True
+        ).exists()
+        
+        if active_user_exists:
+            raise serializers.ValidationError(
+                'This username is already in use by an active admin account.'
+            )
+        
+        # Check if there's an inactive user (for informational purposes)
+        inactive_user = User.objects.filter(
+            username=value,
+            is_active=False
+        ).first()
+        
+        if inactive_user:
+            # Log this for debugging
+            logger.info(
+                f"Username '{value}' belongs to an inactive user. "
+                f"Will reactivate or create new account."
+            )
+        
+        return value
+
+    def validate_email(self, value):
+        """
+        ✅ SOFT DELETE: Only check for ACTIVE users with this email.
+        
+        Inactive (soft-deleted) users are excluded from uniqueness check,
+        allowing the email to be reused.
+        """
+        # Check if any ACTIVE user has this email
+        active_user_exists = User.objects.filter(
+            email=value,
+            is_active=True
+        ).exists()
+        
+        if active_user_exists:
+            raise serializers.ValidationError(
+                'This email is already in use by an active admin account.'
+            )
+        
+        # Check if there's an inactive user (for informational purposes)
+        inactive_user = User.objects.filter(
+            email=value,
+            is_active=False
+        ).first()
+        
+        if inactive_user:
+            # Log this for debugging
+            logger.info(
+                f"Email '{value}' belongs to an inactive user. "
+                f"Will reactivate or create new account."
+            )
+        
+        return value
+
+    def validate_permissions(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('permissions must be a JSON object.')
+        for key, level in value.items():
+            if key not in VALID_SECTIONS:
+                raise serializers.ValidationError(f'Unknown section: "{key}".')
+            if level not in VALID_LEVELS:
+                raise serializers.ValidationError(
+                    f'Invalid level "{level}" for section "{key}". Use: none, view, edit.'
+                )
+        # Ensure at least one section has access
+        if all(v == 'none' for v in value.values()):
+            raise serializers.ValidationError('Grant at least one section permission.')
+        # Fill missing sections
+        for section in VALID_SECTIONS:
+            value.setdefault(section, 'none')
+        return value
+
+
+class DeletedAdminRoleSerializer(serializers.ModelSerializer):
+    """
+    ✅ NEW: Specialized serializer for viewing deleted admin accounts.
+    
+    Shows additional information useful for audit trails.
+    """
+    email = serializers.CharField(source='user.email', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    deleted_at = serializers.DateTimeField(read_only=True)
+    
+    # Calculate how long ago it was deleted
+    days_since_deletion = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AdminRole
+        fields = [
+            'id',
+            'email',
+            'username',
+            'role_name',
+            'permissions',
+            'created_at',
+            'deleted_at',
+            'days_since_deletion',
+        ]
+
+    def get_days_since_deletion(self, obj):
+        """Calculate days since deletion"""
+        if obj.deleted_at:
+            from django.utils import timezone
+            delta = timezone.now() - obj.deleted_at
+            return delta.days
+        return None

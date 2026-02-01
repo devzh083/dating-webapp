@@ -9,6 +9,7 @@ from .views import (
     PremiumManagementViewSet, 
     PremiumFeatureViewSet,
     ExpertTipViewSet,
+    AdminRoleViewSet,  # ✅ CHANGED: Was AdminRoleManagementViewSet
     # Admin review management views only
     AdminReviewsListView,
     AdminReviewDetailView,
@@ -27,6 +28,7 @@ router.register(r'actions', AdminActionViewSet, basename='admin-actions')
 router.register(r'premium/plans', PremiumManagementViewSet, basename='premium-plans')
 router.register(r'premium/features', PremiumFeatureViewSet, basename='premium-features')
 router.register(r'expert-tips', ExpertTipViewSet, basename='expert-tips')
+router.register(r'admin-roles', AdminRoleViewSet, basename='admin-roles')  # ✅ CHANGED: Was AdminRoleManagementViewSet
 
 urlpatterns = [
     # Admin login endpoint
