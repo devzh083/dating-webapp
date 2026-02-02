@@ -49,6 +49,7 @@ const SectionModal: React.FC<{
   onSave: (data: any) => Promise<void>;
   onCancel: () => void;
 }> = ({ section, onSave, onCancel }) => {
+  const { showWarning } = useNotification();
   const [title, setTitle] = useState(section?.title || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -56,6 +57,7 @@ const SectionModal: React.FC<{
   const handleSave = async () => {
     if (!title.trim()) {
       setError('Section title is required');
+      showWarning('Validation Failed', 'Section title is required');
       return;
     }
 
@@ -78,7 +80,11 @@ const SectionModal: React.FC<{
           <h3 className="text-lg font-bold text-gray-900">
             {section ? 'Edit Section' : 'New Section'}
           </h3>
-          <button onClick={onCancel} className="p-1.5 hover:bg-gray-100 rounded-lg">
+          <button 
+            onClick={onCancel} 
+            disabled={saving}
+            className="p-1.5 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
@@ -93,14 +99,15 @@ const SectionModal: React.FC<{
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Section Title *
+              Section Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
+              disabled={saving}
               placeholder="e.g., Company, Support, Legal"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:border-teal-400 disabled:bg-gray-100"
             />
           </div>
         </div>
@@ -109,7 +116,7 @@ const SectionModal: React.FC<{
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 h-10 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 h-10 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? 'Saving...' : 'Save Section'}
@@ -117,7 +124,7 @@ const SectionModal: React.FC<{
           <button
             onClick={onCancel}
             disabled={saving}
-            className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+            className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -135,6 +142,7 @@ const LinkModal: React.FC<{
   onSave: (data: any) => Promise<void>;
   onCancel: () => void;
 }> = ({ link, sectionId, onSave, onCancel }) => {
+  const { showWarning } = useNotification();
   const [title, setTitle] = useState(link?.title || '');
   const [url, setUrl] = useState(link?.url || '');
   const [linkType, setLinkType] = useState<'internal' | 'external'>(link?.link_type || 'internal');
@@ -145,10 +153,12 @@ const LinkModal: React.FC<{
   const handleSave = async () => {
     if (!title.trim()) {
       setError('Link title is required');
+      showWarning('Validation Failed', 'Link title is required');
       return;
     }
     if (!url.trim()) {
       setError('URL is required');
+      showWarning('Validation Failed', 'URL is required');
       return;
     }
 
@@ -177,7 +187,11 @@ const LinkModal: React.FC<{
           <h3 className="text-lg font-bold text-gray-900">
             {link ? 'Edit Link' : 'New Link'}
           </h3>
-          <button onClick={onCancel} className="p-1.5 hover:bg-gray-100 rounded-lg">
+          <button 
+            onClick={onCancel} 
+            disabled={saving}
+            className="p-1.5 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
@@ -192,27 +206,29 @@ const LinkModal: React.FC<{
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Link Title *
+              Link Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
+              disabled={saving}
               placeholder="e.g., About Us, Privacy Policy"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:border-teal-400 disabled:bg-gray-100"
             />
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              URL *
+              URL <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={url}
               onChange={e => setUrl(e.target.value)}
+              disabled={saving}
               placeholder="/about or https://example.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:border-teal-400 disabled:bg-gray-100"
             />
           </div>
 
@@ -224,7 +240,8 @@ const LinkModal: React.FC<{
               <button
                 type="button"
                 onClick={() => setLinkType('internal')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition ${
+                disabled={saving}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${
                   linkType === 'internal'
                     ? 'border-teal-500 bg-teal-50 text-teal-700'
                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
@@ -236,7 +253,8 @@ const LinkModal: React.FC<{
               <button
                 type="button"
                 onClick={() => setLinkType('external')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition ${
+                disabled={saving}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${
                   linkType === 'external'
                     ? 'border-teal-500 bg-teal-50 text-teal-700'
                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
@@ -255,7 +273,8 @@ const LinkModal: React.FC<{
                 id="openNewTab"
                 checked={openNewTab}
                 onChange={e => setOpenNewTab(e.target.checked)}
-                className="w-4 h-4 text-teal-500 rounded focus:ring-teal-400"
+                disabled={saving}
+                className="w-4 h-4 text-teal-500 rounded focus:ring-teal-400 disabled:opacity-50"
               />
               <label htmlFor="openNewTab" className="text-sm text-gray-700">
                 Open in new tab
@@ -268,7 +287,7 @@ const LinkModal: React.FC<{
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 h-10 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 h-10 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? 'Saving...' : 'Save Link'}
@@ -276,7 +295,7 @@ const LinkModal: React.FC<{
           <button
             onClick={onCancel}
             disabled={saving}
-            className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+            className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -318,7 +337,11 @@ const SettingsModal: React.FC<{
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
         <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <h3 className="text-lg font-bold text-gray-900">Footer Settings</h3>
-          <button onClick={onCancel} className="p-1.5 hover:bg-gray-100 rounded-lg">
+          <button 
+            onClick={onCancel} 
+            disabled={saving}
+            className="p-1.5 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
@@ -332,7 +355,8 @@ const SettingsModal: React.FC<{
               type="text"
               value={copyrightText}
               onChange={e => setCopyrightText(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
+              disabled={saving}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:border-teal-400 disabled:bg-gray-100"
             />
             <div className="flex items-center gap-2 mt-2">
               <input
@@ -340,7 +364,8 @@ const SettingsModal: React.FC<{
                 id="showCopyright"
                 checked={showCopyright}
                 onChange={e => setShowCopyright(e.target.checked)}
-                className="w-4 h-4 text-teal-500 rounded focus:ring-teal-400"
+                disabled={saving}
+                className="w-4 h-4 text-teal-500 rounded focus:ring-teal-400 disabled:opacity-50"
               />
               <label htmlFor="showCopyright" className="text-sm text-gray-700">
                 Show copyright text
@@ -356,7 +381,8 @@ const SettingsModal: React.FC<{
               type="text"
               value={tagline}
               onChange={e => setTagline(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
+              disabled={saving}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 focus:border-teal-400 disabled:bg-gray-100"
             />
             <div className="flex items-center gap-2 mt-2">
               <input
@@ -364,7 +390,8 @@ const SettingsModal: React.FC<{
                 id="showTagline"
                 checked={showTagline}
                 onChange={e => setShowTagline(e.target.checked)}
-                className="w-4 h-4 text-teal-500 rounded focus:ring-teal-400"
+                disabled={saving}
+                className="w-4 h-4 text-teal-500 rounded focus:ring-teal-400 disabled:opacity-50"
               />
               <label htmlFor="showTagline" className="text-sm text-gray-700">
                 Show tagline
@@ -377,7 +404,7 @@ const SettingsModal: React.FC<{
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 h-10 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 h-10 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? 'Saving...' : 'Save Settings'}
@@ -385,7 +412,7 @@ const SettingsModal: React.FC<{
           <button
             onClick={onCancel}
             disabled={saving}
-            className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+            className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -432,12 +459,14 @@ const SectionCard: React.FC<{
           <button
             onClick={() => setExpanded(!expanded)}
             className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition"
+            title={expanded ? 'Collapse' : 'Expand'}
           >
             {expanded ? <ChevronUp className="w-4.5 h-4.5" /> : <ChevronDown className="w-4.5 h-4.5" />}
           </button>
           <button
             onClick={onEdit}
             className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition"
+            title="Edit Section"
           >
             <Edit2 className="w-4 h-4" />
           </button>
@@ -446,12 +475,14 @@ const SectionCard: React.FC<{
             className={`p-1.5 rounded-lg transition ${
               section.active ? 'text-amber-500 hover:bg-amber-50' : 'text-green-500 hover:bg-green-50'
             }`}
+            title={section.active ? 'Deactivate' : 'Activate'}
           >
             {section.active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
           <button
             onClick={onDelete}
             className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
+            title="Delete Section"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -503,6 +534,7 @@ const SectionCard: React.FC<{
                     <button
                       onClick={() => onEditLink(link)}
                       className="p-1 text-blue-500 hover:bg-blue-50 rounded transition"
+                      title="Edit Link"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
@@ -511,12 +543,14 @@ const SectionCard: React.FC<{
                       className={`p-1 rounded transition ${
                         link.active ? 'text-amber-500 hover:bg-amber-50' : 'text-green-500 hover:bg-green-50'
                       }`}
+                      title={link.active ? 'Hide Link' : 'Show Link'}
                     >
                       {link.active ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                     <button
                       onClick={() => onDeleteLink(link)}
                       className="p-1 text-red-500 hover:bg-red-50 rounded transition"
+                      title="Delete Link"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -565,9 +599,12 @@ const FooterManagement: React.FC = () => {
 
         setSections(sectionsData);
         setSettings(settingsData);
+      } else {
+        throw new Error('Failed to load footer data');
       }
     } catch (err) {
-      showError('Failed to load footer data');
+      showError('Load Failed', 'Failed to load footer data');
+      console.error('Error fetching footer data:', err);
     } finally {
       setLoading(false);
     }
@@ -597,7 +634,14 @@ const FooterManagement: React.FC = () => {
         await fetchData();
         setSectionModalOpen(false);
         setEditingSection(null);
-        showSuccess(editingSection ? 'Section updated' : 'Section created');
+        showSuccess(
+          editingSection ? 'Section Updated' : 'Section Created',
+          editingSection 
+            ? `${data.title} has been updated`
+            : `${data.title} has been created successfully`
+        );
+      } else {
+        throw new Error('Failed to save section');
       }
     } catch (err) {
       throw new Error('Failed to save section');
@@ -606,10 +650,11 @@ const FooterManagement: React.FC = () => {
 
   const handleDeleteSection = (section: FooterSection) => {
     confirm({
-      title: `Delete ${section.title}?`,
-      message: 'This will also delete all links in this section.',
+      title: 'Delete Footer Section',
+      message: `Are you sure you want to delete "${section.title}"?\n\nThis will also delete all ${section.link_count} link(s) in this section. This action cannot be undone.`,
       type: 'danger',
-      confirmText: 'Delete',
+      confirmText: 'Delete Section',
+      cancelText: 'Cancel',
       onConfirm: async () => {
         try {
           const response = await fetch(`${API_BASE_URL}/sections/${section.id}/`, {
@@ -619,10 +664,12 @@ const FooterManagement: React.FC = () => {
 
           if (response.ok || response.status === 204) {
             await fetchData();
-            showSuccess('Section deleted');
+            showSuccess('Section Deleted', `${section.title} and all its links have been removed`);
+          } else {
+            throw new Error('Failed to delete section');
           }
         } catch (err) {
-          showError('Failed to delete section');
+          showError('Delete Failed', 'Failed to delete the section');
         }
       },
     });
@@ -637,10 +684,15 @@ const FooterManagement: React.FC = () => {
 
       if (response.ok) {
         await fetchData();
-        showSuccess(`Section ${section.active ? 'deactivated' : 'activated'}`);
+        showSuccess(
+          'Status Updated',
+          `${section.title} has been ${section.active ? 'deactivated' : 'activated'}`
+        );
+      } else {
+        throw new Error('Failed to toggle section');
       }
     } catch (err) {
-      showError('Failed to toggle section');
+      showError('Toggle Failed', 'Failed to update section status');
     }
   };
 
@@ -665,7 +717,14 @@ const FooterManagement: React.FC = () => {
         setLinkModalOpen(false);
         setEditingLink(null);
         setSelectedSectionId(null);
-        showSuccess(editingLink ? 'Link updated' : 'Link created');
+        showSuccess(
+          editingLink ? 'Link Updated' : 'Link Created',
+          editingLink 
+            ? `${data.title} has been updated`
+            : `${data.title} has been added successfully`
+        );
+      } else {
+        throw new Error('Failed to save link');
       }
     } catch (err) {
       throw new Error('Failed to save link');
@@ -674,10 +733,11 @@ const FooterManagement: React.FC = () => {
 
   const handleDeleteLink = (link: FooterLink) => {
     confirm({
-      title: `Delete ${link.title}?`,
-      message: 'This action cannot be undone.',
+      title: 'Delete Footer Link',
+      message: `Are you sure you want to delete "${link.title}"?\n\nThis action cannot be undone.`,
       type: 'danger',
-      confirmText: 'Delete',
+      confirmText: 'Delete Link',
+      cancelText: 'Cancel',
       onConfirm: async () => {
         try {
           const response = await fetch(`${API_BASE_URL}/links/${link.id}/`, {
@@ -687,10 +747,12 @@ const FooterManagement: React.FC = () => {
 
           if (response.ok || response.status === 204) {
             await fetchData();
-            showSuccess('Link deleted');
+            showSuccess('Link Deleted', `${link.title} has been removed`);
+          } else {
+            throw new Error('Failed to delete link');
           }
         } catch (err) {
-          showError('Failed to delete link');
+          showError('Delete Failed', 'Failed to delete the link');
         }
       },
     });
@@ -705,10 +767,15 @@ const FooterManagement: React.FC = () => {
 
       if (response.ok) {
         await fetchData();
-        showSuccess(`Link ${link.active ? 'hidden' : 'shown'}`);
+        showSuccess(
+          'Visibility Updated',
+          `${link.title} is now ${link.active ? 'hidden' : 'visible'}`
+        );
+      } else {
+        throw new Error('Failed to toggle link');
       }
     } catch (err) {
-      showError('Failed to toggle link');
+      showError('Toggle Failed', 'Failed to update link visibility');
     }
   };
 
@@ -725,7 +792,9 @@ const FooterManagement: React.FC = () => {
       if (response.ok) {
         await fetchData();
         setSettingsModalOpen(false);
-        showSuccess('Settings updated');
+        showSuccess('Settings Updated', 'Footer settings have been saved successfully');
+      } else {
+        throw new Error('Failed to save settings');
       }
     } catch (err) {
       throw new Error('Failed to save settings');
@@ -737,7 +806,10 @@ const FooterManagement: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader className="w-8 h-8 text-teal-500 animate-spin" />
+        <div className="text-center">
+          <Loader className="w-12 h-12 text-teal-500 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-gray-600">Loading footer management...</p>
+        </div>
       </div>
     );
   }
@@ -748,7 +820,13 @@ const FooterManagement: React.FC = () => {
         <div className="flex gap-3">
           <div className="bg-teal-50 rounded-xl px-4 py-2.5">
             <span className="text-xl font-bold text-teal-600">{sections.length}</span>
-            <span className="text-xs text-gray-500 font-medium ml-2">Sections</span>
+            <span className="text-xs text-gray-500 font-medium ml-2">Section{sections.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="bg-blue-50 rounded-xl px-4 py-2.5">
+            <span className="text-xl font-bold text-blue-600">
+              {sections.reduce((acc, s) => acc + s.link_count, 0)}
+            </span>
+            <span className="text-xs text-gray-500 font-medium ml-2">Total Links</span>
           </div>
         </div>
 
@@ -777,7 +855,16 @@ const FooterManagement: React.FC = () => {
         {sections.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl py-14 text-center">
             <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">No footer sections yet</p>
+            <p className="text-sm text-gray-600 mb-4">No footer sections yet</p>
+            <button
+              onClick={() => {
+                setEditingSection(null);
+                setSectionModalOpen(true);
+              }}
+              className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition font-semibold"
+            >
+              Create Your First Section
+            </button>
           </div>
         ) : (
           sections.map(section => (

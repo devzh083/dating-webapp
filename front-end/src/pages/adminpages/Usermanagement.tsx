@@ -4,6 +4,7 @@ import {
   MapPin, UserCheck, Trash2, AlertTriangle, X
 } from 'lucide-react';
 import { adminService } from '../../services/profileService';
+import { useNotification } from './Notificationsystem';
 
 interface User {
   id: number;
@@ -82,6 +83,8 @@ interface UserDetailsResponse {
 }
 
 const UserManagement: React.FC = () => {
+  const { showSuccess, showError, showWarning, confirm } = useNotification();
+  
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -99,6 +102,9 @@ const UserManagement: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [showUserDetails, setShowUserDetails] = useState<boolean>(false);
   const [userDetails, setUserDetails] = useState<UserDetailsResponse | null>(null);
+  const [actionReason, setActionReason] = useState<string>('');
+  const [showReasonModal, setShowReasonModal] = useState<boolean>(false);
+  const [pendingAction, setPendingAction] = useState<{ userId: number; action: string } | null>(null);
 
   const loadUsers = async (page: number = 1) => {
     setLoading(true);
@@ -125,7 +131,9 @@ const UserManagement: React.FC = () => {
       });
       setUsersPage(page);
     } catch (err) {
-      setError('Failed to load users');
+      const errorMsg = 'Failed to load users';
+      setError(errorMsg);
+      showError('Load Failed', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -138,7 +146,7 @@ const UserManagement: React.FC = () => {
       setUserDetails(data);
       setShowUserDetails(true);
     } catch (err) {
-      setError('Failed to load user details');
+      showError('Failed to Load', 'Could not load user details. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -148,43 +156,77 @@ const UserManagement: React.FC = () => {
     setLoading(true);
     try {
       const data = await adminService.adminApiCall<{ message: string; user?: UserProfile }>(`/users/${userId}/user_action/`, 'POST', { action, reason });
-      alert(data.message);
+      showSuccess('Action Completed', data.message);
       setShowUserDetails(false);
       loadUsers(usersPage);
     } catch (err) {
       const error = err as Error;
-      alert(`Failed to ${action} user: ${error.message}`);
+      showError(`Failed to ${action} user`, error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleUserActionWithReason = (userId: number, action: string) => {
+    const actionLabels: Record<string, string> = {
+      suspend: 'suspension',
+      ban: 'ban',
+      activate: 'activation',
+      delete: 'deletion',
+      verify: 'verification'
+    };
+
+    confirm({
+      title: `${action.charAt(0).toUpperCase() + action.slice(1)} User`,
+      message: `Please provide a reason for this ${actionLabels[action]}:`,
+      confirmText: action.charAt(0).toUpperCase() + action.slice(1),
+      cancelText: 'Cancel',
+      type: action === 'delete' || action === 'ban' ? 'danger' : action === 'suspend' ? 'warning' : 'info',
+      onConfirm: async () => {
+        const reason = prompt(`Enter reason for ${actionLabels[action]}:`);
+        if (reason) {
+          await performUserAction(userId, action, reason);
+        } else {
+          showWarning('Action Cancelled', 'A reason is required to proceed.');
+        }
+      }
+    });
+  };
+
   const performBulkAction = async (action: string, reason: string = '') => {
     if (selectedUsers.length === 0) {
-      alert('Please select at least one user');
+      showWarning('No Selection', 'Please select at least one user to perform this action.');
       return;
     }
     
-    if (!confirm(`Are you sure you want to ${action} ${selectedUsers.length} user(s)?`)) {
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const data = await adminService.adminApiCall<{ message: string; success_count: number; skipped_count: number }>('/users/bulk_action/', 'POST', {
-        user_ids: selectedUsers,
-        action,
-        reason,
-      });
-      alert(`${data.message}\nSuccess: ${data.success_count}, Skipped: ${data.skipped_count}`);
-      setSelectedUsers([]);
-      loadUsers(usersPage);
-    } catch (err) {
-      const error = err as Error;
-      alert(`Bulk action failed: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
+    confirm({
+      title: `Bulk ${action.charAt(0).toUpperCase() + action.slice(1)}`,
+      message: `Are you sure you want to ${action} ${selectedUsers.length} user(s)?\n\nThis action will be applied to all selected users.`,
+      confirmText: `${action.charAt(0).toUpperCase() + action.slice(1)} ${selectedUsers.length} User(s)`,
+      cancelText: 'Cancel',
+      type: action === 'ban' ? 'danger' : action === 'suspend' ? 'warning' : 'info',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          const data = await adminService.adminApiCall<{ message: string; success_count: number; skipped_count: number }>('/users/bulk_action/', 'POST', {
+            user_ids: selectedUsers,
+            action,
+            reason: reason || `Bulk ${action}`,
+          });
+          showSuccess(
+            'Bulk Action Completed',
+            `${data.message}\nSuccess: ${data.success_count}, Skipped: ${data.skipped_count}`
+          );
+          setSelectedUsers([]);
+          loadUsers(usersPage);
+        } catch (err) {
+          const error = err as Error;
+          showError('Bulk Action Failed', error.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   const exportUsers = async () => {
@@ -212,9 +254,11 @@ const UserManagement: React.FC = () => {
       a.href = url;
       a.download = `users-export-${new Date().toISOString().split('T')[0]}.csv`;
       a.click();
+      
+      showSuccess('Export Successful', `Exported ${data.count} users to CSV file.`);
     } catch (err) {
       const error = err as Error;
-      alert('Export failed: ' + error.message);
+      showError('Export Failed', error.message);
     } finally {
       setLoading(false);
     }
@@ -690,12 +734,7 @@ const UserManagement: React.FC = () => {
                 {userDetails.profile.account_status === 'active' && (
                   <>
                     <button
-                      onClick={() => {
-                        const reason = prompt('Enter reason for suspension:');
-                        if (reason) {
-                          performUserAction(userDetails.profile.user.id, 'suspend', reason);
-                        }
-                      }}
+                      onClick={() => handleUserActionWithReason(userDetails.profile.user.id, 'suspend')}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 transition font-semibold"
                       disabled={loading}
                     >
@@ -703,12 +742,7 @@ const UserManagement: React.FC = () => {
                       Suspend
                     </button>
                     <button
-                      onClick={() => {
-                        const reason = prompt('Enter reason for ban:');
-                        if (reason && confirm('Are you sure you want to ban this user?')) {
-                          performUserAction(userDetails.profile.user.id, 'ban', reason);
-                        }
-                      }}
+                      onClick={() => handleUserActionWithReason(userDetails.profile.user.id, 'ban')}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl hover:bg-red-600 transition font-semibold"
                       disabled={loading}
                     >
@@ -720,12 +754,7 @@ const UserManagement: React.FC = () => {
 
                 {(userDetails.profile.account_status === 'suspended' || userDetails.profile.account_status === 'banned') && (
                   <button
-                    onClick={() => {
-                      const reason = prompt('Enter reason for activation:');
-                      if (reason) {
-                        performUserAction(userDetails.profile.user.id, 'activate', reason);
-                      }
-                    }}
+                    onClick={() => handleUserActionWithReason(userDetails.profile.user.id, 'activate')}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-xl hover:bg-green-600 transition font-semibold"
                     disabled={loading}
                   >
@@ -737,9 +766,13 @@ const UserManagement: React.FC = () => {
                 {!userDetails.profile.verified && (
                   <button
                     onClick={() => {
-                      if (confirm('Verify this user?')) {
-                        performUserAction(userDetails.profile.user.id, 'verify', 'User verified by admin');
-                      }
+                      confirm({
+                        title: 'Verify User',
+                        message: `Are you sure you want to verify ${userDetails.profile.username}?`,
+                        confirmText: 'Verify',
+                        type: 'info',
+                        onConfirm: () => performUserAction(userDetails.profile.user.id, 'verify', 'User verified by admin')
+                      });
                     }}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition font-semibold"
                     disabled={loading}
@@ -750,12 +783,7 @@ const UserManagement: React.FC = () => {
                 )}
 
                 <button
-                  onClick={() => {
-                    const reason = prompt('Enter reason for deletion:');
-                    if (reason && confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) {
-                      performUserAction(userDetails.profile.user.id, 'delete', reason);
-                    }
-                  }}
+                  onClick={() => handleUserActionWithReason(userDetails.profile.user.id, 'delete')}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-red-600 rounded-xl hover:bg-red-50 transition font-semibold"
                   disabled={loading}
                 >

@@ -4,6 +4,7 @@ import {
   Search, Filter, Loader, AlertTriangle, X, Calendar, Clock, MessageSquare
 } from 'lucide-react';
 import { adminService } from '../../services/profileService';
+import { useNotification } from './Notificationsystem';
 
 interface Review {
   id: number;
@@ -26,6 +27,8 @@ interface PaginationInfo {
 }
 
 const ReviewsManagement: React.FC = () => {
+  const { showSuccess, showError, showWarning, confirm } = useNotification();
+  
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +50,9 @@ const ReviewsManagement: React.FC = () => {
   // Modal
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [adminNotes, setAdminNotes] = useState('');
+  const [showNotesInput, setShowNotesInput] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | null>(null);
 
   // API helper
   const apiCall = async <T,>(endpoint: string, method: string = 'GET', data: any = null): Promise<T> => {
@@ -87,128 +93,161 @@ const ReviewsManagement: React.FC = () => {
       });
       setCurrentPage(page);
     } catch (err) {
-      setError('Failed to load reviews');
+      const errorMessage = 'Failed to load reviews';
+      setError(errorMessage);
+      showError('Load Failed', errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  // Approve review
-  const approveReview = async (reviewId: number, adminNotes: string = '') => {
+  // Approve review with notes modal
+  const handleApproveClick = (review: Review) => {
+    setSelectedReview(review);
+    setAdminNotes('');
+    setShowNotesInput(true);
+    setPendingAction('approve');
+  };
+
+  // Reject review with notes modal
+  const handleRejectClick = (review: Review) => {
+    setSelectedReview(review);
+    setAdminNotes('');
+    setShowNotesInput(true);
+    setPendingAction('reject');
+  };
+
+  // Execute approve/reject after notes
+  const executeAction = async () => {
+    if (!selectedReview || !pendingAction) return;
+
     setLoading(true);
+    setShowNotesInput(false);
+
     try {
+      const endpoint = pendingAction === 'approve' 
+        ? `/reviews/${selectedReview.id}/approve/`
+        : `/reviews/${selectedReview.id}/reject/`;
+      
       const data = await apiCall<{ message: string; review: Review }>(
-        `/reviews/${reviewId}/approve/`, 
+        endpoint, 
         'POST', 
         { admin_notes: adminNotes }
       );
-      alert(data.message);
-      loadReviews(currentPage);
-      setShowDetailModal(false);
-    } catch (err) {
-      const error = err as Error;
-      alert(`Failed to approve review: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Reject review
-  const rejectReview = async (reviewId: number, adminNotes: string = '') => {
-    setLoading(true);
-    try {
-      const data = await apiCall<{ message: string; review: Review }>(
-        `/reviews/${reviewId}/reject/`, 
-        'POST', 
-        { admin_notes: adminNotes }
+      
+      showSuccess(
+        pendingAction === 'approve' ? 'Review Approved' : 'Review Rejected',
+        data.message
       );
-      alert(data.message);
+      
       loadReviews(currentPage);
       setShowDetailModal(false);
+      setSelectedReview(null);
     } catch (err) {
       const error = err as Error;
-      alert(`Failed to reject review: ${error.message}`);
+      showError(
+        pendingAction === 'approve' ? 'Approval Failed' : 'Rejection Failed',
+        error.message
+      );
     } finally {
       setLoading(false);
+      setPendingAction(null);
+      setAdminNotes('');
     }
   };
 
-  // Delete review
-  const deleteReview = async (reviewId: number) => {
-    if (!confirm('Are you sure you want to permanently delete this review?')) {
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      await apiCall(`/reviews/${reviewId}/`, 'DELETE');
-      alert('Review deleted successfully');
-      loadReviews(currentPage);
-      setShowDetailModal(false);
-    } catch (err) {
-      const error = err as Error;
-      alert(`Failed to delete review: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
+  // Delete review with confirmation
+  const deleteReview = (reviewId: number) => {
+    confirm({
+      title: 'Delete Review',
+      message: 'Are you sure you want to permanently delete this review? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          await apiCall(`/reviews/${reviewId}/`, 'DELETE');
+          showSuccess('Review Deleted', 'The review has been permanently removed.');
+          loadReviews(currentPage);
+          setShowDetailModal(false);
+          setSelectedReview(null);
+        } catch (err) {
+          const error = err as Error;
+          showError('Delete Failed', error.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
-  // Bulk approve
-  const bulkApprove = async () => {
+  // Bulk approve with confirmation
+  const bulkApprove = () => {
     if (selectedReviews.length === 0) {
-      alert('Please select at least one review');
+      showWarning('No Selection', 'Please select at least one review to approve.');
       return;
     }
     
-    if (!confirm(`Approve ${selectedReviews.length} review(s)?`)) {
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const data = await apiCall<{ message: string; approved_count: number }>(
-        '/reviews/bulk_approve/', 
-        'POST', 
-        { review_ids: selectedReviews }
-      );
-      alert(data.message);
-      setSelectedReviews([]);
-      loadReviews(currentPage);
-    } catch (err) {
-      const error = err as Error;
-      alert(`Bulk approve failed: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
+    confirm({
+      title: 'Bulk Approve Reviews',
+      message: `Are you sure you want to approve ${selectedReviews.length} review(s)?`,
+      confirmText: 'Approve All',
+      cancelText: 'Cancel',
+      type: 'info',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          const data = await apiCall<{ message: string; approved_count: number }>(
+            '/reviews/bulk_approve/', 
+            'POST', 
+            { review_ids: selectedReviews }
+          );
+          showSuccess('Bulk Approval Complete', data.message);
+          setSelectedReviews([]);
+          loadReviews(currentPage);
+        } catch (err) {
+          const error = err as Error;
+          showError('Bulk Approval Failed', error.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
-  // Bulk reject
-  const bulkReject = async () => {
+  // Bulk reject with confirmation
+  const bulkReject = () => {
     if (selectedReviews.length === 0) {
-      alert('Please select at least one review');
+      showWarning('No Selection', 'Please select at least one review to reject.');
       return;
     }
     
-    if (!confirm(`Reject ${selectedReviews.length} review(s)?`)) {
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const data = await apiCall<{ message: string; rejected_count: number }>(
-        '/reviews/bulk_reject/', 
-        'POST', 
-        { review_ids: selectedReviews }
-      );
-      alert(data.message);
-      setSelectedReviews([]);
-      loadReviews(currentPage);
-    } catch (err) {
-      const error = err as Error;
-      alert(`Bulk reject failed: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
+    confirm({
+      title: 'Bulk Reject Reviews',
+      message: `Are you sure you want to reject ${selectedReviews.length} review(s)?`,
+      confirmText: 'Reject All',
+      cancelText: 'Cancel',
+      type: 'danger',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          const data = await apiCall<{ message: string; rejected_count: number }>(
+            '/reviews/bulk_reject/', 
+            'POST', 
+            { review_ids: selectedReviews }
+          );
+          showSuccess('Bulk Rejection Complete', data.message);
+          setSelectedReviews([]);
+          loadReviews(currentPage);
+        } catch (err) {
+          const error = err as Error;
+          showError('Bulk Rejection Failed', error.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   // Initial load
@@ -545,10 +584,7 @@ const ReviewsManagement: React.FC = () => {
                 {selectedReview.status === 'pending' && (
                   <>
                     <button
-                      onClick={() => {
-                        const notes = prompt('Enter admin notes (optional):');
-                        approveReview(selectedReview.id, notes || '');
-                      }}
+                      onClick={() => handleApproveClick(selectedReview)}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-xl hover:bg-green-600 transition font-semibold"
                       disabled={loading}
                     >
@@ -556,12 +592,7 @@ const ReviewsManagement: React.FC = () => {
                       Approve Review
                     </button>
                     <button
-                      onClick={() => {
-                        const notes = prompt('Enter reason for rejection:');
-                        if (notes) {
-                          rejectReview(selectedReview.id, notes);
-                        }
-                      }}
+                      onClick={() => handleRejectClick(selectedReview)}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl hover:bg-red-600 transition font-semibold"
                       disabled={loading}
                     >
@@ -573,12 +604,7 @@ const ReviewsManagement: React.FC = () => {
                 
                 {selectedReview.status === 'approved' && (
                   <button
-                    onClick={() => {
-                      const notes = prompt('Enter reason for rejection:');
-                      if (notes) {
-                        rejectReview(selectedReview.id, notes);
-                      }
-                    }}
+                    onClick={() => handleRejectClick(selectedReview)}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl hover:bg-red-600 transition font-semibold"
                     disabled={loading}
                   >
@@ -589,10 +615,7 @@ const ReviewsManagement: React.FC = () => {
 
                 {selectedReview.status === 'rejected' && (
                   <button
-                    onClick={() => {
-                      const notes = prompt('Enter admin notes (optional):');
-                      approveReview(selectedReview.id, notes || '');
-                    }}
+                    onClick={() => handleApproveClick(selectedReview)}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-xl hover:bg-green-600 transition font-semibold"
                     disabled={loading}
                   >
@@ -610,6 +633,64 @@ const ReviewsManagement: React.FC = () => {
                   Delete
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Notes Input Modal */}
+      {showNotesInput && selectedReview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full">
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-bold text-gray-900">
+                {pendingAction === 'approve' ? 'Approve Review' : 'Reject Review'}
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {pendingAction === 'approve' 
+                  ? 'Add optional notes about this approval'
+                  : 'Please provide a reason for rejection'}
+              </p>
+            </div>
+
+            <div className="p-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Admin Notes {pendingAction === 'reject' && <span className="text-red-500">*</span>}
+              </label>
+              <textarea
+                value={adminNotes}
+                onChange={(e) => setAdminNotes(e.target.value)}
+                placeholder={pendingAction === 'approve' 
+                  ? 'Enter any notes (optional)...'
+                  : 'Enter reason for rejection...'
+                }
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none resize-none"
+              />
+            </div>
+
+            <div className="border-t border-gray-200 px-6 py-4 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowNotesInput(false);
+                  setPendingAction(null);
+                  setAdminNotes('');
+                }}
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeAction}
+                disabled={pendingAction === 'reject' && !adminNotes.trim()}
+                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                  pendingAction === 'approve'
+                    ? 'bg-green-500 hover:bg-green-600'
+                    : 'bg-red-500 hover:bg-red-600'
+                }`}
+              >
+                {pendingAction === 'approve' ? 'Approve' : 'Reject'}
+              </button>
             </div>
           </div>
         </div>

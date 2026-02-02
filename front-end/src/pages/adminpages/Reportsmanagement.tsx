@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  AlertTriangle, Search, CheckCircle, XCircle, Loader, X
+  AlertTriangle, Search, CheckCircle, XCircle, Loader, X, Eye, User, MessageSquare
 } from 'lucide-react';
 import { adminService } from '../../services/profileService';
+import { useNotification } from './Notificationsystem';
 
 interface Report {
   id: number;
@@ -27,6 +28,8 @@ interface PaginationInfo {
 }
 
 const ReportsManagement: React.FC = () => {
+  const { showSuccess, showError, showWarning, confirm } = useNotification();
+  
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -37,6 +40,10 @@ const ReportsManagement: React.FC = () => {
   const [reportStatusFilter, setReportStatusFilter] = useState<string>('all');
   const [reportReasonFilter, setReportReasonFilter] = useState<string>('all');
   const [selectedReports, setSelectedReports] = useState<number[]>([]);
+  
+  // Modal state
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   const loadReports = async (page: number = 1) => {
     setLoading(true);
@@ -60,52 +67,102 @@ const ReportsManagement: React.FC = () => {
       });
       setReportsPage(page);
     } catch (err) {
-      setError('Failed to load reports');
+      const errorMessage = 'Failed to load reports';
+      setError(errorMessage);
+      showError('Load Failed', errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const reviewReport = async (reportId: number, action: string, adminNotes: string = '') => {
+  const reviewReport = async (report: Report, action: string, adminNotes: string = '') => {
     setLoading(true);
     try {
-      const data = await adminService.adminApiCall<{ message: string; report: Report }>(`/reports/${reportId}/review/`, 'POST', { action, admin_notes: adminNotes });
-      alert(data.message);
+      const data = await adminService.adminApiCall<{ message: string; report: Report }>(
+        `/reports/${report.id}/review/`, 
+        'POST', 
+        { action, admin_notes: adminNotes }
+      );
+      
+      const actionText = action === 'resolve' ? 'resolved' : 'dismissed';
+      showSuccess(
+        `Report ${actionText.charAt(0).toUpperCase() + actionText.slice(1)}`,
+        `Report against ${report.reported_username} has been ${actionText}`
+      );
+      
       loadReports(reportsPage);
+      setShowDetailModal(false);
+      setSelectedReport(null);
     } catch (err) {
       const error = err as Error;
-      alert(`Failed to review report: ${error.message}`);
+      showError(
+        'Review Failed',
+        `Failed to review report: ${error.message}`
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const bulkReviewReports = async (action: string, adminNotes: string = '') => {
+  const handleReviewClick = (report: Report, action: 'resolve' | 'dismiss') => {
+    const actionText = action === 'resolve' ? 'Resolve' : 'Dismiss';
+    const actionPastTense = action === 'resolve' ? 'resolved' : 'dismissed';
+    
+    confirm({
+      title: `${actionText} Report`,
+      message: `Are you sure you want to ${action} this report against ${report.reported_username}?\n\nReason: ${report.reason}\nReporter: ${report.reporter_username}`,
+      type: action === 'resolve' ? 'info' : 'warning',
+      confirmText: actionText,
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        await reviewReport(report, action, `Report ${actionPastTense} by admin`);
+      }
+    });
+  };
+
+  const bulkReviewReports = async (action: string) => {
     if (selectedReports.length === 0) {
-      alert('Please select at least one report');
+      showWarning('No Selection', 'Please select at least one report to review');
       return;
     }
     
-    if (!confirm(`Are you sure you want to ${action} ${selectedReports.length} report(s)?`)) {
-      return;
-    }
+    const actionText = action === 'resolve' ? 'resolve' : 'dismiss';
+    const actionPastTense = action === 'resolve' ? 'resolved' : 'dismissed';
     
-    setLoading(true);
-    try {
-      const data = await adminService.adminApiCall<{ message: string; updated_count: number }>('/reports/bulk_review/', 'POST', {
-        report_ids: selectedReports,
-        action,
-        admin_notes: adminNotes,
-      });
-      alert(data.message);
-      setSelectedReports([]);
-      loadReports(reportsPage);
-    } catch (err) {
-      const error = err as Error;
-      alert(`Bulk review failed: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
+    confirm({
+      title: `Bulk ${actionText.charAt(0).toUpperCase() + actionText.slice(1)} Reports`,
+      message: `Are you sure you want to ${actionText} ${selectedReports.length} report(s)?`,
+      type: action === 'resolve' ? 'info' : 'warning',
+      confirmText: `${actionText.charAt(0).toUpperCase() + actionText.slice(1)} All`,
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          const data = await adminService.adminApiCall<{ message: string; updated_count: number }>(
+            '/reports/bulk_review/', 
+            'POST', 
+            {
+              report_ids: selectedReports,
+              action,
+              admin_notes: `Bulk ${actionPastTense}`,
+            }
+          );
+          
+          showSuccess(
+            'Bulk Review Complete',
+            `${data.updated_count} report(s) have been ${actionPastTense}`
+          );
+          
+          setSelectedReports([]);
+          loadReports(reportsPage);
+        } catch (err) {
+          const error = err as Error;
+          showError('Bulk Review Failed', error.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   useEffect(() => {
@@ -122,6 +179,22 @@ const ReportsManagement: React.FC = () => {
   const formatDate = (dateString: string | null): string => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString();
+  };
+
+  const formatDateTime = (dateString: string | null): string => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString();
+  };
+
+  const getReasonLabel = (reason: string): string => {
+    const labels: Record<string, string> = {
+      spam: 'Spam',
+      harassment: 'Harassment',
+      inappropriate: 'Inappropriate Content',
+      fake: 'Fake Profile',
+      other: 'Other'
+    };
+    return labels[reason] || reason;
   };
 
   return (
@@ -180,7 +253,7 @@ const ReportsManagement: React.FC = () => {
         {selectedReports.length > 0 && (
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => bulkReviewReports('resolve', 'Bulk resolved')}
+              onClick={() => bulkReviewReports('resolve')}
               className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
               disabled={loading}
             >
@@ -188,7 +261,7 @@ const ReportsManagement: React.FC = () => {
               Resolve ({selectedReports.length})
             </button>
             <button
-              onClick={() => bulkReviewReports('dismiss', 'Bulk dismissed')}
+              onClick={() => bulkReviewReports('dismiss')}
               className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
               disabled={loading}
             >
@@ -290,24 +363,36 @@ const ReportsManagement: React.FC = () => {
                       <span className="text-sm text-gray-600">{formatDate(report.created_at)}</span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {report.status === 'pending' && (
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => reviewReport(report.id, 'resolve', 'Report resolved by admin')}
-                            className="px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 rounded-lg transition"
-                            disabled={loading}
-                          >
-                            Resolve
-                          </button>
-                          <button
-                            onClick={() => reviewReport(report.id, 'dismiss', 'Report dismissed by admin')}
-                            className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition"
-                            disabled={loading}
-                          >
-                            Dismiss
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedReport(report);
+                            setShowDetailModal(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-600 hover:bg-teal-50 rounded-lg transition"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
+                        </button>
+                        {report.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleReviewClick(report, 'resolve')}
+                              className="px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 rounded-lg transition"
+                              disabled={loading}
+                            >
+                              Resolve
+                            </button>
+                            <button
+                              onClick={() => handleReviewClick(report, 'dismiss')}
+                              className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition"
+                              disabled={loading}
+                            >
+                              Dismiss
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -341,6 +426,136 @@ const ReportsManagement: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Report Detail Modal */}
+      {showDetailModal && selectedReport && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-xl font-bold text-gray-900">Report Details</h2>
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedReport(null);
+                }}
+                className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Report Summary */}
+              <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-4 border border-red-100">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-gray-900 mb-1">
+                      {getReasonLabel(selectedReport.reason)}
+                    </h3>
+                    <p className="text-sm text-gray-700">
+                      Reported by <span className="font-semibold">{selectedReport.reporter_username}</span> against{' '}
+                      <span className="font-semibold">{selectedReport.reported_username}</span>
+                    </p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    selectedReport.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    selectedReport.status === 'resolved' ? 'bg-green-100 text-green-800' :
+                    selectedReport.status === 'dismissed' ? 'bg-gray-100 text-gray-800' :
+                    'bg-blue-100 text-blue-800'
+                  }`}>
+                    {selectedReport.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Description */}
+              {selectedReport.description && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-2 flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Description
+                  </p>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-700 leading-relaxed">{selectedReport.description}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Metadata Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Reporter</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                      <User className="w-4 h-4 text-gray-500" />
+                    </div>
+                    <span className="text-sm text-gray-900 font-medium">{selectedReport.reporter_username}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Reported User</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                      <User className="w-4 h-4 text-red-600" />
+                    </div>
+                    <span className="text-sm text-gray-900 font-bold">{selectedReport.reported_username}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Submitted</p>
+                  <p className="text-sm text-gray-900">{formatDateTime(selectedReport.created_at)}</p>
+                </div>
+
+                {selectedReport.reviewed_at && (
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Reviewed</p>
+                    <p className="text-sm text-gray-900">{formatDateTime(selectedReport.reviewed_at)}</p>
+                  </div>
+                )}
+
+                {selectedReport.reviewed_by_username && (
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Reviewed By</p>
+                    <p className="text-sm text-gray-900">{selectedReport.reviewed_by_username}</p>
+                  </div>
+                )}
+
+                {selectedReport.admin_notes && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Admin Notes</p>
+                    <p className="text-sm text-gray-700 bg-blue-50 rounded-lg p-3">{selectedReport.admin_notes}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              {selectedReport.status === 'pending' && (
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => handleReviewClick(selectedReport, 'resolve')}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-xl hover:bg-green-600 transition font-semibold"
+                    disabled={loading}
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Resolve Report
+                  </button>
+                  <button
+                    onClick={() => handleReviewClick(selectedReport, 'dismiss')}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition font-semibold"
+                    disabled={loading}
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Dismiss Report
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

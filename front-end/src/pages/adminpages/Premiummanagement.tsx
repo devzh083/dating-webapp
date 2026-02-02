@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNotification } from './Notificationsystem';
 import {
   Crown, Plus, Edit2, Trash2, Save, X, Eye, EyeOff,
   Star, Check, Zap, Flame, TrendingUp, Loader, AlertCircle
@@ -50,6 +51,8 @@ const PLAN_TYPE_OPTIONS = [
 const MONTH_OPTIONS = [1, 3, 6, 12];
 
 const PremiumManagement: React.FC = () => {
+  const { showSuccess, showError, showWarning, confirm } = useNotification();
+  
   const [plans, setPlans] = useState<PremiumPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +61,7 @@ const PremiumManagement: React.FC = () => {
   const [editingPlan, setEditingPlan] = useState<PremiumPlan | null>(null);
   const [isCreatingPlan, setIsCreatingPlan] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -70,7 +74,9 @@ const PremiumManagement: React.FC = () => {
       const token = localStorage.getItem('admin_token');
       
       if (!token) {
-        setError('No authentication token found');
+        const errorMsg = 'No authentication token found';
+        setError(errorMsg);
+        showError('Authentication Error', errorMsg);
         setLoading(false);
         return;
       }
@@ -123,7 +129,9 @@ const PremiumManagement: React.FC = () => {
 
     } catch (error) {
       console.error('Error fetching premium data:', error);
-      setError('Failed to load premium data. Please try again.');
+      const errorMsg = 'Failed to load premium data. Please try again.';
+      setError(errorMsg);
+      showError('Load Failed', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -168,9 +176,11 @@ const PremiumManagement: React.FC = () => {
     const errors = validatePlan(plan);
     if (errors.length > 0) {
       setValidationErrors(errors);
+      showWarning('Validation Failed', 'Please fix the errors before saving');
       return;
     }
 
+    setIsSaving(true);
     try {
       const token = localStorage.getItem('admin_token');
       const url = isCreatingPlan
@@ -212,7 +222,12 @@ const PremiumManagement: React.FC = () => {
         setEditingPlan(null);
         setIsCreatingPlan(false);
         setValidationErrors([]);
-        alert('Plan saved successfully!');
+        showSuccess(
+          isCreatingPlan ? 'Plan Created' : 'Plan Updated',
+          isCreatingPlan 
+            ? `${plan.name} has been created successfully`
+            : `${plan.name} has been updated`
+        );
       } else {
         const errorData = await response.json();
         console.error('❌ Backend error:', errorData);
@@ -229,71 +244,129 @@ const PremiumManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error saving plan:', error);
-      alert('Failed to save plan. Please try again.');
+      showError(
+        isCreatingPlan ? 'Create Failed' : 'Update Failed',
+        'Failed to save the plan. Please try again.'
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleDeletePlan = async (planId: string) => {
-    if (!confirm('Are you sure you want to delete this plan?')) return;
+  const handleDeletePlan = (plan: PremiumPlan) => {
+    confirm({
+      title: 'Delete Premium Plan',
+      message: `Are you sure you want to delete the "${plan.name}" plan?\n\nThis action cannot be undone and will affect users subscribed to this plan.`,
+      type: 'danger',
+      confirmText: 'Delete Plan',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('admin_token');
+          const response = await fetch(
+            `http://127.0.0.1:8000/api/admin/premium/plans/${plan.plan_id}/`,
+            {
+              method: 'DELETE',
+              headers: { 'Authorization': `Token ${token}` },
+            }
+          );
 
-    try {
-      const token = localStorage.getItem('admin_token');
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/admin/premium/plans/${planId}/`,
-        {
-          method: 'DELETE',
-          headers: { 'Authorization': `Token ${token}` },
+          if (response.ok) {
+            await fetchData();
+            showSuccess('Plan Deleted', `${plan.name} has been removed`);
+          } else {
+            throw new Error('Failed to delete plan');
+          }
+        } catch (error) {
+          console.error('Error deleting plan:', error);
+          showError('Delete Failed', 'Failed to delete the plan');
         }
-      );
-
-      if (response.ok) {
-        await fetchData();
-        alert('Plan deleted successfully!');
-      } else {
-        throw new Error('Failed to delete plan');
       }
-    } catch (error) {
-      console.error('Error deleting plan:', error);
-      alert('Failed to delete plan. Please try again.');
-    }
+    });
   };
 
-  const handleTogglePlanActive = async (planId: string) => {
-    try {
-      const token = localStorage.getItem('admin_token');
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/admin/premium/plans/${planId}/toggle_active/`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Token ${token}` },
+  const handleTogglePlanActive = (plan: PremiumPlan) => {
+    const action = plan.active ? 'deactivate' : 'activate';
+    
+    confirm({
+      title: `${action === 'activate' ? 'Activate' : 'Deactivate'} Plan`,
+      message: `Are you sure you want to ${action} "${plan.name}"?${
+        action === 'deactivate' 
+          ? '\n\nThis will hide the plan from users but won\'t affect existing subscriptions.' 
+          : '\n\nThis will make the plan visible to users.'
+      }`,
+      type: 'info',
+      confirmText: action === 'activate' ? 'Activate' : 'Deactivate',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('admin_token');
+          const response = await fetch(
+            `http://127.0.0.1:8000/api/admin/premium/plans/${plan.plan_id}/toggle_active/`,
+            {
+              method: 'POST',
+              headers: { 'Authorization': `Token ${token}` },
+            }
+          );
+          
+          if (response.ok) {
+            await fetchData();
+            showSuccess(
+              'Status Updated',
+              `${plan.name} has been ${action}d`
+            );
+          } else {
+            throw new Error('Failed to toggle plan status');
+          }
+        } catch (error) {
+          console.error('Error toggling plan:', error);
+          showError('Toggle Failed', 'Failed to update plan status');
         }
-      );
-      
-      if (response.ok) {
-        await fetchData();
       }
-    } catch (error) {
-      console.error('Error toggling plan:', error);
-    }
+    });
   };
 
-  const handleTogglePlanPopular = async (planId: string) => {
-    try {
-      const token = localStorage.getItem('admin_token');
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/admin/premium/plans/${planId}/toggle_popular/`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Token ${token}` },
+  const handleTogglePlanPopular = (plan: PremiumPlan) => {
+    const action = plan.popular ? 'remove popular badge from' : 'mark as popular';
+    
+    confirm({
+      title: plan.popular ? 'Remove Popular Badge' : 'Mark as Popular',
+      message: `Are you sure you want to ${action} "${plan.name}"?${
+        !plan.popular 
+          ? '\n\nThis will add a "Popular" badge to highlight this plan.' 
+          : '\n\nThis will remove the "Popular" badge from this plan.'
+      }`,
+      type: 'info',
+      confirmText: plan.popular ? 'Remove Badge' : 'Mark Popular',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('admin_token');
+          const response = await fetch(
+            `http://127.0.0.1:8000/api/admin/premium/plans/${plan.plan_id}/toggle_popular/`,
+            {
+              method: 'POST',
+              headers: { 'Authorization': `Token ${token}` },
+            }
+          );
+          
+          if (response.ok) {
+            await fetchData();
+            showSuccess(
+              'Badge Updated',
+              plan.popular 
+                ? `Popular badge removed from ${plan.name}`
+                : `${plan.name} is now marked as popular`
+            );
+          } else {
+            throw new Error('Failed to toggle popular status');
+          }
+        } catch (error) {
+          console.error('Error toggling popular:', error);
+          showError('Toggle Failed', 'Failed to update popular status');
         }
-      );
-      
-      if (response.ok) {
-        await fetchData();
       }
-    } catch (error) {
-      console.error('Error toggling popular:', error);
-    }
+    });
   };
 
   const handleCreateNewPlan = () => {
@@ -317,6 +390,27 @@ const PremiumManagement: React.FC = () => {
     });
   };
 
+  const handleCancelEdit = () => {
+    if (isCreatingPlan || validationErrors.length > 0) {
+      confirm({
+        title: 'Discard Changes',
+        message: 'Are you sure you want to discard your changes?',
+        type: 'warning',
+        confirmText: 'Discard',
+        cancelText: 'Continue Editing',
+        onConfirm: () => {
+          setEditingPlan(null);
+          setIsCreatingPlan(false);
+          setValidationErrors([]);
+        }
+      });
+    } else {
+      setEditingPlan(null);
+      setIsCreatingPlan(false);
+      setValidationErrors([]);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -331,10 +425,16 @@ const PremiumManagement: React.FC = () => {
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-        <p className="text-red-800 mb-2">{error}</p>
+        <div className="flex items-start gap-3 mb-4">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-semibold text-red-800 mb-1">Error Loading Plans</h3>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
         <button
           onClick={fetchData}
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
         >
           Try Again
         </button>
@@ -353,7 +453,9 @@ const PremiumManagement: React.FC = () => {
             </div>
             <div>
               <h3 className="text-xl font-bold text-gray-900">Pricing Plans</h3>
-              <p className="text-sm text-gray-600">{plans.length} plan(s)</p>
+              <p className="text-sm text-gray-600">
+                {plans.length} plan(s) • {plans.filter(p => p.active).length} active
+              </p>
             </div>
           </div>
           <button
@@ -371,7 +473,7 @@ const PremiumManagement: React.FC = () => {
             <p className="text-gray-600 mb-4">No premium plans yet</p>
             <button
               onClick={handleCreateNewPlan}
-              className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition"
+              className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition font-semibold"
             >
               Create Your First Plan
             </button>
@@ -385,10 +487,11 @@ const PremiumManagement: React.FC = () => {
                 onEdit={() => {
                   setEditingPlan(plan);
                   setValidationErrors([]);
+                  setIsCreatingPlan(false);
                 }}
-                onDelete={() => handleDeletePlan(plan.plan_id)}
-                onToggleActive={() => handleTogglePlanActive(plan.plan_id)}
-                onTogglePopular={() => handleTogglePlanPopular(plan.plan_id)}
+                onDelete={() => handleDeletePlan(plan)}
+                onToggleActive={() => handleTogglePlanActive(plan)}
+                onTogglePopular={() => handleTogglePlanPopular(plan)}
               />
             ))}
           </div>
@@ -400,12 +503,9 @@ const PremiumManagement: React.FC = () => {
         <PlanEditModal
           plan={editingPlan}
           isCreating={isCreatingPlan}
+          isSaving={isSaving}
           onSave={handleSavePlan}
-          onCancel={() => {
-            setEditingPlan(null);
-            setIsCreatingPlan(false);
-            setValidationErrors([]);
-          }}
+          onCancel={handleCancelEdit}
           onChange={setEditingPlan}
           validationErrors={validationErrors}
         />
@@ -536,11 +636,12 @@ const PlanCard: React.FC<{
 const PlanEditModal: React.FC<{
   plan: PremiumPlan;
   isCreating: boolean;
+  isSaving: boolean;
   onSave: (plan: PremiumPlan) => void;
   onCancel: () => void;
   onChange: (plan: PremiumPlan) => void;
   validationErrors: string[];
-}> = ({ plan, isCreating, onSave, onCancel, onChange, validationErrors }) => {
+}> = ({ plan, isCreating, isSaving, onSave, onCancel, onChange, validationErrors }) => {
   const [newFeature, setNewFeature] = useState('');
 
   const features = Array.isArray(plan.features) ? plan.features : [];
@@ -585,7 +686,8 @@ const PlanEditModal: React.FC<{
           </h2>
           <button
             onClick={onCancel}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={isSaving}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
           </button>
@@ -612,13 +714,13 @@ const PlanEditModal: React.FC<{
           {/* Plan ID */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Plan ID *
+              Plan ID <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={plan.plan_id}
               onChange={(e) => onChange({ ...plan, plan_id: e.target.value })}
-              disabled={!isCreating}
+              disabled={!isCreating || isSaving}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-gray-100"
               placeholder="e.g., monthly, quarterly"
               required
@@ -631,12 +733,13 @@ const PlanEditModal: React.FC<{
           {/* Name */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Plan Name *
+              Plan Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={plan.name}
               onChange={(e) => onChange({ ...plan, name: e.target.value })}
+              disabled={isSaving}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               placeholder="e.g., Monthly Premium"
               required
@@ -647,12 +750,13 @@ const PlanEditModal: React.FC<{
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Duration *
+                Duration <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={plan.duration}
                 onChange={(e) => onChange({ ...plan, duration: e.target.value })}
+                disabled={isSaving}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                 placeholder="e.g., 1 Month"
                 required
@@ -660,11 +764,12 @@ const PlanEditModal: React.FC<{
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Plan Type *
+                Plan Type <span className="text-red-500">*</span>
               </label>
               <select
                 value={plan.plan_type}
                 onChange={(e) => onChange({ ...plan, plan_type: e.target.value as PremiumPlan['plan_type'] })}
+                disabled={isSaving}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               >
                 {PLAN_TYPE_OPTIONS.map((option) => (
@@ -680,13 +785,14 @@ const PlanEditModal: React.FC<{
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Price (₹) *
+                Price (₹) <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
                 step="0.01"
                 value={plan.price}
                 onChange={(e) => handlePriceChange(parseFloat(e.target.value) || 0)}
+                disabled={isSaving}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                 required
               />
@@ -700,6 +806,7 @@ const PlanEditModal: React.FC<{
                 step="0.01"
                 value={plan.original_price || ''}
                 onChange={(e) => onChange({ ...plan, original_price: parseFloat(e.target.value) || undefined })}
+                disabled={isSaving}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                 placeholder="Optional"
               />
@@ -709,7 +816,7 @@ const PlanEditModal: React.FC<{
           {/* ✨ NEW: Number of Months for Calculation */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Calculate Price Over How Many Months? *
+              Calculate Price Over How Many Months? <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-4 gap-3">
               {MONTH_OPTIONS.map((monthOption) => (
@@ -717,7 +824,8 @@ const PlanEditModal: React.FC<{
                   key={monthOption}
                   type="button"
                   onClick={() => handleMonthsChange(monthOption)}
-                  className={`px-4 py-3 rounded-lg border-2 font-semibold transition ${
+                  disabled={isSaving}
+                  className={`px-4 py-3 rounded-lg border-2 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
                     months === monthOption
                       ? 'border-teal-500 bg-teal-50 text-teal-700'
                       : 'border-gray-300 hover:border-teal-300 text-gray-700'
@@ -755,6 +863,7 @@ const PlanEditModal: React.FC<{
               type="text"
               value={plan.discount_text || ''}
               onChange={(e) => onChange({ ...plan, discount_text: e.target.value || undefined })}
+              disabled={isSaving}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               placeholder="e.g., Save 20%"
             />
@@ -772,6 +881,7 @@ const PlanEditModal: React.FC<{
               <select
                 value={plan.icon}
                 onChange={(e) => onChange({ ...plan, icon: e.target.value })}
+                disabled={isSaving}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               >
                 {ICON_OPTIONS.map((option) => (
@@ -788,6 +898,7 @@ const PlanEditModal: React.FC<{
               <select
                 value={plan.gradient}
                 onChange={(e) => onChange({ ...plan, gradient: e.target.value })}
+                disabled={isSaving}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               >
                 {GRADIENT_OPTIONS.map((option) => (
@@ -808,6 +919,7 @@ const PlanEditModal: React.FC<{
               type="number"
               value={plan.display_order}
               onChange={(e) => onChange({ ...plan, display_order: parseInt(e.target.value) || 0 })}
+              disabled={isSaving}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               min="0"
             />
@@ -832,11 +944,13 @@ const PlanEditModal: React.FC<{
                       newFeatures[index] = e.target.value;
                       onChange({ ...plan, features: newFeatures });
                     }}
+                    disabled={isSaving}
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   />
                   <button
                     onClick={() => handleRemoveFeature(index)}
-                    className="p-2 text-red-600 border border-red-200 hover:bg-red-50 rounded-lg transition"
+                    disabled={isSaving}
+                    className="p-2 text-red-600 border border-red-200 hover:bg-red-50 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -849,12 +963,14 @@ const PlanEditModal: React.FC<{
                 value={newFeature}
                 onChange={(e) => setNewFeature(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleAddFeature()}
+                disabled={isSaving}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                 placeholder="Add a feature..."
               />
               <button 
-                onClick={handleAddFeature} 
-                className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition flex items-center gap-2"
+                onClick={handleAddFeature}
+                disabled={isSaving}
+                className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="w-4 h-4" />
                 Add
@@ -866,14 +982,25 @@ const PlanEditModal: React.FC<{
         <div className="flex gap-3 mt-6">
           <button
             onClick={() => onSave(plan)}
-            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-teal-500 to-blue-500 text-white h-12 rounded-lg hover:opacity-90 transition font-semibold"
+            disabled={isSaving}
+            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-teal-500 to-blue-500 text-white h-12 rounded-lg hover:opacity-90 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4" />
-            {isCreating ? 'Create Plan' : 'Save Changes'}
+            {isSaving ? (
+              <>
+                <Loader className="w-4 h-4 animate-spin" />
+                {isCreating ? 'Creating...' : 'Saving...'}
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                {isCreating ? 'Create Plan' : 'Save Changes'}
+              </>
+            )}
           </button>
           <button
             onClick={onCancel}
-            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            disabled={isSaving}
+            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>

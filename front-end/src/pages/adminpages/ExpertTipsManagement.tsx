@@ -4,6 +4,7 @@ import {
   Loader, AlertCircle, MessageCircle, Target, Sparkles,
   Heart, Star, Zap, Users, TrendingUp
 } from 'lucide-react';
+import { useNotification } from './Notificationsystem';
 
 interface ExpertTip {
   id: number;
@@ -53,12 +54,15 @@ const BG_OPTIONS = [
 ];
 
 const ExpertTipsManagement: React.FC = () => {
+  const { showSuccess, showError, showWarning, confirm } = useNotification();
+  
   const [tips, setTips] = useState<ExpertTip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingTip, setEditingTip] = useState<ExpertTip | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchTips();
@@ -71,7 +75,9 @@ const ExpertTipsManagement: React.FC = () => {
       const token = localStorage.getItem('admin_token');
       
       if (!token) {
-        setError('No authentication token found');
+        const errorMsg = 'No authentication token found';
+        setError(errorMsg);
+        showError('Authentication Error', errorMsg);
         setLoading(false);
         return;
       }
@@ -89,7 +95,9 @@ const ExpertTipsManagement: React.FC = () => {
       setTips(processedTips);
     } catch (err) {
       console.error('Error fetching expert tips:', err);
-      setError('Failed to load expert tips. Please try again.');
+      const errorMsg = 'Failed to load expert tips. Please try again.';
+      setError(errorMsg);
+      showError('Load Failed', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -123,9 +131,11 @@ const ExpertTipsManagement: React.FC = () => {
     const errors = validateTip(tip);
     if (errors.length > 0) {
       setValidationErrors(errors);
+      showWarning('Validation Failed', 'Please fix the errors before saving');
       return;
     }
 
+    setIsSaving(true);
     try {
       const token = localStorage.getItem('admin_token');
       const url = isCreating
@@ -148,59 +158,94 @@ const ExpertTipsManagement: React.FC = () => {
         setEditingTip(null);
         setIsCreating(false);
         setValidationErrors([]);
-        alert('Tip saved successfully!');
+        showSuccess(
+          isCreating ? 'Tip Created' : 'Tip Updated',
+          isCreating 
+            ? `Expert tip for ${tip.name} has been created successfully`
+            : `Expert tip for ${tip.name} has been updated`
+        );
       } else {
         const errorData = await response.json();
         throw new Error(JSON.stringify(errorData));
       }
     } catch (err) {
       console.error('Error saving tip:', err);
-      alert('Failed to save tip. Please try again.');
+      showError(
+        isCreating ? 'Create Failed' : 'Update Failed',
+        'Failed to save the expert tip. Please try again.'
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleDeleteTip = async (tipId: number) => {
-    if (!confirm('Are you sure you want to delete this tip?')) return;
+  const handleDeleteTip = (tip: ExpertTip) => {
+    confirm({
+      title: 'Delete Expert Tip',
+      message: `Are you sure you want to delete the tip from ${tip.name}?\n\nThis action cannot be undone.`,
+      type: 'danger',
+      confirmText: 'Delete Tip',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('admin_token');
+          const response = await fetch(
+            `http://127.0.0.1:8000/api/admin/expert-tips/${tip.id}/`,
+            {
+              method: 'DELETE',
+              headers: { 'Authorization': `Token ${token}` },
+            }
+          );
 
-    try {
-      const token = localStorage.getItem('admin_token');
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/admin/expert-tips/${tipId}/`,
-        {
-          method: 'DELETE',
-          headers: { 'Authorization': `Token ${token}` },
+          if (response.ok) {
+            await fetchTips();
+            showSuccess('Tip Deleted', `Tip from ${tip.name} has been removed`);
+          } else {
+            throw new Error('Failed to delete tip');
+          }
+        } catch (err) {
+          console.error('Error deleting tip:', err);
+          showError('Delete Failed', 'Failed to delete the expert tip');
         }
-      );
-
-      if (response.ok) {
-        await fetchTips();
-        alert('Tip deleted successfully!');
-      } else {
-        throw new Error('Failed to delete tip');
       }
-    } catch (err) {
-      console.error('Error deleting tip:', err);
-      alert('Failed to delete tip. Please try again.');
-    }
+    });
   };
 
-  const handleToggleTipActive = async (tipId: number) => {
-    try {
-      const token = localStorage.getItem('admin_token');
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/admin/expert-tips/${tipId}/toggle_active/`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Token ${token}` },
+  const handleToggleTipActive = async (tip: ExpertTip) => {
+    const action = tip.active ? 'deactivate' : 'activate';
+    
+    confirm({
+      title: `${action === 'activate' ? 'Activate' : 'Deactivate'} Tip`,
+      message: `Are you sure you want to ${action} the tip from ${tip.name}?`,
+      type: 'info',
+      confirmText: action === 'activate' ? 'Activate' : 'Deactivate',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('admin_token');
+          const response = await fetch(
+            `http://127.0.0.1:8000/api/admin/expert-tips/${tip.id}/toggle_active/`,
+            {
+              method: 'POST',
+              headers: { 'Authorization': `Token ${token}` },
+            }
+          );
+          
+          if (response.ok) {
+            await fetchTips();
+            showSuccess(
+              'Status Updated',
+              `Tip from ${tip.name} has been ${action}d`
+            );
+          } else {
+            throw new Error('Failed to toggle tip status');
+          }
+        } catch (err) {
+          console.error('Error toggling tip:', err);
+          showError('Toggle Failed', 'Failed to update tip status');
         }
-      );
-      
-      if (response.ok) {
-        await fetchTips();
       }
-    } catch (err) {
-      console.error('Error toggling tip:', err);
-    }
+    });
   };
 
   const handleCreateNewTip = () => {
@@ -220,6 +265,27 @@ const ExpertTipsManagement: React.FC = () => {
     });
   };
 
+  const handleCancelEdit = () => {
+    if (isCreating || validationErrors.length > 0) {
+      confirm({
+        title: 'Discard Changes',
+        message: 'Are you sure you want to discard your changes?',
+        type: 'warning',
+        confirmText: 'Discard',
+        cancelText: 'Continue Editing',
+        onConfirm: () => {
+          setEditingTip(null);
+          setIsCreating(false);
+          setValidationErrors([]);
+        }
+      });
+    } else {
+      setEditingTip(null);
+      setIsCreating(false);
+      setValidationErrors([]);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -234,10 +300,16 @@ const ExpertTipsManagement: React.FC = () => {
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-        <p className="text-red-800 mb-2">{error}</p>
+        <div className="flex items-start gap-3 mb-4">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-semibold text-red-800 mb-1">Error Loading Tips</h3>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
         <button
           onClick={fetchTips}
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
         >
           Try Again
         </button>
@@ -255,7 +327,9 @@ const ExpertTipsManagement: React.FC = () => {
             </div>
             <div>
               <h3 className="text-xl font-bold text-gray-900">Expert Tips</h3>
-              <p className="text-sm text-gray-600">{tips.length} tip(s)</p>
+              <p className="text-sm text-gray-600">
+                {tips.length} tip(s) • {tips.filter(t => t.active).length} active
+              </p>
             </div>
           </div>
           <button
@@ -273,7 +347,7 @@ const ExpertTipsManagement: React.FC = () => {
             <p className="text-gray-600 mb-4">No expert tips yet</p>
             <button
               onClick={handleCreateNewTip}
-              className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition"
+              className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition font-semibold"
             >
               Create Your First Tip
             </button>
@@ -287,9 +361,10 @@ const ExpertTipsManagement: React.FC = () => {
                 onEdit={() => {
                   setEditingTip(tip);
                   setValidationErrors([]);
+                  setIsCreating(false);
                 }}
-                onDelete={() => handleDeleteTip(tip.id)}
-                onToggleActive={() => handleToggleTipActive(tip.id)}
+                onDelete={() => handleDeleteTip(tip)}
+                onToggleActive={() => handleToggleTipActive(tip)}
               />
             ))}
           </div>
@@ -300,12 +375,9 @@ const ExpertTipsManagement: React.FC = () => {
         <TipEditModal
           tip={editingTip}
           isCreating={isCreating}
+          isSaving={isSaving}
           onSave={handleSaveTip}
-          onCancel={() => {
-            setEditingTip(null);
-            setIsCreating(false);
-            setValidationErrors([]);
-          }}
+          onCancel={handleCancelEdit}
           onChange={setEditingTip}
           validationErrors={validationErrors}
         />
@@ -397,11 +469,12 @@ const TipCard: React.FC<{
 const TipEditModal: React.FC<{
   tip: ExpertTip;
   isCreating: boolean;
+  isSaving: boolean;
   onSave: (tip: ExpertTip) => void;
   onCancel: () => void;
   onChange: (tip: ExpertTip) => void;
   validationErrors: string[];
-}> = ({ tip, isCreating, onSave, onCancel, onChange, validationErrors }) => {
+}> = ({ tip, isCreating, isSaving, onSave, onCancel, onChange, validationErrors }) => {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -411,7 +484,8 @@ const TipEditModal: React.FC<{
           </h2>
           <button
             onClick={onCancel}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={isSaving}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
           </button>
@@ -437,7 +511,7 @@ const TipEditModal: React.FC<{
           {/* Expert Name */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Expert Name *
+              Expert Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -446,13 +520,14 @@ const TipEditModal: React.FC<{
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               placeholder="e.g., Dr. Alex Rivera"
               required
+              disabled={isSaving}
             />
           </div>
 
           {/* Expert Role */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Expert Role *
+              Expert Role <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -461,13 +536,14 @@ const TipEditModal: React.FC<{
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               placeholder="e.g., Relationship Psychologist"
               required
+              disabled={isSaving}
             />
           </div>
 
           {/* Image URL */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Image URL *
+              Image URL <span className="text-red-500">*</span>
             </label>
             <input
               type="url"
@@ -476,6 +552,7 @@ const TipEditModal: React.FC<{
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               placeholder="https://i.pravatar.cc/150?img=11"
               required
+              disabled={isSaving}
             />
             <p className="text-xs text-gray-500 mt-1">
               Suggested: https://i.pravatar.cc/150?img=XX (replace XX with a number)
@@ -498,7 +575,7 @@ const TipEditModal: React.FC<{
           {/* Tip Text */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Expert Tip *
+              Expert Tip <span className="text-red-500">*</span>
             </label>
             <textarea
               value={tip.tip}
@@ -507,6 +584,7 @@ const TipEditModal: React.FC<{
               placeholder="Enter the expert tip..."
               rows={3}
               required
+              disabled={isSaving}
             />
           </div>
 
@@ -523,7 +601,8 @@ const TipEditModal: React.FC<{
                     key={option.value}
                     type="button"
                     onClick={() => onChange({ ...tip, icon: option.value })}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition ${
+                    disabled={isSaving}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${
                       tip.icon === option.value
                         ? 'border-teal-500 bg-teal-50 text-teal-700'
                         : 'border-gray-300 hover:border-teal-300 text-gray-700'
@@ -548,7 +627,8 @@ const TipEditModal: React.FC<{
                   key={option.value}
                   type="button"
                   onClick={() => onChange({ ...tip, icon_color: option.value })}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition ${
+                  disabled={isSaving}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${
                     tip.icon_color === option.value
                       ? 'border-teal-500 bg-teal-50'
                       : 'border-gray-300 hover:border-teal-300'
@@ -572,7 +652,8 @@ const TipEditModal: React.FC<{
                   key={option.value}
                   type="button"
                   onClick={() => onChange({ ...tip, bg_color: option.value })}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition ${
+                  disabled={isSaving}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${
                     tip.bg_color === option.value
                       ? 'border-teal-500 bg-teal-50'
                       : 'border-gray-300 hover:border-teal-300'
@@ -596,6 +677,7 @@ const TipEditModal: React.FC<{
               onChange={(e) => onChange({ ...tip, display_order: parseInt(e.target.value) || 0 })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               min="0"
+              disabled={isSaving}
             />
             <p className="text-xs text-gray-500 mt-1">
               Lower numbers appear first in the list
@@ -606,14 +688,25 @@ const TipEditModal: React.FC<{
         <div className="flex gap-3 mt-6">
           <button
             onClick={() => onSave(tip)}
-            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-teal-500 to-blue-500 text-white h-12 rounded-lg hover:opacity-90 transition font-semibold"
+            disabled={isSaving}
+            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-teal-500 to-blue-500 text-white h-12 rounded-lg hover:opacity-90 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4" />
-            {isCreating ? 'Create Tip' : 'Save Changes'}
+            {isSaving ? (
+              <>
+                <Loader className="w-4 h-4 animate-spin" />
+                {isCreating ? 'Creating...' : 'Saving...'}
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                {isCreating ? 'Create Tip' : 'Save Changes'}
+              </>
+            )}
           </button>
           <button
             onClick={onCancel}
-            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            disabled={isSaving}
+            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
