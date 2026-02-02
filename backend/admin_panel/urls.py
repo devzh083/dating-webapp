@@ -9,7 +9,7 @@ from .views import (
     PremiumManagementViewSet, 
     PremiumFeatureViewSet,
     ExpertTipViewSet,
-    AdminRoleViewSet,  # ✅ CHANGED: Was AdminRoleManagementViewSet
+    AdminRoleViewSet, 
     # Admin review management views only
     AdminReviewsListView,
     AdminReviewDetailView,
@@ -17,6 +17,10 @@ from .views import (
     RejectReviewView,
     BulkApproveReviewsView,
     BulkRejectReviewsView,
+    # footer 
+    FooterSectionViewSet,
+    FooterLinkViewSet,
+    FooterSettingsViewSet,
 )
 
 # Create router for ViewSets
@@ -28,7 +32,10 @@ router.register(r'actions', AdminActionViewSet, basename='admin-actions')
 router.register(r'premium/plans', PremiumManagementViewSet, basename='premium-plans')
 router.register(r'premium/features', PremiumFeatureViewSet, basename='premium-features')
 router.register(r'expert-tips', ExpertTipViewSet, basename='expert-tips')
-router.register(r'admin-roles', AdminRoleViewSet, basename='admin-roles')  # ✅ CHANGED: Was AdminRoleManagementViewSet
+router.register(r'admin-roles', AdminRoleViewSet, basename='admin-roles') 
+router.register(r'footer/sections', FooterSectionViewSet, basename='footer-sections')
+router.register(r'footer/links', FooterLinkViewSet, basename='footer-links')
+router.register(r'footer/settings', FooterSettingsViewSet, basename='footer-settings')
 
 urlpatterns = [
     # Admin login endpoint

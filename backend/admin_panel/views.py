@@ -17,6 +17,7 @@ from .permissions import IsAdminUser, IsSuperAdmin, HasSectionPermission
 from .models import (
     UserReport, AdminAction, PremiumPlan, PremiumFeature,
     ExpertTip, Review, AdminRole,
+    FooterSection, FooterLink, FooterSettings,
 )
 from profiles.models import UserProfile
 from .serializers import (
@@ -25,6 +26,7 @@ from .serializers import (
     PremiumPlanSerializer, PremiumFeatureSerializer,
     ExpertTipSerializer, ReviewSerializer, ApprovedReviewSerializer,
     AdminRoleSerializer, AdminRoleCreateSerializer,
+    FooterSectionSerializer, FooterLinkSerializer, FooterSettingsSerializer, 
 )
 import secrets
 import string
@@ -1191,3 +1193,203 @@ class AdminRoleViewSet(viewsets.ModelViewSet):
         alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
         password = ''.join(secrets.choice(alphabet) for _ in range(length))
         return password
+    
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FOOTER MANAGEMENT
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FooterSectionViewSet(viewsets.ModelViewSet):
+    permission_classes = [HasSectionPermission]
+    serializer_class = FooterSectionSerializer
+    queryset = FooterSection.objects.all()
+    section_id = 'footer'
+    required_level = 'view'
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = FooterSection.objects.prefetch_related('links').all()
+        active = self.request.query_params.get('active')
+        if active is not None:
+            queryset = queryset.filter(active=active.lower() == 'true')
+        return queryset.order_by('display_order', 'title')
+
+    def create(self, request, *args, **kwargs):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, pk=None):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        section = self.get_object()
+        section.active = not section.active
+        section.save()
+        return Response({
+            'message': f'Section {"activated" if section.active else "deactivated"} successfully',
+            'section': FooterSectionSerializer(section).data
+        })
+
+    @action(detail=False, methods=['post'])
+    def reorder(self, request):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        try:
+            for item in request.data.get('orders', []):
+                section_id = item.get('id')
+                order = item.get('order')
+                if section_id and order is not None:
+                    FooterSection.objects.filter(id=section_id).update(display_order=order)
+            return Response({'message': 'Sections reordered successfully'})
+        except Exception as e:
+            return Response(
+                {'error': f'Reorder failed: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class FooterLinkViewSet(viewsets.ModelViewSet):
+    permission_classes = [HasSectionPermission]
+    serializer_class = FooterLinkSerializer
+    queryset = FooterLink.objects.all()
+    section_id = 'footer'
+    required_level = 'view'
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = FooterLink.objects.select_related('section').all()
+        
+        # Filter by section
+        section_id = self.request.query_params.get('section')
+        if section_id:
+            queryset = queryset.filter(section_id=section_id)
+        
+        # Filter by active
+        active = self.request.query_params.get('active')
+        if active is not None:
+            queryset = queryset.filter(active=active.lower() == 'true')
+        
+        return queryset.order_by('section__display_order', 'display_order', 'title')
+
+    def create(self, request, *args, **kwargs):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, pk=None):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        link = self.get_object()
+        link.active = not link.active
+        link.save()
+        return Response({
+            'message': f'Link {"activated" if link.active else "deactivated"} successfully',
+            'link': FooterLinkSerializer(link).data
+        })
+
+    @action(detail=False, methods=['post'])
+    def reorder(self, request):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        try:
+            for item in request.data.get('orders', []):
+                link_id = item.get('id')
+                order = item.get('order')
+                if link_id and order is not None:
+                    FooterLink.objects.filter(id=link_id).update(display_order=order)
+            return Response({'message': 'Links reordered successfully'})
+        except Exception as e:
+            return Response(
+                {'error': f'Reorder failed: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class FooterSettingsViewSet(viewsets.ViewSet):
+    permission_classes = [HasSectionPermission]
+    section_id = 'footer'
+    required_level = 'view'
+
+    def list(self, request):
+        """Get footer settings"""
+        settings = FooterSettings.get_settings()
+        serializer = FooterSettingsSerializer(settings)
+        return Response(serializer.data)
+
+    def update(self, request, pk=None):
+        """Update footer settings"""
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        
+        settings = FooterSettings.get_settings()
+        serializer = FooterSettingsSerializer(settings, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Footer settings updated successfully',
+                'settings': serializer.data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PUBLIC FOOTER ENDPOINT
+# ─────────────────────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_footer_data(request):
+    """
+    Public endpoint to get complete footer data for frontend
+    """
+    try:
+        # Get active sections with their active links
+        sections = FooterSection.objects.filter(active=True).prefetch_related(
+            'links'
+        ).order_by('display_order', 'title')
+        
+        # Get settings
+        settings = FooterSettings.get_settings()
+        
+        # Serialize data
+        sections_data = []
+        for section in sections:
+            active_links = section.links.filter(active=True).order_by('display_order', 'title')
+            sections_data.append({
+                'id': section.id,
+                'title': section.title,
+                'links': FooterLinkSerializer(active_links, many=True).data
+            })
+        
+        return Response({
+            'sections': sections_data,
+            'settings': FooterSettingsSerializer(settings).data
+        })
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch footer data: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

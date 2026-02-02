@@ -450,3 +450,99 @@ class AdminRole(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FOOTER MANAGEMENT
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FooterSection(models.Model):
+    """
+    Footer column/section (e.g., Company, Support, Legal, Social)
+    """
+    title = models.CharField(max_length=100)
+    display_order = models.IntegerField(default=0)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'footer_sections'
+        ordering = ['display_order', 'title']
+        verbose_name = 'Footer Section'
+        verbose_name_plural = 'Footer Sections'
+
+    def __str__(self):
+        return self.title
+
+
+class FooterLink(models.Model):
+    """
+    Individual link within a footer section
+    """
+    LINK_TYPES = [
+        ('internal', 'Internal Link'),
+        ('external', 'External Link'),
+    ]
+
+    section = models.ForeignKey(
+        FooterSection, 
+        on_delete=models.CASCADE, 
+        related_name='links'
+    )
+    title = models.CharField(max_length=100)
+    url = models.CharField(max_length=500)
+    link_type = models.CharField(max_length=20, choices=LINK_TYPES, default='internal')
+    open_new_tab = models.BooleanField(
+        default=False,
+        help_text="Open link in new tab (for external links)"
+    )
+    display_order = models.IntegerField(default=0)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'footer_links'
+        ordering = ['section', 'display_order', 'title']
+        verbose_name = 'Footer Link'
+        verbose_name_plural = 'Footer Links'
+
+    def __str__(self):
+        return f"{self.section.title} - {self.title}"
+
+
+class FooterSettings(models.Model):
+    """
+    Global footer settings (copyright text, tagline, etc.)
+    Singleton model - only one instance should exist
+    """
+    copyright_text = models.CharField(
+        max_length=200,
+        default="© 2026 The Dating App. All rights reserved."
+    )
+    tagline = models.CharField(
+        max_length=200,
+        default="Made in Hyderabad, India ❤️ for genuine connections."
+    )
+    show_copyright = models.BooleanField(default=True)
+    show_tagline = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'footer_settings'
+        verbose_name = 'Footer Settings'
+        verbose_name_plural = 'Footer Settings'
+
+    def __str__(self):
+        return "Footer Settings"
+
+    def save(self, *args, **kwargs):
+        # Ensure only one instance exists (singleton)
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_settings(cls):
+        """Get or create the singleton instance"""
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj

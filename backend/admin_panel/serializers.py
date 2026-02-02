@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from profiles.models import UserProfile
+from .models import FooterSection, FooterLink, FooterSettings
 from .models import UserReport, AdminAction, PremiumPlan, PremiumFeature, ExpertTip, Review, AdminRole
 import logging
 
@@ -365,3 +366,52 @@ class DeletedAdminRoleSerializer(serializers.ModelSerializer):
             delta = timezone.now() - obj.deleted_at
             return delta.days
         return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FOOTER SERIALIZERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FooterLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FooterLink
+        fields = [
+            'id', 'title', 'url', 'link_type', 'open_new_tab',
+            'display_order', 'active', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+
+class FooterSectionSerializer(serializers.ModelSerializer):
+    links = FooterLinkSerializer(many=True, read_only=True)
+    link_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FooterSection
+        fields = [
+            'id', 'title', 'display_order', 'active',
+            'links', 'link_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def get_link_count(self, obj):
+        return obj.links.filter(active=True).count()
+
+
+class FooterSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FooterSettings
+        fields = [
+            'id', 'copyright_text', 'tagline',
+            'show_copyright', 'show_tagline', 'updated_at'
+        ]
+        read_only_fields = ['id', 'updated_at']
+
+
+# Public serializer (for frontend footer display)
+class PublicFooterSerializer(serializers.Serializer):
+    """
+    Complete footer data for public display
+    """
+    sections = FooterSectionSerializer(many=True)
+    settings = FooterSettingsSerializer()

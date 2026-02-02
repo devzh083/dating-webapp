@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Shield, X, LogOut, BarChart3, Users as UsersIcon, AlertTriangle, 
-  FileText, Crown, Lightbulb, Quote, Settings
+  FileText, Crown, Lightbulb, Quote, Settings, Layers
 } from 'lucide-react';
 import { adminService } from '../services/profileService';
 import { NotificationProvider, useNotification } from './adminpages/Notificationsystem';
@@ -16,9 +16,10 @@ import PremiumManagement from './adminpages/Premiummanagement';
 import ExpertTipsManagement from './adminpages/ExpertTipsManagement';
 import ReviewsManagement from './adminpages/ReviewsManagement';
 import AdminRoleManagement from './adminpages/Adminrolemanagement';
+import FooterManagement from './adminpages/Footermanagement';
 
 // Define all available tabs
-type TabId = 'overview' | 'users' | 'reports' | 'analytics' | 'premium' | 'expert-tips' | 'reviews' | 'admin-roles';
+type TabId = 'overview' | 'users' | 'reports' | 'analytics' | 'premium' | 'expert-tips' | 'reviews' | 'admin-roles' | 'footer';
 
 // Inner component that uses notifications
 const AdminPanelContent: React.FC = () => {
@@ -64,7 +65,8 @@ const AdminPanelContent: React.FC = () => {
       premium: { title: 'Premium Management', description: 'Manage premium subscriptions' },
       'expert-tips': { title: 'Expert Tips Management', description: 'Manage expert tips and advice' },
       reviews: { title: 'Reviews Management', description: 'Review and approve user testimonials' },
-      'admin-roles': { title: 'Admin Role Management', description: 'Manage admin permissions and access' }
+      'admin-roles': { title: 'Admin Role Management', description: 'Manage admin permissions and access' },
+      footer: { title: 'Footer Management', description: 'Manage footer sections and links' }
     };
     return tabInfo[activeTab];
   };
@@ -114,7 +116,8 @@ const AdminPanelContent: React.FC = () => {
               { id: 'premium' as const, label: 'Premium', icon: Crown, color: 'text-purple-500' },
               { id: 'expert-tips' as const, label: 'Expert Tips', icon: Lightbulb, color: 'text-amber-500' },
               { id: 'reviews' as const, label: 'Reviews', icon: Quote, color: 'text-rose-500' },
-              { id: 'admin-roles' as const, label: 'Admin Roles', icon: Settings, color: 'text-gray-500' }
+              { id: 'admin-roles' as const, label: 'Admin Roles', icon: Settings, color: 'text-gray-500' },
+              { id: 'footer' as const, label: 'Footer', icon: Layers, color: 'text-slate-500' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -182,6 +185,7 @@ const AdminPanelContent: React.FC = () => {
             {activeTab === 'expert-tips' && <ExpertTipsManagement />}
             {activeTab === 'reviews' && <ReviewsManagement />}
             {activeTab === 'admin-roles' && <AdminRoleManagement />}
+            {activeTab === 'footer' && <FooterManagement />}
           </div>
         </div>
       </div>

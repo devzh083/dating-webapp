@@ -6,6 +6,7 @@ from admin_panel.views import (
     public_premium_plans, 
     public_premium_features,
     public_expert_tips,
+    public_footer_data,
     ApprovedReviewsView,  
     SubmitReviewView,     
 )
@@ -24,8 +25,10 @@ urlpatterns = [
     
     # Reviews (public endpoints)
     path('api/reviews/approved/', ApprovedReviewsView.as_view(), name='public-approved-reviews'),  # ✅ NEW: View approved reviews
-    path('api/reviews/submit/', SubmitReviewView.as_view(), name='public-submit-review'),          # ✅ NEW: Submit new review
-    
+    path('api/reviews/submit/', SubmitReviewView.as_view(), name='public-submit-review'),    
+
+    #footer
+    path('api/footer/', public_footer_data, name='public-footer-data'), 
     # ==========================================
     # APP-SPECIFIC API ROUTES
     # ==========================================
