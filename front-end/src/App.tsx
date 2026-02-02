@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 
-// Existing Pages
+/* ---------------- EXISTING PAGES ---------------- */
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 import HomePage from "./pages/HomePage";
@@ -14,15 +14,19 @@ import ProfilePage from "./pages/ProfilePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import AdminLogin from './pages/AdminLogin';
 import AdminPanel from './pages/AdminPanel';
-import { adminService, profileService } from './services/profileService'; // ✅ Imported profileService
+// ✅ MERGE: Added PremiumPage from Vikas's branch
+import PremiumPage from './pages/Premiumpage'; 
 
-// Footer Pages
+import { adminService, profileService } from './services/profileService'; 
+
+/* ---------------- FOOTER PAGES ---------------- */
 import LegalPage from './pages/footer/LegalPage';
 import AboutPage from './pages/footer/AboutPage';
 import ContactPage from './pages/footer/ContactPage';
 import CareersPage from './pages/footer/CareersPage';
 import HelpCenterPage from './pages/footer/HelpCenterPage';
 
+// Admin Protected Route Component
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const isAdmin = adminService.isAdmin();
   if (!isAdmin) return <Navigate to="/admin/login" replace />;
@@ -30,7 +34,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppInner: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = loading
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   const navigate = useNavigate();
@@ -38,15 +42,16 @@ const AppInner: React.FC = () => {
 
   /* ---------------- SCROLL BEHAVIOR ---------------- */
   useEffect(() => {
+    // Only scroll to top if NOT on the Chats page.
     if (!location.pathname.startsWith('/chats')) {
       window.scrollTo(0, 0);
     }
   }, [location.pathname]);
 
-  /* ---------------- CHECK PROFILE (ROBUST) ---------------- */
+  /* ---------------- CHECK USER PROFILE (ROBUST FIX) ---------------- */
+  // ✅ Used your fixed logic: checks actual data via profileService to prevent loops
   const checkProfile = async () => {
     try {
-      // ✅ FIX: Use profileService to check actual data instead of a status flag
       const result = await profileService.getProfile();
       
       // We consider onboarding complete ONLY if the profile exists AND has a first name
@@ -97,7 +102,8 @@ const AppInner: React.FC = () => {
     };
 
     initAuth();
-  }, []); // ✅ Empty dependency array prevents infinite loops
+    // ✅ CRITICAL FIX: Empty dependency array [] prevents infinite loops (Your fix)
+  }, []); 
 
   const handleLoginSuccess = async () => {
     await checkProfile();
@@ -125,11 +131,12 @@ const AppInner: React.FC = () => {
 
   return (
     <Routes>
+      {/* ---------------- ADMIN ROUTES ---------------- */}
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminRoute><AdminPanel /></AdminRoute>} />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
-      {/* Footer Routes */}
+      {/* ---------------- FOOTER / PUBLIC ROUTES ---------------- */}
       <Route path="/about" element={<AboutPage />} />
       <Route path="/careers" element={<CareersPage />} />
       <Route path="/press" element={<LegalPage type="press" />} />
@@ -143,6 +150,7 @@ const AppInner: React.FC = () => {
       <Route path="/cookies" element={<LegalPage type="cookies" />} />
       <Route path="/ip" element={<LegalPage type="ip" />} />
 
+      {/* ---------------- CORE APP ROUTES ---------------- */}
       <Route
         path="/"
         element={
@@ -167,19 +175,24 @@ const AppInner: React.FC = () => {
           isLoggedIn ? (
             <OnboardingPage
               onComplete={() => setNeedsOnboarding(false)}
-              onLogout={handleLogout}
+              onLogout={handleLogout} // ✅ Your fix: Passed logout so users aren't trapped
             />
           ) : <Navigate to="/" replace />
         }
       />
 
+      {/* ---------------- PROTECTED ROUTES ---------------- */}
       <Route path="/home" element={!isLoggedIn ? <Navigate to="/" replace /> : needsOnboarding ? <Navigate to="/onboarding" replace /> : <HomePage onLogout={handleLogout} />} />
       <Route path="/chats" element={!isLoggedIn ? <Navigate to="/" replace /> : needsOnboarding ? <Navigate to="/onboarding" replace /> : <ChatsPage onLogout={handleLogout} />} />
       <Route path="/notifications" element={!isLoggedIn ? <Navigate to="/" replace /> : needsOnboarding ? <Navigate to="/onboarding" replace /> : <NotificationsPage onLogout={handleLogout} />} />
       <Route path="/profile" element={!isLoggedIn ? <Navigate to="/" replace /> : needsOnboarding ? <Navigate to="/onboarding" replace /> : <ProfilePage />} />
       <Route path="/cafes" element={!isLoggedIn ? <Navigate to="/" replace /> : needsOnboarding ? <Navigate to="/onboarding" replace /> : <CafesPage onLogout={handleLogout} />} />
       <Route path="/cafes/:id/book" element={!isLoggedIn ? <Navigate to="/" replace /> : needsOnboarding ? <Navigate to="/onboarding" replace /> : <BookingPage />} />
+      
+      {/* ✅ MERGE: Added Vikas's Premium Route */}
+      <Route path="/premium" element={<PremiumPage />} />
 
+      {/* ---------------- 404 NOT FOUND ---------------- */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

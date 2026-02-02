@@ -2,6 +2,7 @@ import { Heart } from "lucide-react"; // Icon for the active state
 import StepLayout from "../StepLayout";
 import { cn } from "@/lib/utils";
 
+// ✅ Keep Strong Types
 interface Step2Props {
   data: {
     relationshipType: string;
@@ -9,7 +10,7 @@ interface Step2Props {
   onChange: (data: Partial<Step2Props["data"]>) => void;
   onNext: () => void;
   onBack: () => void;
-  onSkip?: () => void; // ✅ Skip prop included
+  onSkip?: () => void; 
 }
 
 const RELATIONSHIP_STATUSES = [
@@ -37,8 +38,9 @@ export default function Step2Orientation({
       subtitle="Be honest, it helps us find what you really need."
       onNext={onNext}
       onBack={onBack}
-      onSkip={onSkip} // ✅ Passed to Layout to render top-right button
+      onSkip={onSkip} // ✅ Passed to Layout
       canProceed={canProceed}
+      showBack={true} // Explicitly show back button
     >
       <div className="space-y-3 pt-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
         {RELATIONSHIP_STATUSES.map((status) => {

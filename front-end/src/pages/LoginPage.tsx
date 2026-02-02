@@ -39,80 +39,134 @@ export default function LoginPage({
 
   /* ---------------- GOOGLE REDIRECT HANDLING ---------------- */
   useEffect(() => {
-      const params = new URLSearchParams(location.search);
-      const access = params.get("access_token");
-      const refresh = params.get("refresh_token");
+    const params = new URLSearchParams(location.search);
+    const access = params.get("access_token");
+    const refresh = params.get("refresh_token");
 
-      if (!access || !refresh) return;
+    if (!access || !refresh) return;
 
-      localStorage.setItem("access_token", access);
-      localStorage.setItem("refresh_token", refresh);
+    localStorage.setItem("access_token", access);
+    localStorage.setItem("refresh_token", refresh);
 
-      fetch(`${API_BASE_URL}/me/`, {
-        headers: { Authorization: `Bearer ${access}` },
+    fetch(`${API_BASE_URL}/me/`, {
+      headers: { Authorization: `Bearer ${access}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch user");
+        return res.json();
       })
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to fetch user");
-          return res.json();
-        })
-        .then((user) => {
-          if (user?.email) {
-            localStorage.setItem("user_email", user.email.toLowerCase());
-          }
+      .then((user) => {
+        if (user?.email) {
+          localStorage.setItem("user_email", user.email.toLowerCase());
+        }
 
-          window.history.replaceState({}, "", window.location.pathname);
-          onLoginSuccess();
-          navigate("/home");
-        })
-        .catch(() => {
-          setErrorMsg("Google login failed. Please try again.");
-        });
-    }, [location.search, navigate, onLoginSuccess]);
+        window.history.replaceState({}, "", window.location.pathname);
+        onLoginSuccess();
+        navigate("/home");
+      })
+      .catch(() => {
+        setErrorMsg("Google login failed. Please try again.");
+      });
+  }, [location.search, navigate, onLoginSuccess]);
 
-  /* ---------------- LOGIN ---------------- */
-   const handleLogin = async (e: React.FormEvent) => {
+  /* ---------------- UNIFIED LOGIN (auto-detects admin) ---------------- */
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setLoading(true);
 
+    const username = email.trim();
+
     try {
-      const res = await fetch(`${API_BASE_URL}/login/`, {
+      // STEP 1: Try regular user login first
+      const userRes = await fetch(`${API_BASE_URL}/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: email.trim(),
+          username: username,
           password,
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Invalid credentials");
+      if (userRes.ok) {
+        const data = await userRes.json();
+        const { access, refresh, user } = data;
 
-      const { access, refresh, user } = data;
+        // Check if user needs OTP verification
+        if (!user?.is_verified) {
+          await fetch(`${API_BASE_URL}/login/send-otp/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: username }),
+          });
+          setView("otp");
+          setLoading(false);
+          return;
+        }
 
-      if (!user?.is_verified) {
-        await fetch(`${API_BASE_URL}/login/send-otp/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: email.trim() }),
+        // Store regular user tokens
+        localStorage.setItem("access_token", access);
+        localStorage.setItem("refresh_token", refresh);
+        localStorage.setItem("user_email", user.email.toLowerCase());
+
+        // Check if this user is actually an admin
+        // Try to access admin endpoint with the JWT token
+        const adminCheckRes = await fetch(`${API_BASE_URL}/admin/dashboard/stats/`, {
+          headers: { 
+            Authorization: `Bearer ${access}`,
+            "Content-Type": "application/json"
+          },
         });
-        setView("otp");
+
+        if (adminCheckRes.ok) {
+          // User is an admin! Redirect to admin dashboard
+          console.log("Admin user detected, redirecting to admin dashboard");
+          navigate("/admin/dashboard");
+          setLoading(false);
+          return;
+        }
+
+        // Regular user - go to home
+        onLoginSuccess();
+        navigate("/home");
         setLoading(false);
         return;
       }
 
-      localStorage.setItem("access_token", access);
-      localStorage.setItem("refresh_token", refresh);
-      localStorage.setItem("user_email", user.email.toLowerCase());
+      // STEP 2: If regular login failed, try admin login
+      const adminRes = await fetch(`${API_BASE_URL}/admin/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          username: username, 
+          password 
+        }),
+      });
 
-      onLoginSuccess();
-      navigate("/home");
+      if (adminRes.ok) {
+        const adminData = await adminRes.json();
+        
+        // Store admin token (Token-based auth)
+        localStorage.setItem("admin_token", adminData.token);
+        localStorage.setItem("admin_user", JSON.stringify(adminData.user));
+        
+        console.log("Admin login successful:", adminData.user.username);
+        navigate("/admin/dashboard");
+        setLoading(false);
+        return;
+      }
+
+      // Both logins failed
+      const adminError = await adminRes.json();
+      throw new Error(adminError.error || adminError.detail || "Invalid credentials");
+
     } catch (err: any) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.message || "Invalid credentials");
     } finally {
       setLoading(false);
     }
   };
+
   /* ---------------- SIGNUP ---------------- */
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +200,6 @@ export default function LoginPage({
         throw new Error(registerData.detail || "Signup failed");
       }
 
-      // After registration, send OTP to this email and go to OTP page
       await fetch(`${API_BASE_URL}/login/send-otp/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -194,11 +247,10 @@ export default function LoginPage({
   /* ---------------- UI ---------------- */
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f3fbff] to-[#f9fdfc]">
-      
-      {/* ✅ RESTORED TOP BAR (Without Navigation Links) */}
+      {/* Top Bar */}
       <nav className="w-full bg-white">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-10 py-3.5">
-          {/* 1. Left: Branding */}
+          {/* Left: Branding */}
           <Link to="/" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#02b2f6] flex items-center justify-center shadow-sm">
               <Heart className="w-4 h-4 text-white fill-white" />
@@ -208,26 +260,15 @@ export default function LoginPage({
             </span>
           </Link>
 
-          {/* 2. Middle: Navigation Links REMOVED as requested */}
-
-          {/* 3. Right: Action Button */}
-<div className="flex items-center gap-3">
-  <Button
-    variant="ghost"
-    className="text-[12px] font-semibold"
-    onClick={() => navigate("/admin/login")}
-  >
-    Admin
-  </Button>
-
-  <Button
-    className="rounded-full px-6 py-2 text-[12px] font-semibold text-white bg-gradient-to-r from-[#02b2f6] to-[#09cf8b] hover:opacity-90 shadow-sm"
-    onClick={() => navigate("/login")}
-  >
-    Login / Sign Up
-  </Button>
-</div>
-
+          {/* Right: Action Button */}
+          <div className="flex items-center gap-3">
+            <Button
+              className="rounded-full px-6 py-2 text-[12px] font-semibold text-white bg-gradient-to-r from-[#02b2f6] to-[#09cf8b] hover:opacity-90 shadow-sm"
+              onClick={() => navigate("/login")}
+            >
+              Login / Sign Up
+            </Button>
+          </div>
         </div>
       </nav>
 
@@ -247,6 +288,7 @@ export default function LoginPage({
               onBack={() => setView("login")}
             />
           ) : view === "signup" ? (
+            /* ---------------- SIGNUP VIEW ---------------- */
             <motion.div
               key="signup"
               initial={{ opacity: 0, x: 20 }}
@@ -406,6 +448,7 @@ export default function LoginPage({
               </div>
             </motion.div>
           ) : (
+            /* ---------------- LOGIN VIEW ---------------- */
             <motion.div
               key="login"
               initial={{ opacity: 0, y: 20 }}
@@ -428,11 +471,11 @@ export default function LoginPage({
                       htmlFor="email"
                       className="text-[11px] font-medium text-[#4b5563]"
                     >
-                      Email
+                      Email / Username
                     </Label>
                     <Input
                       id="email"
-                      type="email"
+                      type="text"
                       placeholder="youremail@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -515,21 +558,13 @@ export default function LoginPage({
                   </Button>
                 </form>
 
-                <div className="mt-6 text-center space-y-1">
+                <div className="mt-6 text-center">
                   <button
                     onClick={() => setView("signup")}
                     className="text-[11px] text-[#16a3ff] hover:underline font-medium"
                   >
                     New user? Sign up
                   </button>
-                  {/* <p className="text-[11px] text-[#b0b5c0]">
-                    <Link
-                      to="/cafe-partner/login"
-                      className="hover:text-[#6b7280] underline-offset-2 hover:underline"
-                    >
-                      Café Partner Login
-                    </Link> */}
-                  {/* </p> */}
                 </div>
               </div>
             </motion.div>

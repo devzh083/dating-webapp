@@ -1,22 +1,203 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from django.db.models import Q, Count, Sum, QuerySet
 from django.utils import timezone
 from datetime import timedelta
-from .models import UserReport, AdminAction
 from profiles.models import UserProfile
 from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate
+from .models import PremiumPlan, PremiumFeature, UserReport, AdminAction
 from .serializers import (
+    PremiumPlanSerializer, PremiumFeatureSerializer,
     UserProfileSerializer, UserReportSerializer, 
     AdminActionSerializer, UserActionSerializer
 )
+
+
+class PremiumManagementViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing premium plans"""
+    # Default permission is Admin only, but overriden in get_permissions
+    permission_classes = [IsAdminUser]
+    serializer_class = PremiumPlanSerializer
+    queryset = PremiumPlan.objects.all()
+    lookup_field = 'plan_id'
+    
+    def get_permissions(self):
+        """
+        CRITICAL UPDATE: Allow public access to list plans.
+        """
+        if self.action in ['list', 'retrieve', 'public_plans']:
+            return [AllowAny()]
+        return [IsAdminUser()]
+    
+    def get_queryset(self):
+        """Get queryset with optional filtering"""
+        request = self.request
+        queryset = PremiumPlan.objects.all()
+        
+        # SECURITY: If user is NOT admin, only show active plans
+        if not request.user.is_staff:
+            queryset = queryset.filter(active=True)
+        
+        # Filters for Admin
+        active = request.query_params.get('active', None)
+        if active is not None and request.user.is_staff:
+            queryset = queryset.filter(active=active.lower() == 'true')
+        
+        popular = request.query_params.get('popular', None)
+        if popular is not None:
+            queryset = queryset.filter(popular=popular.lower() == 'true')
+        
+        return queryset.order_by('display_order', 'price')
+    
+    @action(detail=False, methods=['get'])
+    def public_plans(self, request):
+        """Get active plans for public display (Explicit endpoint)"""
+        plans = PremiumPlan.objects.filter(active=True).order_by('display_order', 'price')
+        serializer = self.get_serializer(plans, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, plan_id=None):
+        """Toggle plan active status"""
+        try:
+            plan = self.get_object()
+            plan.active = not plan.active
+            plan.save()
+            
+            return Response({
+                'message': f'Plan {"activated" if plan.active else "deactivated"} successfully',
+                'plan': PremiumPlanSerializer(plan).data
+            })
+        except PremiumPlan.DoesNotExist:
+            return Response(
+                {'error': 'Plan not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=True, methods=['post'])
+    def toggle_popular(self, request, plan_id=None):
+        """Toggle plan popular status"""
+        try:
+            plan = self.get_object()
+            
+            # If setting as popular, remove popular from all other plans
+            if not plan.popular:
+                PremiumPlan.objects.all().update(popular=False)
+            
+            plan.popular = not plan.popular
+            plan.save()
+            
+            return Response({
+                'message': f'Plan marked as {"popular" if plan.popular else "regular"}',
+                'plan': PremiumPlanSerializer(plan).data
+            })
+        except PremiumPlan.DoesNotExist:
+            return Response(
+                {'error': 'Plan not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['post'])
+    def reorder(self, request):
+        """Reorder plans"""
+        try:
+            orders = request.data.get('orders', [])  # [{plan_id: 'monthly', order: 0}, ...]
+            
+            for item in orders:
+                plan_id = item.get('plan_id')
+                order = item.get('order')
+                
+                if plan_id and order is not None:
+                    PremiumPlan.objects.filter(plan_id=plan_id).update(display_order=order)
+            
+            return Response({'message': 'Plans reordered successfully'})
+        except Exception as e:
+            return Response(
+                {'error': f'Reorder failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PremiumFeatureViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing premium features"""
+    permission_classes = [IsAdminUser]
+    serializer_class = PremiumFeatureSerializer
+    queryset = PremiumFeature.objects.all()
+    
+    def get_permissions(self):
+        """
+        CRITICAL UPDATE: Allow public access to list features.
+        """
+        if self.action in ['list', 'retrieve', 'public_features']:
+            return [AllowAny()]
+        return [IsAdminUser()]
+    
+    def get_queryset(self):
+        """Get queryset with optional filtering"""
+        request = self.request
+        queryset = PremiumFeature.objects.all()
+        
+        # SECURITY: If user is NOT admin, only show active features
+        if not request.user.is_staff:
+            queryset = queryset.filter(active=True)
+        
+        # Filter by active status (Admin only)
+        active = request.query_params.get('active', None)
+        if active is not None and request.user.is_staff:
+            queryset = queryset.filter(active=active.lower() == 'true')
+        
+        return queryset.order_by('display_order')
+    
+    @action(detail=False, methods=['get'])
+    def public_features(self, request):
+        """Get active features for public display (no auth required)"""
+        features = PremiumFeature.objects.filter(active=True).order_by('display_order')
+        serializer = self.get_serializer(features, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, pk=None):
+        """Toggle feature active status"""
+        try:
+            feature = self.get_object()
+            feature.active = not feature.active
+            feature.save()
+            
+            return Response({
+                'message': f'Feature {"activated" if feature.active else "deactivated"} successfully',
+                'feature': PremiumFeatureSerializer(feature).data
+            })
+        except PremiumFeature.DoesNotExist:
+            return Response(
+                {'error': 'Feature not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['post'])
+    def reorder(self, request):
+        """Reorder features"""
+        try:
+            orders = request.data.get('orders', [])  # [{id: 1, order: 0}, ...]
+            
+            for item in orders:
+                feature_id = item.get('id')
+                order = item.get('order')
+                
+                if feature_id and order is not None:
+                    PremiumFeature.objects.filter(id=feature_id).update(display_order=order)
+            
+            return Response({'message': 'Features reordered successfully'})
+        except Exception as e:
+            return Response(
+                {'error': f'Reorder failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -569,22 +750,42 @@ class AdminActionViewSet(viewsets.ReadOnlyModelViewSet):
             )
         
 class AdminLoginView(APIView):
-    """Admin login view"""
+    """Admin login view - accepts both username and email"""
     permission_classes = [AllowAny]
     
     def post(self, request: Request) -> Response:
-        """Handle admin login with username/password"""
+        """Handle admin login with username/email + password"""
         try:
-            username = request.data.get('username')
+            identifier = request.data.get('username')  # Can be username or email
             password = request.data.get('password')
             
-            if not username or not password:
+            if not identifier or not password:
                 return Response(
-                    {'error': 'Username and password are required'},
+                    {'error': 'Username/email and password are required'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            user = authenticate(username=username, password=password)
+            # Try to authenticate with username first
+            user = authenticate(username=identifier, password=password)
+            
+            # If that fails and identifier looks like an email, try to find user by email
+            if user is None and '@' in identifier:
+                try:
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    
+                    # Get all users with this email (there might be multiple)
+                    users_with_email = User.objects.filter(email=identifier)
+                    
+                    # Try to authenticate with each one until one works
+                    for potential_user in users_with_email:
+                        user = authenticate(username=potential_user.username, password=password)
+                        if user is not None:
+                            break  # Found the right user!
+                            
+                except Exception as e:
+                    print(f"Error looking up user by email: {e}")
+                    pass
             
             if user is None:
                 return Response(

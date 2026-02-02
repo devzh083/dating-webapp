@@ -256,6 +256,7 @@ class RegisterView(APIView):
 class LoginView(APIView):
     """
     Normal username+password login (no OTP).
+    Staff users should use /api/admin/login/ instead.
     """
 
     permission_classes = [AllowAny]
@@ -275,6 +276,13 @@ class LoginView(APIView):
             return Response(
                 {"detail": "Invalid credentials"},
                 status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # 🔥 NEW: If user is staff, they should use admin login endpoint
+        if user.is_staff:
+            return Response(
+                {"detail": "Staff users must use admin login endpoint"},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         refresh = RefreshToken.for_user(user)
@@ -298,7 +306,6 @@ class LoginView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
 
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
