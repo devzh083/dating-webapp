@@ -234,7 +234,8 @@ class ExpertTip(models.Model):
 
 VALID_SECTIONS = {
     'overview', 'users', 'reports', 'analytics',
-    'premium', 'expert-tips', 'reviews',
+    'premium', 'expert-tips', 'reviews','footer',
+    'promo-codes',
 }
 VALID_LEVELS = {'none', 'view', 'edit'}
 
@@ -546,3 +547,191 @@ class FooterSettings(models.Model):
         """Get or create the singleton instance"""
         obj, created = cls.objects.get_or_create(pk=1)
         return obj
+    
+
+# Add at the end of models.py, after FooterSettings
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMO CODE SYSTEM
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PromoCode(models.Model):
+    """
+    Promotional codes for premium plans
+    """
+    # Code details
+    code = models.CharField(
+        max_length=50, 
+        unique=True,
+        help_text="Unique promo code (e.g., SUMMER2024, FREEMONTH100)"
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Internal description (not shown to users)"
+    )
+    
+    # Plan restriction - ONLY FOR ONE PLAN
+    plan = models.ForeignKey(
+        PremiumPlan,
+        on_delete=models.CASCADE,
+        related_name='promo_codes',
+        help_text="Which plan this code applies to"
+    )
+    
+    # Make it FREE
+    discount_percentage = models.IntegerField(
+        default=100,
+        help_text="Discount percentage (100 = FREE)"
+    )
+    
+    # Usage limits
+    max_uses = models.IntegerField(
+        default=100,
+        help_text="Maximum number of people who can use this code"
+    )
+    current_uses = models.IntegerField(
+        default=0,
+        help_text="Current number of times used"
+    )
+    
+    # Time restrictions
+    valid_from = models.DateTimeField(
+        default=timezone.now,
+        help_text="When this code becomes valid"
+    )
+    valid_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this code expires (leave empty for no expiration)"
+    )
+    
+    # Status
+    active = models.BooleanField(
+        default=True,
+        help_text="Whether this code is currently active"
+    )
+    
+    # Metadata
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_promo_codes'
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'promo_codes'
+        ordering = ['-created_at']
+        verbose_name = 'Promo Code'
+        verbose_name_plural = 'Promo Codes'
+        indexes = [
+            models.Index(fields=['code']),
+            models.Index(fields=['active']),
+        ]
+
+    def __str__(self):
+        return f"{self.code} - {self.plan.name} ({self.current_uses}/{self.max_uses})"
+
+    @property
+    def is_valid(self):
+        """Check if code is currently valid"""
+        if not self.active:
+            return False
+        
+        # Check if expired
+        if self.valid_until and timezone.now() > self.valid_until:
+            return False
+        
+        # Check if not yet valid
+        if timezone.now() < self.valid_from:
+            return False
+        
+        # Check usage limit
+        if self.current_uses >= self.max_uses:
+            return False
+        
+        return True
+
+    @property
+    def remaining_uses(self):
+        """Get remaining uses"""
+        return max(0, self.max_uses - self.current_uses)
+
+    @property
+    def usage_percentage(self):
+        """Get usage as percentage"""
+        if self.max_uses == 0:
+            return 0
+        return int((self.current_uses / self.max_uses) * 100)
+
+    def can_be_used_by(self, user):
+        """Check if a specific user can use this code"""
+        if not self.is_valid:
+            return False
+        
+        # Check if user already used this code
+        if PromoCodeUsage.objects.filter(promo_code=self, user=user).exists():
+            return False
+        
+        return True
+
+    def use_code(self, user):
+        """
+        Mark this code as used by a user
+        Returns (success, message)
+        """
+        if not self.is_valid:
+            return False, "This promo code is no longer valid"
+        
+        if PromoCodeUsage.objects.filter(promo_code=self, user=user).exists():
+            return False, "You have already used this promo code"
+        
+        # Increment usage counter
+        self.current_uses += 1
+        self.save(update_fields=['current_uses'])
+        
+        # Create usage record
+        PromoCodeUsage.objects.create(
+            promo_code=self,
+            user=user,
+            plan=self.plan
+        )
+        
+        return True, "Promo code applied successfully!"
+
+
+class PromoCodeUsage(models.Model):
+    """
+    Track who used which promo codes
+    """
+    promo_code = models.ForeignKey(
+        PromoCode,
+        on_delete=models.CASCADE,
+        related_name='usages'
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='promo_code_usages'
+    )
+    plan = models.ForeignKey(
+        PremiumPlan,
+        on_delete=models.CASCADE
+    )
+    used_at = models.DateTimeField(default=timezone.now)
+    
+    class Meta:
+        db_table = 'promo_code_usages'
+        ordering = ['-used_at']
+        verbose_name = 'Promo Code Usage'
+        verbose_name_plural = 'Promo Code Usages'
+        unique_together = [['promo_code', 'user']]  # One code per user
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['promo_code']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} used {self.promo_code.code} on {self.used_at.strftime('%Y-%m-%d')}"

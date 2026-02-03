@@ -16,6 +16,8 @@ import {
   Shield,
   Loader,
   AlertCircle,
+  Ticket,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -64,6 +66,284 @@ interface PremiumFeature {
   display_order: number;
 }
 
+interface PromoDiscount {
+  code: string;
+  discountPercentage: number;
+  originalPrice: number;
+  discountAmount: number;
+  finalPrice: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTION TO GET AUTH TOKEN
+// ═══════════════════════════════════════════════════════════════════════════
+
+const getAuthToken = (): { token: string; type: 'Bearer' | 'Token' } | null => {
+  // JWT tokens (used by regular users)
+  const jwtKeys = ['access_token', 'accessToken', 'jwt', 'access'];
+  
+  // DRF Token keys (used by admin or Token auth)
+  const tokenKeys = ['token', 'authToken', 'auth_token', 'admin_token'];
+
+  // Check for JWT tokens first (in localStorage)
+  for (const key of jwtKeys) {
+    const token = localStorage.getItem(key);
+    if (token) {
+      console.log(`Found JWT token in localStorage with key: ${key}`);
+      return { token, type: 'Bearer' };
+    }
+  }
+
+  // Check for DRF tokens (in localStorage)
+  for (const key of tokenKeys) {
+    const token = localStorage.getItem(key);
+    if (token) {
+      console.log(`Found DRF token in localStorage with key: ${key}`);
+      return { token, type: 'Token' };
+    }
+  }
+
+  // Check sessionStorage for JWT
+  for (const key of jwtKeys) {
+    const token = sessionStorage.getItem(key);
+    if (token) {
+      console.log(`Found JWT token in sessionStorage with key: ${key}`);
+      return { token, type: 'Bearer' };
+    }
+  }
+
+  // Check sessionStorage for DRF tokens
+  for (const key of tokenKeys) {
+    const token = sessionStorage.getItem(key);
+    if (token) {
+      console.log(`Found DRF token in sessionStorage with key: ${key}`);
+      return { token, type: 'Token' };
+    }
+  }
+
+  console.error('No authentication token found in localStorage or sessionStorage');
+  return null;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PROMO CODE COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface PromoCodeInputProps {
+  selectedPlan: string;
+  onPromoApplied: (discount: PromoDiscount) => void;
+  onPromoRemoved: () => void;
+}
+
+const PromoCodeInput: React.FC<PromoCodeInputProps> = ({
+  selectedPlan,
+  onPromoApplied,
+  onPromoRemoved,
+}) => {
+  const [promoCode, setPromoCode] = useState('');
+  const [validating, setValidating] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState<PromoDiscount | null>(null);
+  const [error, setError] = useState('');
+
+  const validatePromo = async () => {
+    if (!promoCode.trim()) {
+      setError('Please enter a promo code');
+      return;
+    }
+
+    if (!selectedPlan) {
+      setError('Please select a plan first');
+      return;
+    }
+
+    setValidating(true);
+    setError('');
+
+    try {
+      const authData = getAuthToken();
+      
+      if (!authData) {
+        setError('Please log in to use promo codes. If you are logged in, try refreshing the page.');
+        setValidating(false);
+        return;
+      }
+      
+      console.log('Validating promo code with token type:', authData.type); // Debug log
+      
+      const response = await fetch('http://127.0.0.1:8000/api/promo/validate/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `${authData.type} ${authData.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: promoCode.toUpperCase().trim(),
+          plan_id: selectedPlan,
+        }),
+      });
+
+      const data = await response.json();
+
+      console.log('Promo validation response:', data); // Debug log
+
+      if (response.ok && data.valid) {
+        // ✅ Calculate discount amount correctly
+        const originalPrice = parseFloat(data.promo_code.plan.original_price);
+        const finalPrice = parseFloat(data.promo_code.plan.final_price);
+        const discountAmount = originalPrice - finalPrice;
+
+        const discount: PromoDiscount = {
+          code: data.promo_code.code,
+          discountPercentage: data.promo_code.discount_percentage,
+          originalPrice: originalPrice,
+          discountAmount: discountAmount,
+          finalPrice: finalPrice,
+        };
+        
+        console.log('Parsed discount:', discount); // Debug log
+        
+        setAppliedPromo(discount);
+        onPromoApplied(discount);
+        setPromoCode('');
+      } else {
+        // Check if it's an authentication error
+        if (response.status === 401 || response.status === 403) {
+          setError('Authentication failed. Please log in again.');
+        } else {
+          setError(data.message || 'Invalid promo code');
+        }
+      }
+    } catch (err) {
+      console.error('Promo validation error:', err);
+      setError('Failed to validate promo code. Please try again.');
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const removePromo = () => {
+    setAppliedPromo(null);
+    setError('');
+    onPromoRemoved();
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      validatePromo();
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Applied Promo Success */}
+      {appliedPromo && (
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                <Check className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-bold text-green-900">Promo Code Applied!</span>
+                  <span className="px-2 py-0.5 bg-green-600 text-white text-xs font-bold rounded-full">
+                    {appliedPromo.code}
+                  </span>
+                </div>
+                <p className="text-sm text-green-700 mb-2">
+                  {appliedPromo.discountPercentage}% discount applied
+                </p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-green-900">
+                    ₹{appliedPromo.finalPrice.toFixed(2)}
+                  </span>
+                  <span className="text-lg text-green-600 line-through">
+                    ₹{appliedPromo.originalPrice.toFixed(2)}
+                  </span>
+                  <span className="text-sm font-bold text-green-700">
+                    You save ₹{appliedPromo.discountAmount.toFixed(2)}!
+                  </span>
+                </div>
+                {appliedPromo.finalPrice === 0 && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-yellow-500" />
+                    <span className="text-sm font-bold text-green-900">
+                      This plan is FREE! 🎉
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={removePromo}
+              className="p-1.5 hover:bg-green-200 rounded-lg transition flex-shrink-0"
+              title="Remove promo code"
+            >
+              <X className="w-5 h-5 text-green-700" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Promo Code Input */}
+      {!appliedPromo && (
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Ticket className="w-5 h-5 text-purple-600" />
+            <span className="text-sm font-bold text-purple-900">Have a promo code?</span>
+          </div>
+          
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <input
+                type="text"
+                value={promoCode}
+                onChange={(e) => {
+                  setPromoCode(e.target.value.toUpperCase());
+                  setError('');
+                }}
+                onKeyPress={handleKeyPress}
+                placeholder="Enter code (e.g., SUMMER100)"
+                disabled={validating}
+                className="w-full px-4 py-2.5 border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:border-purple-400 font-mono font-bold text-purple-900 placeholder:text-purple-400 placeholder:font-normal disabled:bg-purple-100"
+              />
+            </div>
+            <button
+              onClick={validatePromo}
+              disabled={validating || !promoCode.trim()}
+              className="px-6 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {validating ? (
+                <>
+                  <Loader className="w-4 h-4 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                'Apply'
+              )}
+            </button>
+          </div>
+
+          {error && (
+            <div className="mt-3 flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-2">
+              <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          <p className="text-xs text-purple-600 mt-2">
+            Enter your promo code to get exclusive discounts or free access
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN PREMIUM PAGE COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
+
 const PremiumPage = () => {
   const navigate = useNavigate();
   const [plans, setPlans] = useState<PremiumPlan[]>([]);
@@ -72,9 +352,18 @@ const PremiumPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>("");
   const [selectedPlan, setSelectedPlan] = useState<string>("");
+  
+  // ✅ PROMO CODE STATE
+  const [promoDiscount, setPromoDiscount] = useState<PromoDiscount | null>(null);
 
   useEffect(() => {
     fetchPremiumData();
+    
+    // Debug: Log available storage keys
+    console.log('=== STORAGE DEBUG ===');
+    console.log('localStorage keys:', Object.keys(localStorage));
+    console.log('sessionStorage keys:', Object.keys(sessionStorage));
+    console.log('Auth token found:', getAuthToken() ? 'YES' : 'NO');
   }, []);
 
   const fetchPremiumData = async () => {
@@ -103,9 +392,9 @@ const PremiumPage = () => {
         console.warn('Public endpoints not found, trying admin endpoints with auth...');
         setDebugInfo(`Public endpoints not found (404), trying admin endpoints...`);
         
-        const token = localStorage.getItem('token') || localStorage.getItem('admin_token');
+        const authData = getAuthToken();
         
-        if (!token) {
+        if (!authData) {
           throw new Error('Public endpoints not available and no authentication token found. Please ensure the API endpoints are configured correctly.');
         }
 
@@ -117,14 +406,14 @@ const PremiumPage = () => {
 
         plansRes = await fetch(plansUrl, {
           headers: {
-            'Authorization': `Token ${token}`,
+            'Authorization': `${authData.type} ${authData.token}`,
             'Accept': 'application/json',
           },
         });
         
         featuresRes = await fetch(featuresUrl, {
           headers: {
-            'Authorization': `Token ${token}`,
+            'Authorization': `${authData.type} ${authData.token}`,
             'Accept': 'application/json',
           },
         });
@@ -229,10 +518,74 @@ const PremiumPage = () => {
     }
   };
 
-  const handlePurchase = (planId: string) => {
+  // ✅ PROMO CODE HANDLERS
+  const handlePromoApplied = (discount: PromoDiscount) => {
+    setPromoDiscount(discount);
+  };
+
+  const handlePromoRemoved = () => {
+    setPromoDiscount(null);
+  };
+
+  // ✅ UPDATED PURCHASE HANDLER WITH PROMO CODE REDEMPTION
+  const handlePurchase = async (planId: string) => {
     console.log("Purchase plan:", planId);
+    
+    // If promo code is applied, redeem it
+    if (promoDiscount) {
+      try {
+        const authData = getAuthToken();
+        
+        if (!authData) {
+          alert('Please log in to use promo codes. If you are logged in, try refreshing the page.');
+          return;
+        }
+
+        const response = await fetch('http://127.0.0.1:8000/api/promo/redeem/', {
+          method: 'POST',
+          headers: {
+            'Authorization': `${authData.type} ${authData.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            code: promoDiscount.code,
+            plan_id: planId,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to redeem promo code');
+        }
+
+        // If plan is free, just show success
+        if (promoDiscount.finalPrice === 0) {
+          alert(`🎉 Success! Your ${data.plan.name} plan is now active for FREE!\n\nPromo code "${promoDiscount.code}" has been applied.`);
+          // Optionally navigate away or refresh user state
+          return;
+        }
+      } catch (error: any) {
+        alert(`Failed to apply promo code: ${error.message}`);
+        return;
+      }
+    }
+
+    // Proceed to payment with discounted price
+    const finalPrice = promoDiscount 
+      ? promoDiscount.finalPrice 
+      : plans.find(p => p.plan_id === planId)?.price || 0;
+    
+    alert(`Redirecting to payment for ₹${finalPrice.toFixed(2)}...`);
     // TODO: Integrate payment gateway
-    alert(`Redirecting to payment for ${planId} plan...`);
+  };
+
+  // ✅ CALCULATE DISPLAY PRICE
+  const getDisplayPrice = (plan: PremiumPlan) => {
+    if (promoDiscount && selectedPlan === plan.plan_id) {
+      return promoDiscount.finalPrice;
+    }
+    return plan.price;
   };
 
   if (loading) {
@@ -441,6 +794,7 @@ const PremiumPage = () => {
               const Icon = ICON_MAP[plan.icon] || Crown;
               const isSelected = selectedPlan === plan.plan_id;
               const planFeatures = Array.isArray(plan.features) ? plan.features : [];
+              const displayPrice = getDisplayPrice(plan);
 
               return (
                 <motion.div
@@ -484,16 +838,16 @@ const PremiumPage = () => {
                     <div className="mb-4">
                       <div className="flex items-baseline gap-2">
                         <span className="text-4xl font-black text-gray-900">
-                          ${plan.price.toFixed(2)}
+                          ₹{displayPrice.toFixed(2)}
                         </span>
-                        {plan.original_price && (
+                        {(plan.original_price || (promoDiscount && isSelected)) && (
                           <span className="text-lg text-gray-400 line-through">
-                            ${plan.original_price.toFixed(2)}
+                            ₹{plan.price.toFixed(2)}
                           </span>
                         )}
                       </div>
                       <p className="text-sm text-gray-500 mt-1">
-                        ${plan.price_per_month.toFixed(2)}/month
+                        ₹{plan.price_per_month.toFixed(2)}/month
                       </p>
                       {plan.discount_text && (
                         <div className="inline-block mt-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">
@@ -577,12 +931,26 @@ const PremiumPage = () => {
             })}
           </div>
 
+          {/* ✅ PROMO CODE INPUT - INSERTED AFTER PLAN CARDS */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mt-8 max-w-2xl mx-auto"
+          >
+            <PromoCodeInput
+              selectedPlan={selectedPlan}
+              onPromoApplied={handlePromoApplied}
+              onPromoRemoved={handlePromoRemoved}
+            />
+          </motion.div>
+
           {/* Purchase Button */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="mt-12 text-center"
+            className="mt-8 text-center"
           >
             <Button
               onClick={() => handlePurchase(selectedPlan)}
@@ -591,10 +959,13 @@ const PremiumPage = () => {
               className={`${PRIMARY_GRADIENT} text-white px-12 h-16 rounded-full text-lg font-bold shadow-2xl hover:shadow-3xl hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <Crown className="w-5 h-5 mr-2" />
-              Get Premium Now
+              {promoDiscount && promoDiscount.finalPrice === 0 ? 'Activate Free Plan' : 'Get Premium Now'}
             </Button>
             <p className="text-sm text-gray-500 mt-4">
-              Cancel anytime • Secure payment • Money-back guarantee
+              {promoDiscount && promoDiscount.finalPrice === 0 
+                ? `Promo code "${promoDiscount.code}" applied - Plan is FREE! 🎉`
+                : 'Cancel anytime • Secure payment • Money-back guarantee'
+              }
             </p>
           </motion.div>
         </div>

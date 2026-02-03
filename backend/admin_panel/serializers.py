@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from profiles.models import UserProfile
 from .models import FooterSection, FooterLink, FooterSettings
-from .models import UserReport, AdminAction, PremiumPlan, PremiumFeature, ExpertTip, Review, AdminRole
+from .models import UserReport, AdminAction, PremiumPlan, PremiumFeature, ExpertTip, Review, AdminRole,PromoCode, PromoCodeUsage
 import logging
 
 logger = logging.getLogger(__name__)
@@ -415,3 +415,84 @@ class PublicFooterSerializer(serializers.Serializer):
     """
     sections = FooterSectionSerializer(many=True)
     settings = FooterSettingsSerializer()
+
+# Add after FooterSettingsSerializer
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMO CODE SERIALIZERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PromoCodeUsageSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    plan_name = serializers.CharField(source='plan.name', read_only=True)
+
+    class Meta:
+        model = PromoCodeUsage
+        fields = ['id', 'user', 'username', 'user_email', 'plan_name', 'used_at']
+        read_only_fields = ['id', 'used_at']
+
+
+class PromoCodeSerializer(serializers.ModelSerializer):
+    plan_name = serializers.CharField(source='plan.name', read_only=True)
+    plan_price = serializers.DecimalField(
+        source='plan.price', 
+        max_digits=10, 
+        decimal_places=2, 
+        read_only=True
+    )
+    is_valid = serializers.BooleanField(read_only=True)
+    remaining_uses = serializers.IntegerField(read_only=True)
+    usage_percentage = serializers.IntegerField(read_only=True)
+    created_by_username = serializers.CharField(
+        source='created_by.username', 
+        read_only=True, 
+        allow_null=True
+    )
+    recent_usages = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PromoCode
+        fields = [
+            'id', 'code', 'description', 'discount_percentage',
+            'plan', 'plan_name', 'plan_price',
+            'max_uses', 'current_uses', 'remaining_uses', 'usage_percentage',
+            'valid_from', 'valid_until', 'active', 'is_valid',
+            'created_by', 'created_by_username', 'created_at', 'updated_at',
+            'recent_usages'
+        ]
+        read_only_fields = ['id', 'current_uses', 'created_by', 'created_at', 'updated_at']
+
+    def get_recent_usages(self, obj):
+        # Return last 10 usages
+        recent = obj.usages.all()[:10]
+        return PromoCodeUsageSerializer(recent, many=True).data
+
+    def validate_code(self, value):
+        # Ensure code is uppercase and alphanumeric
+        value = value.upper().strip()
+        if not value.replace('_', '').replace('-', '').isalnum():
+            raise serializers.ValidationError(
+                "Code must contain only letters, numbers, hyphens, and underscores"
+            )
+        return value
+
+    def validate_discount_percentage(self, value):
+        if not (0 <= value <= 100):
+            raise serializers.ValidationError("Discount must be between 0 and 100")
+        return value
+
+    def validate_max_uses(self, value):
+        if value < 1:
+            raise serializers.ValidationError("Max uses must be at least 1")
+        return value
+
+    def validate(self, attrs):
+        # Validate valid_until is after valid_from
+        if attrs.get('valid_until') and attrs.get('valid_from'):
+            if attrs['valid_until'] <= attrs['valid_from']:
+                raise serializers.ValidationError({
+                    'valid_until': 'Expiration date must be after start date'
+                })
+        
+        return attrs

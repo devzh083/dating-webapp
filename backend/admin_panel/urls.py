@@ -21,6 +21,10 @@ from .views import (
     FooterSectionViewSet,
     FooterLinkViewSet,
     FooterSettingsViewSet,
+    # promo-code
+    PromoCodeViewSet,
+    ValidatePromoCodeView, 
+    RedeemPromoCodeView,   
 )
 
 # Create router for ViewSets
@@ -36,6 +40,8 @@ router.register(r'admin-roles', AdminRoleViewSet, basename='admin-roles')
 router.register(r'footer/sections', FooterSectionViewSet, basename='footer-sections')
 router.register(r'footer/links', FooterLinkViewSet, basename='footer-links')
 router.register(r'footer/settings', FooterSettingsViewSet, basename='footer-settings')
+router.register(r'promo-codes', PromoCodeViewSet, basename='promo-codes')
+
 
 urlpatterns = [
     # Admin login endpoint
@@ -51,6 +57,7 @@ urlpatterns = [
     path('reviews/<int:pk>/reject/', RejectReviewView.as_view(), name='reject-review'),
     path('reviews/bulk_approve/', BulkApproveReviewsView.as_view(), name='bulk-approve-reviews'),
     path('reviews/bulk_reject/', BulkRejectReviewsView.as_view(), name='bulk-reject-reviews'),
+    
     
     # Include all router URLs
     path('', include(router.urls)),

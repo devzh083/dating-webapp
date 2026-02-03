@@ -7,6 +7,8 @@ from rest_framework.request import Request
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from rest_framework import generics
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.db.models import Q, Count, Sum, QuerySet
 from django.utils import timezone
 from django.contrib.auth import authenticate
@@ -18,6 +20,7 @@ from .models import (
     UserReport, AdminAction, PremiumPlan, PremiumFeature,
     ExpertTip, Review, AdminRole,
     FooterSection, FooterLink, FooterSettings,
+    PromoCode, PromoCodeUsage,
 )
 from profiles.models import UserProfile
 from .serializers import (
@@ -27,6 +30,7 @@ from .serializers import (
     ExpertTipSerializer, ReviewSerializer, ApprovedReviewSerializer,
     AdminRoleSerializer, AdminRoleCreateSerializer,
     FooterSectionSerializer, FooterLinkSerializer, FooterSettingsSerializer, 
+    PromoCodeSerializer, PromoCodeUsageSerializer,
 )
 import secrets
 import string
@@ -1393,3 +1397,244 @@ def public_footer_data(request):
             {'error': f'Failed to fetch footer data: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMO CODE MANAGEMENT (ADMIN)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PromoCodeViewSet(viewsets.ModelViewSet):
+    permission_classes = [HasSectionPermission]
+    serializer_class = PromoCodeSerializer
+    queryset = PromoCode.objects.all()
+    section_id = 'premium'
+    required_level = 'view'
+    pagination_class = None
+
+    def get_queryset(self):
+        queryset = PromoCode.objects.select_related('plan', 'created_by').prefetch_related('usages').all()
+        
+        # Filter by active status
+        active = self.request.query_params.get('active')
+        if active is not None:
+            queryset = queryset.filter(active=active.lower() == 'true')
+        
+        # Filter by plan
+        plan_id = self.request.query_params.get('plan_id')
+        if plan_id:
+            queryset = queryset.filter(plan_id=plan_id)
+        
+        return queryset.order_by('-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, pk=None):
+        self.required_level = 'edit'
+        self.check_permissions(request)
+        promo = self.get_object()
+        promo.active = not promo.active
+        promo.save()
+        return Response({
+            'message': f'Promo code {"activated" if promo.active else "deactivated"} successfully',
+            'promo_code': PromoCodeSerializer(promo).data
+        })
+
+    @action(detail=True, methods=['get'])
+    def usages(self, request, pk=None):
+        """Get all usages for a specific promo code"""
+        promo = self.get_object()
+        usages = promo.usages.select_related('user', 'plan').all()
+        
+        page = self.paginate_queryset(usages)
+        if page is not None:
+            serializer = PromoCodeUsageSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = PromoCodeUsageSerializer(usages, many=True)
+        return Response({
+            'promo_code': promo.code,
+            'total_usages': promo.current_uses,
+            'max_uses': promo.max_uses,
+            'remaining': promo.remaining_uses,
+            'usages': serializer.data
+        })
+
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get promo code statistics"""
+        total_codes = PromoCode.objects.count()
+        active_codes = PromoCode.objects.filter(active=True).count()
+        total_redemptions = PromoCodeUsage.objects.count()
+        
+        # Most used codes
+        most_used = PromoCode.objects.annotate(
+            usage_count=Count('usages')
+        ).order_by('-usage_count')[:5]
+        
+        return Response({
+            'total_codes': total_codes,
+            'active_codes': active_codes,
+            'inactive_codes': total_codes - active_codes,
+            'total_redemptions': total_redemptions,
+            'most_used_codes': [{
+                'code': code.code,
+                'plan': code.plan.name,
+                'uses': code.current_uses,
+                'max_uses': code.max_uses
+            } for code in most_used]
+        })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MULTI-AUTHENTICATION BASE VIEW
+# ─────────────────────────────────────────────────────────────────────────────
+
+class MultipleAuthenticationView(APIView):
+    """
+    Base view that accepts multiple authentication methods:
+    - JWT (for regular user login)
+    - Token (for admin/alternative login)
+    - Session (for Django admin)
+    """
+    authentication_classes = [JWTAuthentication, TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PUBLIC PROMO CODE VALIDATION (for users during checkout)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ValidatePromoCodeView(MultipleAuthenticationView):
+    """
+    Validate a promo code for a specific plan
+    Users call this before checkout to see if code is valid
+    """
+    def post(self, request):
+        code = request.data.get('code', '').upper().strip()
+        plan_id = request.data.get('plan_id', '').strip()
+        
+        if not code or not plan_id:
+            return Response({
+                'valid': False,
+                'message': 'Code and plan ID are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            promo = PromoCode.objects.select_related('plan').get(
+                code=code,
+                plan_id=plan_id
+            )
+            
+            # Check if valid
+            if not promo.is_valid:
+                reasons = []
+                if not promo.active:
+                    reasons.append('Code is inactive')
+                elif promo.valid_until and timezone.now() > promo.valid_until:
+                    reasons.append('Code has expired')
+                elif timezone.now() < promo.valid_from:
+                    reasons.append('Code is not yet valid')
+                elif promo.current_uses >= promo.max_uses:
+                    reasons.append('Code usage limit reached')
+                
+                return Response({
+                    'valid': False,
+                    'message': ', '.join(reasons) if reasons else 'Code is not valid'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if user already used it
+            if PromoCodeUsage.objects.filter(promo_code=promo, user=request.user).exists():
+                return Response({
+                    'valid': False,
+                    'message': 'You have already used this promo code'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Calculate discounted price
+            original_price = float(promo.plan.price)
+            discount_amount = original_price * (promo.discount_percentage / 100)
+            final_price = max(0, original_price - discount_amount)
+            
+            return Response({
+                'valid': True,
+                'promo_code': {
+                    'code': promo.code,
+                    'discount_percentage': promo.discount_percentage,
+                    'plan': {
+                        'id': promo.plan.plan_id,
+                        'name': promo.plan.name,
+                        'original_price': original_price,
+                        'discount_amount': discount_amount,
+                        'final_price': final_price,
+                    }
+                },
+                'message': f'Promo code valid! {promo.discount_percentage}% off' if promo.discount_percentage < 100 else 'Promo code valid! Plan is FREE!'
+            })
+            
+        except PromoCode.DoesNotExist:
+            return Response({
+                'valid': False,
+                'message': 'Invalid promo code for this plan'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+class RedeemPromoCodeView(MultipleAuthenticationView):
+    """
+    Redeem a promo code (mark as used)
+    Call this after payment is successful
+    """
+    def post(self, request):
+        code = request.data.get('code', '').upper().strip()
+        plan_id = request.data.get('plan_id', '').strip()
+        
+        if not code or not plan_id:
+            return Response({
+                'error': 'Code and plan ID are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            with transaction.atomic():
+                promo = PromoCode.objects.select_for_update().select_related('plan').get(
+                    code=code,
+                    plan_id=plan_id
+                )
+                
+                # Use the code
+                success, message = promo.use_code(request.user)
+                
+                if success:
+                    return Response({
+                        'success': True,
+                        'message': message,
+                        'plan': {
+                            'id': promo.plan.plan_id,
+                            'name': promo.plan.name
+                        }
+                    })
+                else:
+                    return Response({
+                        'success': False,
+                        'error': message
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                    
+        except PromoCode.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Invalid promo code'
+            }, status=status.HTTP_404_NOT_FOUND)

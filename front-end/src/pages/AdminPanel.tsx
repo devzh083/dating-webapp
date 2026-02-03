@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Shield, X, LogOut, BarChart3, Users as UsersIcon, AlertTriangle, 
-  FileText, Crown, Lightbulb, Quote, Settings, Layers
+  FileText, Crown, Lightbulb, Quote, Settings, Layers, Ticket
 } from 'lucide-react';
 import { adminService } from '../services/profileService';
 import { NotificationProvider, useNotification } from './adminpages/Notificationsystem';
@@ -13,13 +13,14 @@ import UserManagement from './adminpages/Usermanagement';
 import ReportsManagement from './adminpages/Reportsmanagement';
 import AdminActionsLog from './adminpages/Adminactionslog';
 import PremiumManagement from './adminpages/Premiummanagement';
+import PromoCodeManagement from './adminpages/Promocodemanagement';
 import ExpertTipsManagement from './adminpages/ExpertTipsManagement';
 import ReviewsManagement from './adminpages/ReviewsManagement';
 import AdminRoleManagement from './adminpages/Adminrolemanagement';
 import FooterManagement from './adminpages/Footermanagement';
 
 // Define all available tabs
-type TabId = 'overview' | 'users' | 'reports' | 'analytics' | 'premium' | 'expert-tips' | 'reviews' | 'admin-roles' | 'footer';
+type TabId = 'overview' | 'users' | 'reports' | 'analytics' | 'premium' | 'promo-codes' | 'expert-tips' | 'reviews' | 'admin-roles' | 'footer';
 
 // Inner component that uses notifications
 const AdminPanelContent: React.FC = () => {
@@ -50,7 +51,7 @@ const AdminPanelContent: React.FC = () => {
       cancelText: 'Cancel',
       onConfirm: () => {
         adminService.adminLogout();
-        navigate('/admin/login');
+        navigate('/');
       }
     });
   };
@@ -62,7 +63,8 @@ const AdminPanelContent: React.FC = () => {
       users: { title: 'User Management', description: 'Manage and moderate user accounts' },
       reports: { title: 'Reports Management', description: 'Review and handle user reports' },
       analytics: { title: 'Admin Actions Log', description: 'Track administrative actions' },
-      premium: { title: 'Premium Management', description: 'Manage premium subscriptions' },
+      premium: { title: 'Premium Management', description: 'Manage premium plans and features' },
+      'promo-codes': { title: 'Promo Codes', description: 'Manage promotional discount codes' },
       'expert-tips': { title: 'Expert Tips Management', description: 'Manage expert tips and advice' },
       reviews: { title: 'Reviews Management', description: 'Review and approve user testimonials' },
       'admin-roles': { title: 'Admin Role Management', description: 'Manage admin permissions and access' },
@@ -114,6 +116,7 @@ const AdminPanelContent: React.FC = () => {
               { id: 'reports' as const, label: 'Reports', icon: AlertTriangle, color: 'text-orange-500' },
               { id: 'analytics' as const, label: 'Admin Actions', icon: FileText, color: 'text-indigo-500' },
               { id: 'premium' as const, label: 'Premium', icon: Crown, color: 'text-purple-500' },
+              { id: 'promo-codes' as const, label: 'Promo Codes', icon: Ticket, color: 'text-pink-500' },
               { id: 'expert-tips' as const, label: 'Expert Tips', icon: Lightbulb, color: 'text-amber-500' },
               { id: 'reviews' as const, label: 'Reviews', icon: Quote, color: 'text-rose-500' },
               { id: 'admin-roles' as const, label: 'Admin Roles', icon: Settings, color: 'text-gray-500' },
@@ -182,6 +185,7 @@ const AdminPanelContent: React.FC = () => {
             {activeTab === 'reports' && <ReportsManagement />}
             {activeTab === 'analytics' && <AdminActionsLog />}
             {activeTab === 'premium' && <PremiumManagement />}
+            {activeTab === 'promo-codes' && <PromoCodeManagement />}
             {activeTab === 'expert-tips' && <ExpertTipsManagement />}
             {activeTab === 'reviews' && <ReviewsManagement />}
             {activeTab === 'admin-roles' && <AdminRoleManagement />}

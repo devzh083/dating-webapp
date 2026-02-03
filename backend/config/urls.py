@@ -7,8 +7,10 @@ from admin_panel.views import (
     public_premium_features,
     public_expert_tips,
     public_footer_data,
+    ValidatePromoCodeView, 
+    RedeemPromoCodeView,   
     ApprovedReviewsView,  
-    SubmitReviewView,     
+    SubmitReviewView, 
 )
 
 urlpatterns = [
@@ -18,17 +20,22 @@ urlpatterns = [
     # ✅ PUBLIC ENDPOINTS (no auth required or basic auth only)
     # ==========================================
     
+    # ✅ Promo Code Endpoints (with multi-auth support: JWT + Token + Session)
+    path('api/promo/validate/', ValidatePromoCodeView.as_view(), name='validate-promo-code'),
+    path('api/promo/redeem/', RedeemPromoCodeView.as_view(), name='redeem-promo-code'),
+    
     # Premium & Features
     path('api/premium/plans/', public_premium_plans, name='public-premium-plans'),
     path('api/premium/features/', public_premium_features, name='public-premium-features'),
     path('api/expert-tips/', public_expert_tips, name='public-expert-tips'),
     
     # Reviews (public endpoints)
-    path('api/reviews/approved/', ApprovedReviewsView.as_view(), name='public-approved-reviews'),  # ✅ NEW: View approved reviews
+    path('api/reviews/approved/', ApprovedReviewsView.as_view(), name='public-approved-reviews'),
     path('api/reviews/submit/', SubmitReviewView.as_view(), name='public-submit-review'),    
 
-    #footer
+    # Footer
     path('api/footer/', public_footer_data, name='public-footer-data'), 
+    
     # ==========================================
     # APP-SPECIFIC API ROUTES
     # ==========================================
