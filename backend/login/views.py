@@ -1191,27 +1191,39 @@ class SendChatMessageView(APIView):
 
     def post(self, request, chat_id):
         sender = request.user.username.lower()
-        content = request.data.get("content")
+        content = request.data.get("content", "").strip()
+
+        if not content:
+            return Response(
+                {"detail": "Message content cannot be empty"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         chat = MySQLChatManager.get_chat(chat_id)
         if not chat or sender not in chat["participants"]:
-            return Response({"detail": "Forbidden"}, status=403)
-
-        receiver = next(e for e in chat["participants"] if e != sender)
-
-        # 🚫 BLOCK CHECK (THIS IS THE KEY)
-        is_blocked = BlockedUser.objects.filter(
-            Q(blocker=receiver, blocked=sender) |
-            Q(blocker=sender, blocked=receiver)
-        ).exists()
-
-        if is_blocked:
             return Response(
-                {"detail": "You cannot send messages to this user"},
+                {"detail": "Forbidden"},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # ✅ ONLY NOW create & broadcast
+        receiver = next(e for e in chat["participants"] if e != sender)
+
+        # 🚫 BLOCK CHECK — ABSOLUTE GATE
+        if BlockedUser.objects.filter(
+            Q(blocker=receiver, blocked=sender) |
+            Q(blocker=sender, blocked=receiver)
+        ).exists():
+            return Response(
+                {
+                    "detail": "You cannot send messages to this user",
+                    "blocked": True
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 🔒 NO CODE ABOVE THIS LINE MUST HAVE SIDE EFFECTS
+
+        # ✅ Safe to persist
         MySQLChatManager.add_message(
             chat_id=chat_id,
             sender=sender,
@@ -1219,6 +1231,7 @@ class SendChatMessageView(APIView):
             content=content
         )
 
+        # ✅ Safe to broadcast
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f"chat_{chat_id}",
@@ -1232,7 +1245,7 @@ class SendChatMessageView(APIView):
             }
         )
 
-        return Response({"status": "sent"}, status=201)
+        return Response({"status": "sent"}, status=status.HTTP_201_CREATED)
 
 class BlockUserView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1294,36 +1307,51 @@ class CreateUserReportView(APIView):
 
     def post(self, request):
         serializer = CreateUserReportSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
 
-        reported_user = User.objects.get(
-            id=serializer.validated_data['reported_user_id']
-        )
+        chat_id = serializer.validated_data["chat_id"]
 
-        # Prevent self-reporting
+        match = Match.objects.filter(chat_id=chat_id).first()
+        if not match:
+            return Response(
+                {"error": "Invalid chat"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # identify reported user via email
+        if request.user.email == match.user_a:
+            reported_email = match.user_b
+        elif request.user.email == match.user_b:
+            reported_email = match.user_a
+        else:
+            return Response(
+                {"error": "You are not part of this chat"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        reported_user = User.objects.get(email=reported_email)
+
         if reported_user == request.user:
             return Response(
                 {"error": "You cannot report yourself"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Optional: prevent duplicate pending reports
         if UserReport.objects.filter(
             reporter=request.user,
             reported_user=reported_user,
-            status='pending'
+            status="pending"
         ).exists():
             return Response(
                 {"error": "You already reported this user"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        report = UserReport.objects.create(
+        UserReport.objects.create(
             reporter=request.user,
             reported_user=reported_user,
-            reason=serializer.validated_data['reason'],
-            description=serializer.validated_data['description'],
+            reason=serializer.validated_data["reason"],
+            description=serializer.validated_data.get("description", "")
         )
 
         return Response(
