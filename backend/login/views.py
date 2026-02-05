@@ -1,3 +1,4 @@
+from decimal import Decimal
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -10,7 +11,12 @@ from django.conf import settings
 from django.shortcuts import redirect
 from django.core.mail import send_mail
 from django.core.cache import cache
-from .models import Match, Like
+from .models import Match, Like, Payment
+
+import hmac
+import hashlib
+from django.conf import settings
+
 
 import urllib.parse
 import requests
@@ -23,7 +29,7 @@ from math import radians, sin, cos, asin, sqrt
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from admin_panel.models import UserReport
+from admin_panel.models import PremiumPlan, PromoCode, UserReport
 from login.serializers import CreateUserReportSerializer
 from login.models import Match
 
@@ -50,7 +56,7 @@ from login.mysql_managers import MySQLMatchManager as FirebaseMatchManager
 from login.mysql_managers import MySQLChatManager as FirebaseChatManager
 from profiles.models import UserProfile
 from django.db.models import Q
-
+from .razorpay_client import client
 
 
 from .models_photos import UserPhoto  # <-- your ImageField model
@@ -1358,3 +1364,87 @@ class CreateUserReportView(APIView):
             {"message": "Report submitted successfully"},
             status=status.HTTP_201_CREATED
         )
+
+
+
+
+class CreateOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        plan_id = request.data.get("plan_id")
+        promo_code = request.data.get("promo_code")  # optional
+
+        if not plan_id:
+            return Response({"error": "plan_id required"}, status=400)
+
+        plan = PremiumPlan.objects.filter(
+            plan_id=plan_id,
+            active=True
+        ).first()
+
+        if not plan:
+            return Response({"error": "Invalid plan"}, status=400)
+
+        amount = Decimal(plan.price)
+
+        # 🔐 Promo logic (optional)
+        if promo_code:
+            promo = PromoCode.objects.filter(
+                code=promo_code,
+                active=True
+            ).first()
+            if promo:
+                amount = promo.apply_discount(amount)
+
+        order = client.order.create({
+            "amount": int(amount * 100),  # paise
+            "currency": "INR",
+            "payment_capture": 1
+        })
+
+        return Response({
+            "order_id": order["id"],
+            "amount": order["amount"],
+            "currency": "INR",
+            "razorpay_key": settings.RAZORPAY_KEY_ID,
+            "plan_name": plan.name
+        })
+
+
+class VerifyPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+
+        order_id = data.get("razorpay_order_id")
+        payment_id = data.get("razorpay_payment_id")
+        signature = data.get("razorpay_signature")
+
+        body = f"{order_id}|{payment_id}"
+
+        expected_signature = hmac.new(
+            settings.RAZORPAY_KEY_SECRET.encode(),
+            body.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+        if expected_signature != signature:
+            return Response({"error": "Invalid signature"}, status=400)
+
+        # Activate premium
+        # (example)
+        request.user.profile.is_premium = True
+        request.user.profile.save()
+
+        Payment.objects.create(
+            user=request.user,
+            plan=PremiumPlan.objects.get(plan_id=request.data.get("plan_id", "")),
+            razorpay_order_id=order_id,
+            razorpay_payment_id=payment_id,
+            amount=0,  # optional
+            status="SUCCESS"
+        )
+
+        return Response({"status": "success"})

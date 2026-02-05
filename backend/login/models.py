@@ -1,4 +1,7 @@
-from datetime import datetime 
+from datetime import datetime
+
+from django.conf import settings 
+from admin_panel.models import PremiumPlan
 from config.firebase import db
 from firebase_admin import firestore
 from django.db import models
@@ -392,3 +395,13 @@ class BlockedUser(models.Model):
 
     class Meta:
         unique_together = ("blocker", "blocked")
+
+
+class Payment(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    plan = models.ForeignKey(PremiumPlan, on_delete=models.PROTECT)
+    razorpay_order_id = models.CharField(max_length=100)
+    razorpay_payment_id = models.CharField(max_length=100)
+    amount = models.DecimalField(max_digits=8, decimal_places=2)
+    status = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)

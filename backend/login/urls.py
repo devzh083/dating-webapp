@@ -47,4 +47,7 @@ urlpatterns = [
     path("users/unblock/", views.UnblockUserView.as_view()),
 
     path('reports/', views.CreateUserReportView.as_view(), name='create-report'),
+
+     path("create-order/", views.CreateOrderView.as_view()),
+    path("verify-payment/", views.VerifyPaymentView.as_view())
 ]

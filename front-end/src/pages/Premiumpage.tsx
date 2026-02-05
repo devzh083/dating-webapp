@@ -245,30 +245,101 @@ const PremiumPage = () => {
     }
   };
 
-  const handlePurchase = async (planId: string) => {
-    if (promoDiscount) {
-        // Vikas's Promo Logic
-        const authData = getAuthToken();
-        if (!authData) return alert('Please log in first.');
+  // const handlePurchase = async (planId: string) => {
+  //   if (promoDiscount) {
+  //       // Vikas's Promo Logic
+  //       const authData = getAuthToken();
+  //       if (!authData) return alert('Please log in first.');
         
-        try {
-            const response = await fetch('http://127.0.0.1:8000/api/promo/redeem/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `${authData.type} ${authData.token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ code: promoDiscount.code, plan_id: planId }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                alert(`Success! Plan activated using ${promoDiscount.code}`);
-                return;
-            }
-        } catch (e) { console.error(e); }
+  //       try {
+  //           const response = await fetch('http://127.0.0.1:8000/api/promo/redeem/', {
+  //               method: 'POST',
+  //               headers: {
+  //                   'Authorization': `${authData.type} ${authData.token}`,
+  //                   'Content-Type': 'application/json',
+  //               },
+  //               body: JSON.stringify({ code: promoDiscount.code, plan_id: planId }),
+  //           });
+  //           const data = await response.json();
+  //           if (response.ok) {
+  //               alert(`Success! Plan activated using ${promoDiscount.code}`);
+  //               return;
+  //           }
+  //       } catch (e) { console.error(e); }
+  //   }
+  //   alert(`Proceeding to payment for plan ${planId}`);
+  // };
+
+  const handlePurchase = async (planId: string) => {
+  try {
+    const authData = getAuthToken();
+    if (!authData) {
+      alert("Please log in first.");
+      return;
     }
-    alert(`Proceeding to payment for plan ${planId}`);
-  };
+
+    // 1️⃣ Create Razorpay Order
+    const orderRes = await fetch(
+      "http://127.0.0.1:8000/api/create-order/",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `${authData.type} ${authData.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          plan_id: planId,
+          promo_code: promoDiscount?.code || null,
+        }),
+      }
+    );
+
+    if (!orderRes.ok) throw new Error("Order creation failed");
+
+    const order = await orderRes.json();
+
+    // 2️⃣ Open Razorpay Checkout
+    const rzp = new window.Razorpay({
+      key: order.razorpay_key,
+      amount: order.amount,
+      currency: order.currency,
+      order_id: order.order_id,
+      name: "The Dating App",
+      description: order.plan_name,
+      handler: async (response: any) => {
+        const verifyRes = await fetch(
+          "http://127.0.0.1:8000/api/verify/",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `${authData.type} ${authData.token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              ...response,
+              plan_id: planId,
+            }),
+          }
+        );
+
+        if (!verifyRes.ok) {
+          alert("Payment verification failed");
+          return;
+        }
+
+        alert("🎉 Premium activated!");
+        navigate("/premium-success");
+      },
+      theme: { color: "#00B4D8" },
+    });
+
+    rzp.open();
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong. Try again.");
+  }
+};
+
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
