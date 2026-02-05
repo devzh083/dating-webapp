@@ -10,7 +10,7 @@ interface Step2Props {
   onChange: (data: Partial<Step2Props["data"]>) => void;
   onNext: () => void;
   onBack: () => void;
-  onSkip?: () => void; 
+  onSkip?: () => void;
 }
 
 const RELATIONSHIP_STATUSES = [

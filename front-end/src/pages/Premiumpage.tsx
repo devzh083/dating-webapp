@@ -15,6 +15,8 @@ import {
   Shield,
   Loader,
   AlertCircle,
+  Ticket,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -51,21 +53,162 @@ interface PremiumPlan {
   active: boolean;
 }
 
-interface PremiumFeature {
-  id: number;
-  title: string;
-  description: string;
-  icon: string;
-  active: boolean;
+interface PromoDiscount {
+  code: string;
+  discountPercentage: number;
+  originalPrice: number;
+  discountAmount: number;
+  finalPrice: number;
 }
 
+// --- HELPER: Get Token ---
+const getAuthToken = (): { token: string; type: 'Bearer' | 'Token' } | null => {
+  const jwtKeys = ['access_token', 'accessToken', 'jwt', 'access'];
+  const tokenKeys = ['token', 'authToken', 'auth_token', 'admin_token'];
+
+  for (const key of jwtKeys) {
+    const token = localStorage.getItem(key) || sessionStorage.getItem(key);
+    if (token) return { token, type: 'Bearer' };
+  }
+  for (const key of tokenKeys) {
+    const token = localStorage.getItem(key) || sessionStorage.getItem(key);
+    if (token) return { token, type: 'Token' };
+  }
+  return null;
+};
+
+// --- COMPONENT: Promo Code Input ---
+interface PromoCodeInputProps {
+  selectedPlan: string;
+  onPromoApplied: (discount: PromoDiscount) => void;
+  onPromoRemoved: () => void;
+}
+
+const PromoCodeInput: React.FC<PromoCodeInputProps> = ({ selectedPlan, onPromoApplied, onPromoRemoved }) => {
+  const [promoCode, setPromoCode] = useState('');
+  const [validating, setValidating] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState<PromoDiscount | null>(null);
+  const [error, setError] = useState('');
+
+  const validatePromo = async () => {
+    if (!promoCode.trim()) { setError('Please enter a promo code'); return; }
+    if (!selectedPlan) { setError('Please select a plan first'); return; }
+
+    setValidating(true);
+    setError('');
+
+    try {
+      const authData = getAuthToken();
+      if (!authData) {
+        setError('Please log in to use promo codes.');
+        setValidating(false);
+        return;
+      }
+      
+      const response = await fetch('http://127.0.0.1:8000/api/promo/validate/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `${authData.type} ${authData.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: promoCode.toUpperCase().trim(), plan_id: selectedPlan }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.valid) {
+        const originalPrice = parseFloat(data.promo_code.plan.original_price);
+        const finalPrice = parseFloat(data.promo_code.plan.final_price);
+        const discount: PromoDiscount = {
+          code: data.promo_code.code,
+          discountPercentage: data.promo_code.discount_percentage,
+          originalPrice: originalPrice,
+          discountAmount: originalPrice - finalPrice,
+          finalPrice: finalPrice,
+        };
+        setAppliedPromo(discount);
+        onPromoApplied(discount);
+        setPromoCode('');
+      } else {
+        setError(data.message || 'Invalid promo code');
+      }
+    } catch (err) {
+      console.error('Promo error:', err);
+      setError('Failed to validate promo code.');
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const removePromo = () => {
+    setAppliedPromo(null);
+    setError('');
+    onPromoRemoved();
+  };
+
+  return (
+    <div className="w-full">
+      {appliedPromo ? (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex justify-between items-center shadow-sm animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                <Check className="w-4 h-4 text-emerald-600" strokeWidth={3} />
+            </div>
+            <div>
+              <p className="text-emerald-900 font-bold text-sm">
+                Code <span className="font-mono">{appliedPromo.code}</span> Applied!
+              </p>
+              <p className="text-xs text-emerald-700 font-medium mt-0.5">
+                You save ₹{appliedPromo.discountAmount.toFixed(0)} ({appliedPromo.discountPercentage}%)
+              </p>
+            </div>
+          </div>
+          <button onClick={removePromo} className="text-emerald-500 hover:text-emerald-700 hover:bg-emerald-100 p-2 rounded-full transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl p-1.5 shadow-sm flex items-center gap-2 focus-within:ring-2 focus-within:ring-teal-500/20 focus-within:border-teal-500 transition-all">
+            <div className="pl-3 text-gray-400">
+                <Ticket className="w-4 h-4" />
+            </div>
+            <input
+              type="text"
+              value={promoCode}
+              onChange={(e) => {
+                  setPromoCode(e.target.value.toUpperCase());
+                  setError('');
+              }}
+              placeholder="Enter Promo Code"
+              className="flex-1 py-2.5 bg-transparent border-none outline-none text-sm font-medium text-slate-800 placeholder:text-slate-400 uppercase"
+            />
+            <button
+              onClick={validatePromo}
+              disabled={validating || !promoCode.trim()}
+              className="bg-slate-900 text-white px-5 py-2 rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800 transition-colors"
+            >
+              {validating ? <Loader className="w-4 h-4 animate-spin" /> : 'Apply'}
+            </button>
+        </div>
+      )}
+      {error && (
+          <div className="mt-2 flex items-center gap-1.5 text-red-500 text-xs font-medium pl-1 animate-in fade-in">
+              <AlertCircle className="w-3 h-3" />
+              {error}
+          </div>
+      )}
+    </div>
+  );
+};
+
+// --- MAIN PAGE ---
 const PremiumPage = () => {
   const navigate = useNavigate();
   const [plans, setPlans] = useState<PremiumPlan[]>([]);
-  const [features, setFeatures] = useState<PremiumFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>("");
+  const [promoDiscount, setPromoDiscount] = useState<PromoDiscount | null>(null);
 
   useEffect(() => {
     fetchPremiumData();
@@ -76,201 +219,242 @@ const PremiumPage = () => {
       setLoading(true);
       setError(null);
 
-      // ✅ Uses the standard admin endpoints which now allow public GET access
       const baseUrl = 'http://127.0.0.1:8000/api/admin'; 
       
-      console.log("Fetching premium data from:", baseUrl);
-
-      // We make a simple GET request. No headers needed because permission is AllowAny.
       const [plansRes, featuresRes] = await Promise.all([
         fetch(`${baseUrl}/premium/plans/`),
         fetch(`${baseUrl}/premium/features/`)
       ]);
 
-      if (!plansRes.ok || !featuresRes.ok) {
-        throw new Error("Failed to fetch premium data from server");
-      }
+      if (!plansRes.ok || !featuresRes.ok) throw new Error("Failed to fetch data");
 
       const plansData = await plansRes.json();
-      const featuresData = await featuresRes.json();
-
-      // Handle Django Rest Framework pagination results
       const cleanPlans = Array.isArray(plansData) ? plansData : (plansData.results || []);
-      const cleanFeatures = Array.isArray(featuresData) ? featuresData : (featuresData.results || []);
-
+      
       setPlans(cleanPlans);
-      setFeatures(cleanFeatures);
-
-      // Auto-select popular plan or first available
+      
       const popular = cleanPlans.find((p: PremiumPlan) => p.popular);
       if (popular) setSelectedPlan(popular.plan_id);
       else if (cleanPlans.length > 0) setSelectedPlan(cleanPlans[0].plan_id);
 
     } catch (error: any) {
-      console.error('Error fetching premium data:', error);
-      setError("Unable to load plans. Please try again later.");
+      console.error('Error:', error);
+      setError("Unable to load plans.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePurchase = (planId: string) => {
-    // Placeholder for payment gateway integration
-    alert(`Proceeding to payment for plan: ${planId}`);
+  const handlePurchase = async (planId: string) => {
+    if (promoDiscount) {
+        // Vikas's Promo Logic
+        const authData = getAuthToken();
+        if (!authData) return alert('Please log in first.');
+        
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/promo/redeem/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `${authData.type} ${authData.token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ code: promoDiscount.code, plan_id: planId }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                alert(`Success! Plan activated using ${promoDiscount.code}`);
+                return;
+            }
+        } catch (e) { console.error(e); }
+    }
+    alert(`Proceeding to payment for plan ${planId}`);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader className="w-10 h-10 text-teal-500 animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
+        <Loader className="w-8 h-8 text-teal-500 animate-spin" />
+        <p className="text-sm font-medium text-gray-400">Loading plans...</p>
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-white">
-        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
-        <p className="text-gray-500 mb-6 text-center max-w-md">{error}</p>
-        <div className="flex gap-3">
-            <Button onClick={fetchPremiumData} className="bg-teal-600 hover:bg-teal-700 text-white">
-                Try Again
-            </Button>
-            <Button onClick={() => navigate(-1)} variant="outline">
-                Go Back
-            </Button>
+  if (error) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6 text-center">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle className="w-8 h-8 text-red-500" />
         </div>
-      </div>
-    );
-  }
+        <h2 className="text-xl font-bold text-slate-900 mb-2">Unable to load plans</h2>
+        <p className="text-slate-500 mb-6 max-w-xs mx-auto text-sm">{error}</p>
+        <button onClick={fetchPremiumData} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm">
+            Try Again
+        </button>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white font-sans">
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-semibold">Back</span>
+    <div className="min-h-screen bg-[#FAFAFA] font-sans pb-20">
+      
+      {/* --- Header --- */}
+      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100/50">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full hover:bg-gray-50 text-slate-600 transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6" />
           </button>
-          <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg ${PRIMARY_GRADIENT} flex items-center justify-center shadow-sm`}>
-              <Crown className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-gray-900">Premium</span>
-          </div>
-          <div className="w-20"></div>
+          <span className="font-bold text-lg text-slate-900">Premium</span>
+          <div className="w-10" /> {/* Spacer for centering */}
         </div>
       </div>
 
-      {/* Hero Section */}
-      <section className="py-16 text-center px-4">
-        <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-50 border border-teal-100 text-teal-600 text-xs font-bold uppercase tracking-widest mb-6"
-        >
-            <Crown className="w-3.5 h-3.5" />
-            <span>Upgrade your love life</span>
-        </motion.div>
-
-        <h1 className="text-4xl md:text-6xl font-black text-slate-900 mb-6 tracking-tight">
-          Find Love <span className={TEXT_GRADIENT}>Faster</span>
-        </h1>
-        <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Unlock exclusive features, see who likes you, and get 10x more matches today.
-        </p>
-      </section>
-
-      {/* Plans Grid */}
-      <section className="max-w-7xl mx-auto px-4 pb-24">
-        {plans.length === 0 ? (
-            <div className="text-center py-16 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-                <Crown className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500 font-medium">No active plans found.</p>
-                <p className="text-slate-400 text-sm mt-1">Please add plans via the Admin Panel.</p>
+      <div className="max-w-6xl mx-auto px-4 pt-8 pb-12">
+        
+        {/* --- Hero --- */}
+        <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-100 rounded-full mb-6">
+                <Crown className="w-4 h-4 text-teal-600" strokeWidth={2.5} />
+                <span className="text-xs font-bold text-teal-800 uppercase tracking-wider">Premium Access</span>
             </div>
-        ) : (
-            <div className="grid md:grid-cols-3 gap-8 items-start">
+            <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight">
+                Upgrade your <br className="md:hidden" /><span className={TEXT_GRADIENT}>Love Life</span>
+            </h1>
+            <p className="text-slate-500 text-base md:text-lg leading-relaxed max-w-lg mx-auto">
+                Unlock exclusive features, see who likes you, and get 10x more matches with our premium plans.
+            </p>
+        </div>
+
+        {/* --- Plans Grid --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto mb-12">
             {plans.map((plan) => {
-                const Icon = ICON_MAP[plan.icon] || Star;
                 const isSelected = selectedPlan === plan.plan_id;
-                
+                const displayPrice = (promoDiscount && isSelected) ? promoDiscount.finalPrice : plan.price;
+                const Icon = ICON_MAP[plan.icon] || Star;
+
                 return (
-                <motion.div
-                    key={plan.plan_id}
-                    onClick={() => setSelectedPlan(plan.plan_id)}
-                    className={`relative bg-white rounded-[32px] p-8 cursor-pointer transition-all duration-300 ${
-                    isSelected 
-                        ? "border-2 border-teal-500 shadow-2xl shadow-teal-900/10 scale-105 z-10" 
-                        : "border border-slate-100 shadow-xl hover:border-teal-200 hover:-translate-y-1"
-                    }`}
-                >
-                    {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-md flex items-center gap-1.5">
-                        <Sparkles className="w-3 h-3 text-yellow-200 fill-current" />
-                        Most Popular
-                    </div>
-                    )}
-                    
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className={`w-12 h-12 rounded-2xl ${plan.gradient || 'bg-slate-100'} flex items-center justify-center text-white shadow-md`}>
-                            <Icon className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-slate-900 leading-tight">{plan.name}</h3>
-                            <p className="text-slate-500 text-sm font-medium">{plan.duration}</p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-baseline gap-1 mb-6">
-                        <span className="text-4xl font-black text-slate-900">₹{Math.floor(plan.price)}</span>
-                        {plan.original_price && (
-                          <span className="text-lg text-slate-400 line-through decoration-2 decoration-red-200 ml-2">
-                            ₹{Math.floor(plan.original_price)}
-                          </span>
-                        )}
-                    </div>
-                    
-                    {plan.discount_text && (
-                        <div className="mb-6 inline-block px-3 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-lg border border-green-100">
-                          {plan.discount_text}
-                        </div>
-                    )}
-
-                    <div className="h-px bg-slate-100 mb-6"></div>
-
-                    <ul className="space-y-4 mb-8">
-                        {plan.features.map((feature, i) => (
-                            <li key={i} className="flex items-start gap-3 text-sm text-slate-600 font-medium leading-snug">
-                                <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${isSelected ? "bg-teal-100 text-teal-600" : "bg-slate-100 text-slate-400"}`}>
-                                    <Check className="w-3 h-3" strokeWidth={3} />
-                                </div>
-                                {feature}
-                            </li>
-                        ))}
-                    </ul>
-
-                    <Button 
-                        className={`w-full py-6 text-base font-bold rounded-xl transition-all shadow-lg active:scale-[0.98] ${
-                            isSelected 
-                            ? 'bg-gradient-to-r from-teal-500 to-teal-600 hover:to-teal-700 text-white shadow-teal-500/20' 
-                            : 'bg-slate-900 text-white hover:bg-slate-800'
-                        }`}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handlePurchase(plan.plan_id);
-                        }}
+                    <motion.div
+                        key={plan.plan_id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        whileHover={{ y: -4 }}
+                        onClick={() => setSelectedPlan(plan.plan_id)}
+                        className={`
+                            relative bg-white rounded-[32px] p-8 cursor-pointer transition-all duration-300 flex flex-col
+                            ${isSelected 
+                                ? 'shadow-[0_20px_40px_-12px_rgba(13,148,136,0.15)] ring-2 ring-teal-500 z-10 scale-[1.02]' 
+                                : 'shadow-sm border border-gray-100 hover:border-teal-100 hover:shadow-md'
+                            }
+                        `}
                     >
-                        Choose {plan.name}
-                    </Button>
-                </motion.div>
+                        {/* Popular Badge */}
+                        {plan.popular && (
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-md flex items-center gap-1.5">
+                                <Sparkles className="w-3 h-3 text-yellow-200 fill-current" />
+                                Most Popular
+                            </div>
+                        )}
+                        
+                        {/* Header Part */}
+                        <div className="flex items-start justify-between mb-6">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-14 h-14 rounded-2xl ${plan.gradient || 'bg-slate-100'} flex items-center justify-center text-white shadow-lg shadow-gray-200`}>
+                                    <Icon className="w-7 h-7" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900 leading-tight mb-1">{plan.name}</h3>
+                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{plan.duration}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Pricing */}
+                        <div className="mb-6">
+                            <div className="flex items-baseline gap-2 mb-1">
+                                <span className="text-4xl font-black text-slate-900">
+                                    ₹{Math.floor(displayPrice)}
+                                </span>
+                                {(plan.original_price || (promoDiscount && isSelected)) && (
+                                    <span className="text-lg text-slate-400 line-through font-medium decoration-2">
+                                        ₹{Math.floor(plan.price)}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <p className="text-sm text-slate-500 font-medium">
+                                    ₹{Math.floor(plan.price_per_month)}/month
+                                </p>
+                                {plan.discount_text && (
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                                        {plan.discount_text}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div className="h-px bg-slate-100 mb-6" />
+
+                        {/* Features List */}
+                        <ul className="space-y-4 mb-8 flex-1">
+                            {plan.features.map((f, i) => (
+                                <li key={i} className="flex items-start gap-3 text-sm text-slate-600 font-medium">
+                                    <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${isSelected ? "bg-teal-100 text-teal-600" : "bg-slate-100 text-slate-300"}`}>
+                                        <Check className="w-3 h-3" strokeWidth={3.5} />
+                                    </div>
+                                    <span className="leading-snug">{f}</span>
+                                </li>
+                            ))}
+                        </ul>
+
+                        {/* Selection Indicator Button */}
+                        <Button 
+                            className={`
+                                w-full py-6 rounded-xl font-bold text-base transition-all shadow-none
+                                ${isSelected 
+                                    ? `${PRIMARY_GRADIENT} text-white shadow-lg shadow-teal-500/20 hover:opacity-90` 
+                                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                                }
+                            `}
+                        >
+                            {isSelected ? 'Selected Plan' : 'Choose Plan'}
+                        </Button>
+                    </motion.div>
                 );
             })}
-            </div>
-        )}
-      </section>
+        </div>
+
+        {/* --- Footer Area --- */}
+        <div className="max-w-md mx-auto space-y-6">
+            <PromoCodeInput 
+                selectedPlan={selectedPlan}
+                onPromoApplied={setPromoDiscount}
+                onPromoRemoved={() => setPromoDiscount(null)}
+            />
+
+            <motion.button 
+                onClick={() => handlePurchase(selectedPlan)}
+                disabled={!selectedPlan}
+                whileTap={{ scale: 0.98 }}
+                className={`
+                    w-full py-4 rounded-2xl font-bold text-lg shadow-xl flex items-center justify-center gap-3 transition-all
+                    ${selectedPlan 
+                        ? 'bg-slate-900 text-white shadow-slate-900/20 hover:bg-slate-800' 
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }
+                `}
+            >
+                <Crown className={`w-5 h-5 ${selectedPlan ? 'text-yellow-400 fill-yellow-400' : ''}`} />
+                {promoDiscount && promoDiscount.finalPrice === 0 
+                    ? 'Activate Free Plan' 
+                    : 'Continue to Payment'
+                }
+            </motion.button>
+
+            <p className="text-center text-xs text-slate-400 font-medium px-8 leading-relaxed">
+                By continuing, you agree to our Terms of Service. 
+                Recurring billing, cancel anytime.
+            </p>
+        </div>
+
+      </div>
     </div>
   );
 };

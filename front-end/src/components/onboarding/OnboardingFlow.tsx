@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-
-// Layout Components
 import TopBar from "@/components/layout/TopBar";
-
 import { useNavigate, useLocation } from "react-router-dom";
 import Step1BasicInfo from "./steps/Step1BasicInfo";
 import Step2Orientation from "./steps/Step2Orientation";
@@ -17,14 +14,12 @@ import Step9Social from "./steps/Step9Social";
 import Step10Review from "./steps/Step10Review";
 import { profileService } from "../../services/profileService";
 
-// ---------------- TYPES ----------------
-
 export type OnboardingData = {
   firstName: string;
   dateOfBirth: Date | null;
   gender: string;
   showGender: boolean;
-  relationshipType: string; // ✅ Preserved to fix TS errors
+  relationshipType: string;
   interestedIn: string[];
   distance: number;
   strictDistance: boolean;
@@ -54,7 +49,7 @@ const initialData: OnboardingData = {
   dateOfBirth: null,
   gender: "",
   showGender: false,
-  relationshipType: "", // ✅ Preserved initialization
+  relationshipType: "",
   interestedIn: [],
   distance: 25,
   strictDistance: false,
@@ -81,14 +76,12 @@ const initialData: OnboardingData = {
 
 const TOTAL_STEPS = 10;
 
-// ---------------- COMPONENT ----------------
-
 export default function OnboardingFlow({ 
   onComplete, 
   onLogout 
 }: { 
   onComplete?: () => void; 
-  onLogout?: () => void; // ✅ Preserved logout prop
+  onLogout?: () => void; 
 }) {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<OnboardingData>(initialData);
@@ -98,8 +91,6 @@ export default function OnboardingFlow({
 
   const navigate = useNavigate();
   const location = useLocation();
-
-  // ---------------- LOCAL STORAGE ----------------
 
   useEffect(() => {
     const savedData = localStorage.getItem("onboardingData");
@@ -120,12 +111,8 @@ export default function OnboardingFlow({
     localStorage.setItem("onboardingData", JSON.stringify(data));
   }, [data]);
 
-  // ---------------- LOAD EXISTING PROFILE ----------------
-
   useEffect(() => {
     loadExistingProfile();
-    
-    // Support starting from a specific step (Vikas's addition preserved)
     const state = location.state as { startStep?: number } | null;
     if (state?.startStep) {
       setStep(state.startStep);
@@ -138,10 +125,8 @@ export default function OnboardingFlow({
       const result = await profileService.getProfile();
 
       if (result?.exists && result?.data) {
-        console.log("✅ Loading existing profile for editing:", result.data);
+        console.log("✅ Existing profile loaded:", result.data);
         setData({ ...initialData, ...result.data });
-      } else {
-        console.log("ℹ️ No existing profile found, starting fresh");
       }
     } catch (err) {
       console.error("⚠️ Failed to load profile:", err);
@@ -149,8 +134,6 @@ export default function OnboardingFlow({
       setIsLoading(false);
     }
   };
-
-  // ---------------- STEP CONTROL ----------------
 
   const setStepData = (patch: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...patch }));
@@ -172,21 +155,24 @@ export default function OnboardingFlow({
     goNext();
   };
 
-  // ---------------- FINAL SAVE ----------------
-
   const saveProfileAndFinish = async () => {
     try {
       setIsSaving(true);
       setError(null);
-
       await profileService.saveProfile(data);
-
       localStorage.removeItem("onboardingData");
-
-      if (onComplete) {
-        onComplete();
+      
+      // ✅ GENDER GATEKEEPER LOGIC
+      if (data.gender && data.gender.toLowerCase() === 'male') {
+          // Male users -> Must buy premium
+          navigate("/premium", { replace: true });
       } else {
-        navigate("/home", { replace: true });
+          // Female users -> Free Access
+          if (onComplete) {
+            onComplete();
+          } else {
+            navigate("/home", { replace: true });
+          }
       }
     } catch (err) {
       console.error("❌ Profile save failed:", err);
@@ -196,47 +182,24 @@ export default function OnboardingFlow({
     }
   };
 
-  // ---------------- STEP RENDER ----------------
-
   const renderStep = () => {
     switch (step) {
-      case 1:
-        return <Step1BasicInfo data={data} onChange={setStepData} onNext={goNext} onSkip={handleSkip} />;
-      case 2:
-        return <Step2Orientation data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 3:
-        return <Step3Lifestyle data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 4:
-        return <Step4Communication data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 5:
-        return <Step5Interests data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 6:
-        return <Step6Location data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 7:
-        return <Step7Photos data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 8:
-        return <Step8Bio data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 9:
-        return <Step9Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      default:
-        return (
-          <Step10Review
-            data={data}
-            onNext={saveProfileAndFinish}
-            onBack={goBack}
-            onSkip={handleSkip}
-          />
-        );
+      case 1: return <Step1BasicInfo data={data} onChange={setStepData} onNext={goNext} onSkip={handleSkip} />;
+      case 2: return <Step2Orientation data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 3: return <Step3Lifestyle data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 4: return <Step4Communication data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 5: return <Step5Interests data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 6: return <Step6Location data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 7: return <Step7Photos data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 8: return <Step8Bio data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      case 9: return <Step9Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
+      default: return <Step10Review data={data} onNext={saveProfileAndFinish} onBack={goBack} onSkip={handleSkip} />;
     }
   };
 
-  // ---------------- RENDER ----------------
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* ✅ Pass onLogout to TopBar to allow escape from loop */}
       <TopBar userName={data.firstName || "User"} onLogout={onLogout} />
-
       <AnimatePresence mode="wait">
         <motion.div
           key={step}

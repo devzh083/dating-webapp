@@ -30,6 +30,7 @@ interface ChatUser {
   last_message?: string;
   unread_count?: number;
   is_blocked?: boolean; 
+  user_email?: string; // ✅ Added to fix TS Error
   // Mock fields for profile view
   age?: number;
   instagram_id?: string;
@@ -140,7 +141,7 @@ const DenseDoodleBackground = () => (
 
 export default function ChatsPage({ onLogout }: ChatsPageProps) {
   /* ---------------- STATE ---------------- */
-  
+   
   const [selectedChat, setSelectedChat] = useState<number | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -152,7 +153,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   // Presence & Typing State
   const [typingUser, setTypingUser] = useState<string | null>(null);
   const [isOnlineMap, setIsOnlineMap] = useState<Record<string, boolean>>({});
-  
+   
   // Modals State
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -191,7 +192,7 @@ export default function ChatsPage({ onLogout }: ChatsPageProps) {
   }, [messages, selectedChat]);
 
   /* ---------------- CONTEXT MENU LOGIC ---------------- */
-  
+   
   // Close menu on click anywhere
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -792,7 +793,7 @@ const submitReport = async () => {
 
                 {/* ✅ MESSAGES AREA CONTAINER */}
                 <div className="flex-1 relative overflow-hidden bg-slate-50/20">
-                   
+                    
                    <DenseDoodleBackground />
 
                    {/* ✅ SCROLLABLE CONTENT */}
