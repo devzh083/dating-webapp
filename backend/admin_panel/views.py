@@ -20,6 +20,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
+# Razorpay imports
+import razorpay
+from django.conf import settings
+from dateutil.relativedelta import relativedelta
+
 # Local imports
 from profiles.models import UserProfile
 from .models import (
@@ -47,6 +52,9 @@ except ImportError:
     HasSectionPermission = IsAdminUser
 
 logger = logging.getLogger(__name__)
+
+# Initialize Razorpay Client
+client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1622,3 +1630,242 @@ class RedeemPromoCodeView(MultipleAuthenticationView):
                 'success': False,
                 'error': 'Invalid promo code'
             }, status=status.HTTP_404_NOT_FOUND)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RAZORPAY PAYMENT HANDLING - WITH FREE PLAN SUPPORT
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CreateOrderView(MultipleAuthenticationView):
+    """
+    Create Razorpay order for premium plan purchase.
+    
+    ✅ HANDLES FREE PLANS (100% discount) - directly activates without payment
+    ✅ HANDLES PAID PLANS - creates Razorpay order
+    """
+    
+    def post(self, request):
+        try:
+            plan_id = request.data.get('plan_id')
+            promo_code = request.data.get('promo_code')
+            
+            if not plan_id:
+                return Response(
+                    {'error': 'Plan ID is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get the plan
+            try:
+                plan = PremiumPlan.objects.get(plan_id=plan_id)
+            except PremiumPlan.DoesNotExist:
+                return Response(
+                    {'error': 'Invalid plan'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Calculate final amount
+            original_amount = float(plan.price)
+            final_amount = original_amount
+            promo_discount = None
+            
+            # Apply promo code if provided
+            if promo_code:
+                try:
+                    promo = PromoCode.objects.get(
+                        code=promo_code.upper().strip(),
+                        plan=plan,
+                        active=True
+                    )
+                    
+                    # Validate promo code
+                    if not promo.is_valid:
+                        return Response(
+                            {'error': 'Promo code is not valid or has expired'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    
+                    # Check if user already used it
+                    if PromoCodeUsage.objects.filter(
+                        promo_code=promo,
+                        user=request.user
+                    ).exists():
+                        return Response(
+                            {'error': 'You have already used this promo code'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    
+                    # Calculate discount
+                    final_amount = float(promo.apply_discount(original_amount))
+                    promo_discount = {
+                        'code': promo.code,
+                        'percentage': promo.discount_percentage,
+                        'amount_saved': original_amount - final_amount
+                    }
+                    
+                except PromoCode.DoesNotExist:
+                    return Response(
+                        {'error': 'Invalid promo code for this plan'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            # ✅ CRITICAL FIX: Handle FREE plans (100% discount)
+            if final_amount == 0:
+                # Directly activate premium without payment
+                with transaction.atomic():
+                    # 1. Update user profile to premium
+                    profile = request.user.userprofile
+                    profile.premium = True
+                    profile.premium_plan = plan.name
+                    profile.premium_activated_at = timezone.now()
+                    
+                    # Calculate expiry based on plan type
+                    months_map = {
+                        'monthly': 1,
+                        'quarterly': 3,
+                        'biannual': 6,
+                        'annual': 12
+                    }
+                    months = months_map.get(plan.plan_type, 1)
+                    profile.premium_expires_at = timezone.now() + relativedelta(months=months)
+                    profile.save()
+                    
+                    # 2. Mark promo code as used
+                    if promo_code:
+                        promo.use_code(request.user)
+                
+                return Response({
+                    'success': True,
+                    'free_activation': True,
+                    'message': 'Premium activated successfully!',
+                    'plan': {
+                        'name': plan.name,
+                        'duration': plan.duration,
+                    },
+                    'promo_discount': promo_discount,
+                    'expires_at': profile.premium_expires_at.isoformat()
+                }, status=status.HTTP_200_OK)
+            
+            # ✅ For paid plans: Create Razorpay order
+            # Convert to paise (Razorpay requires amount in smallest currency unit)
+            amount_in_paise = int(final_amount * 100)
+            
+            # Razorpay minimum amount check
+            if amount_in_paise < 100:  # ₹1 minimum
+                return Response(
+                    {'error': 'Order amount is below minimum allowed (₹1)'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create Razorpay order
+            order = client.order.create({
+                'amount': amount_in_paise,
+                'currency': 'INR',
+                'payment_capture': 1,
+                'notes': {
+                    'user_id': request.user.id,
+                    'plan_id': plan.plan_id,
+                    'promo_code': promo_code or '',
+                }
+            })
+            
+            return Response({
+                'order_id': order['id'],
+                'amount': amount_in_paise,
+                'currency': 'INR',
+                'razorpay_key': settings.RAZORPAY_KEY_ID,
+                'plan_name': plan.name,
+                'plan_duration': plan.duration,
+                'original_price': original_amount,
+                'final_price': final_amount,
+                'promo_discount': promo_discount,
+                'free_activation': False,
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            import traceback
+            print("❌ Create Order Error:", traceback.format_exc())
+            return Response(
+                {'error': f'Failed to create order: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class VerifyPaymentView(MultipleAuthenticationView):
+    """
+    Verify Razorpay payment and activate premium subscription.
+    """
+    
+    def post(self, request):
+        try:
+            # Get payment details from frontend
+            razorpay_order_id = request.data.get('razorpay_order_id')
+            razorpay_payment_id = request.data.get('razorpay_payment_id')
+            razorpay_signature = request.data.get('razorpay_signature')
+            plan_id = request.data.get('plan_id')
+            
+            if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature, plan_id]):
+                return Response(
+                    {'error': 'Missing payment details'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Verify signature
+            params_dict = {
+                'razorpay_order_id': razorpay_order_id,
+                'razorpay_payment_id': razorpay_payment_id,
+                'razorpay_signature': razorpay_signature
+            }
+            
+            try:
+                client.utility.verify_payment_signature(params_dict)
+            except razorpay.errors.SignatureVerificationError:
+                return Response(
+                    {'error': 'Payment verification failed'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get plan
+            try:
+                plan = PremiumPlan.objects.get(plan_id=plan_id)
+            except PremiumPlan.DoesNotExist:
+                return Response(
+                    {'error': 'Invalid plan'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Activate premium subscription
+            with transaction.atomic():
+                profile = request.user.userprofile
+                profile.premium = True
+                profile.premium_plan = plan.name
+                profile.premium_activated_at = timezone.now()
+                
+                # Calculate expiry
+                months_map = {
+                    'monthly': 1,
+                    'quarterly': 3,
+                    'biannual': 6,
+                    'annual': 12
+                }
+                months = months_map.get(plan.plan_type, 1)
+                profile.premium_expires_at = timezone.now() + relativedelta(months=months)
+                profile.save()
+            
+            return Response({
+                'success': True,
+                'message': 'Payment verified and premium activated!',
+                'plan': {
+                    'name': plan.name,
+                    'duration': plan.duration,
+                },
+                'expires_at': profile.premium_expires_at.isoformat()
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            import traceback
+            print("❌ Verify Payment Error:", traceback.format_exc())
+            return Response(
+                {'error': f'Payment verification failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users, Search, Download, Eye, Ban, CheckCircle, XCircle, Loader,
-  MapPin, UserCheck, Trash2, AlertTriangle, X
+  MapPin, UserCheck, Trash2, AlertTriangle, X, Crown, Calendar, DollarSign
 } from 'lucide-react';
 import { adminService } from '../../services/profileService';
 import { useNotification } from './Notificationsystem';
@@ -36,6 +36,7 @@ interface UserProfile {
   profile_complete: boolean;
   verified: boolean;
   premium: boolean;
+  premium_expiry: string | null;
   first_name: string | null;
   date_of_birth: string | null;
   bio: string | null;
@@ -64,7 +65,7 @@ interface AdminAction {
   admin_username: string;
   target_user: number;
   target_username: string;
-  action_type: 'suspend' | 'ban' | 'activate' | 'delete' | 'verify' | 'warn';
+  action_type: 'suspend' | 'ban' | 'activate' | 'delete' | 'verify' | 'warn' | 'grant_premium' | 'revoke_premium';
   reason: string;
   created_at: string;
 }
@@ -96,6 +97,7 @@ const UserManagement: React.FC = () => {
   const [accountStatusFilter, setAccountStatusFilter] = useState<string>('all');
   const [verifiedFilter, setVerifiedFilter] = useState<string>('all');
   const [premiumFilter, setPremiumFilter] = useState<string>('all');
+  const [genderFilter, setGenderFilter] = useState<string>('all');
   const [orderingFilter, setOrderingFilter] = useState<string>('-join_date');
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   
@@ -105,6 +107,11 @@ const UserManagement: React.FC = () => {
   const [actionReason, setActionReason] = useState<string>('');
   const [showReasonModal, setShowReasonModal] = useState<boolean>(false);
   const [pendingAction, setPendingAction] = useState<{ userId: number; action: string } | null>(null);
+
+  // Premium management states
+  const [showPremiumModal, setShowPremiumModal] = useState<boolean>(false);
+  const [premiumExpiryDate, setPremiumExpiryDate] = useState<string>('');
+  const [premiumDuration, setPremiumDuration] = useState<number>(30);
 
   const loadUsers = async (page: number = 1) => {
     setLoading(true);
@@ -120,6 +127,7 @@ const UserManagement: React.FC = () => {
       if (accountStatusFilter !== 'all') params.append('account_status', accountStatusFilter);
       if (verifiedFilter !== 'all') params.append('verified', verifiedFilter);
       if (premiumFilter !== 'all') params.append('premium', premiumFilter);
+      if (genderFilter !== 'all') params.append('gender', genderFilter);
       if (orderingFilter) params.append('ordering', orderingFilter);
       
       const data = await adminService.adminApiCall<{ results: UserProfile[]; count: number; next: string | null; previous: string | null }>(`/users/?${params.toString()}`);
@@ -152,12 +160,13 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const performUserAction = async (userId: number, action: string, reason: string = '') => {
+  const performUserAction = async (userId: number, action: string, reason: string = '', extraData: any = {}) => {
     setLoading(true);
     try {
-      const data = await adminService.adminApiCall<{ message: string; user?: UserProfile }>(`/users/${userId}/user_action/`, 'POST', { action, reason });
+      const data = await adminService.adminApiCall<{ message: string; user?: UserProfile }>(`/users/${userId}/user_action/`, 'POST', { action, reason, ...extraData });
       showSuccess('Action Completed', data.message);
       setShowUserDetails(false);
+      setShowPremiumModal(false);
       loadUsers(usersPage);
     } catch (err) {
       const error = err as Error;
@@ -191,6 +200,57 @@ const UserManagement: React.FC = () => {
         }
       }
     });
+  };
+
+  const handleGrantPremium = (userId: number) => {
+    setShowPremiumModal(true);
+    const defaultDate = new Date();
+    defaultDate.setDate(defaultDate.getDate() + 30);
+    setPremiumExpiryDate(defaultDate.toISOString().split('T')[0]);
+    setPremiumDuration(30);
+  };
+
+  const handleRevokePremium = (userId: number) => {
+    confirm({
+      title: 'Revoke Premium Access',
+      message: 'Are you sure you want to revoke premium access for this user?',
+      confirmText: 'Revoke Premium',
+      cancelText: 'Cancel',
+      type: 'warning',
+      onConfirm: async () => {
+        const reason = prompt('Enter reason for revoking premium:');
+        if (reason) {
+          await performUserAction(userId, 'revoke_premium', reason);
+        }
+      }
+    });
+  };
+
+  const handlePremiumDurationChange = (days: number) => {
+    setPremiumDuration(days);
+    const newDate = new Date();
+    newDate.setDate(newDate.getDate() + days);
+    setPremiumExpiryDate(newDate.toISOString().split('T')[0]);
+  };
+
+  const handleSubmitPremium = async () => {
+    if (!userDetails || !premiumExpiryDate) {
+      showWarning('Invalid Data', 'Please select an expiry date');
+      return;
+    }
+
+    const reason = prompt('Enter reason for granting premium access:');
+    if (!reason) {
+      showWarning('Action Cancelled', 'A reason is required to proceed.');
+      return;
+    }
+
+    await performUserAction(
+      userDetails.profile.user.id, 
+      'grant_premium', 
+      reason,
+      { expiry_date: premiumExpiryDate }
+    );
   };
 
   const performBulkAction = async (action: string, reason: string = '') => {
@@ -236,15 +296,17 @@ const UserManagement: React.FC = () => {
       if (searchTerm) params.append('search', searchTerm);
       if (statusFilter !== 'all') params.append('status', statusFilter);
       if (accountStatusFilter !== 'all') params.append('account_status', accountStatusFilter);
+      if (genderFilter !== 'all') params.append('gender', genderFilter);
       
       const data = await adminService.adminApiCall<{ data: UserProfile[]; count: number }>(`/users/export/?${params.toString()}`);
       
       const csv = [
-        ['ID', 'Username', 'Email', 'Gender', 'Age', 'Location', 'Status', 'Account Status', 'Join Date', 'Matches', 'Messages'],
+        ['ID', 'Username', 'Email', 'Gender', 'Age', 'Location', 'Status', 'Account Status', 'Join Date', 'Matches', 'Messages', 'Premium', 'Premium Expiry'],
         ...data.data.map(u => [
           u.user.id, u.username, u.email, u.gender || '', u.age || '', 
           u.location || '', u.status, u.account_status, u.join_date, 
-          u.matches || 0, u.messages || 0
+          u.matches || 0, u.messages || 0, u.premium ? 'Yes' : 'No',
+          u.premium_expiry || 'N/A'
         ])
       ].map(row => row.join(',')).join('\n');
       
@@ -273,7 +335,7 @@ const UserManagement: React.FC = () => {
       loadUsers(1);
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, statusFilter, accountStatusFilter, verifiedFilter, premiumFilter, orderingFilter]);
+  }, [searchTerm, statusFilter, accountStatusFilter, verifiedFilter, premiumFilter, genderFilter, orderingFilter]);
 
   const getStatusColor = (status: string): string => {
     const colors: Record<string, string> = {
@@ -311,6 +373,22 @@ const UserManagement: React.FC = () => {
     return `${days}d ${hours % 24}h`;
   };
 
+  const isPremiumExpired = (expiryDate: string | null): boolean => {
+    if (!expiryDate) return false;
+    return new Date(expiryDate) < new Date();
+  };
+
+  const getDaysUntilExpiry = (expiryDate: string | null): number => {
+    if (!expiryDate) return 0;
+    const diff = new Date(expiryDate).getTime() - new Date().getTime();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  };
+
+  // Calculate statistics
+  const maleUsers = users.filter(u => u.gender?.toLowerCase() === 'male').length;
+  const femaleUsers = users.filter(u => u.gender?.toLowerCase() === 'female').length;
+  const premiumUsers = users.filter(u => u.premium).length;
+
   return (
     <div className="space-y-6">
       {/* Error Message */}
@@ -323,6 +401,57 @@ const UserManagement: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Statistics Bar */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Users className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{usersPagination.count}</p>
+              <p className="text-xs text-gray-500">Total Users</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+              <Users className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{maleUsers}</p>
+              <p className="text-xs text-gray-500">Male Users</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-pink-100 flex items-center justify-center">
+              <Users className="w-5 h-5 text-pink-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{femaleUsers}</p>
+              <p className="text-xs text-gray-500">Female Users</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
+              <Crown className="w-5 h-5 text-yellow-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{premiumUsers}</p>
+              <p className="text-xs text-gray-500">Premium Users</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Filters & Search */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -337,6 +466,17 @@ const UserManagement: React.FC = () => {
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
             />
           </div>
+
+          <select
+            value={genderFilter}
+            onChange={(e) => setGenderFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+          >
+            <option value="all">All Genders</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
 
           <select
             value={statusFilter}
@@ -465,10 +605,11 @@ const UserManagement: React.FC = () => {
                   />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">User</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Gender</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Location</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Joined</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Matches</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Membership</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Account</th>
                 <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
               </tr>
@@ -476,88 +617,125 @@ const UserManagement: React.FC = () => {
             <tbody className="divide-y divide-gray-200">
               {loading && users.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
+                  <td colSpan={9} className="px-6 py-12 text-center">
                     <Loader className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-2" />
                     <p className="text-sm text-gray-500">Loading users...</p>
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
+                  <td colSpan={9} className="px-6 py-12 text-center">
                     <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">No users found</p>
                   </td>
                 </tr>
               ) : (
-                users.map(user => (
-                  <tr key={user.user.id} className="hover:bg-gray-50 transition">
-                    <td className="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedUsers.includes(user.user.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedUsers([...selectedUsers, user.user.id]);
-                          } else {
-                            setSelectedUsers(selectedUsers.filter(id => id !== user.user.id));
-                          }
-                        }}
-                        className="w-4 h-4 text-teal-600 rounded"
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-semibold">
-                            {user.username?.charAt(0).toUpperCase() || 'U'}
+                users.map(user => {
+                  const isPremium = user.premium;
+                  const isExpired = isPremiumExpired(user.premium_expiry);
+                  const daysLeft = getDaysUntilExpiry(user.premium_expiry);
+                  const isMale = user.gender?.toLowerCase() === 'male';
+
+                  return (
+                    <tr key={user.user.id} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.includes(user.user.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedUsers([...selectedUsers, user.user.id]);
+                            } else {
+                              setSelectedUsers(selectedUsers.filter(id => id !== user.user.id));
+                            }
+                          }}
+                          className="w-4 h-4 text-teal-600 rounded"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${
+                              isMale ? 'bg-blue-500' : 'bg-pink-500'
+                            }`}>
+                              {user.username?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${getStatusColor(user.status)}`} />
                           </div>
-                          <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${getStatusColor(user.status)}`} />
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                              {user.username || 'Unknown'}
+                              {user.verified && <CheckCircle className="w-4 h-4 text-blue-500" />}
+                              {isPremium && !isExpired && (
+                                <Crown className="w-4 h-4 text-yellow-500 fill-yellow-400" />
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-500">{user.email}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                            {user.username || 'Unknown'}
-                            {user.verified && <CheckCircle className="w-4 h-4 text-blue-500" />}
-                            {user.premium && <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-bold rounded">PRO</span>}
-                          </p>
-                          <p className="text-xs text-gray-500">{user.email}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          isMale ? 'text-blue-600 bg-blue-50' : 'text-pink-600 bg-pink-50'
+                        }`}>
+                          {user.gender || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="capitalize text-sm text-gray-600">{user.status}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                          <MapPin className="w-4 h-4 text-gray-400" />
+                          {user.location || 'N/A'}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="capitalize text-sm text-gray-600">{user.status}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                        <MapPin className="w-4 h-4 text-gray-400" />
-                        {user.location || 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">{formatDate(user.join_date)}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold text-gray-900">{user.matches || 0}</span>
-                        <span className="text-xs text-gray-400">{user.messages || 0} msgs</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getAccountStatusColor(user.account_status)}`}>
-                        {user.account_status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => loadUserDetails(user.user.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-600 hover:bg-teal-50 rounded-lg transition"
-                        disabled={loading}
-                      >
-                        <Eye className="w-4 h-4" />
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-600">{formatDate(user.join_date)}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {isPremium ? (
+                          <div className="space-y-1">
+                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              isExpired ? 'text-red-600 bg-red-50' : 'text-yellow-600 bg-yellow-50'
+                            }`}>
+                              {isExpired ? 'Expired' : 'Premium'}
+                            </span>
+                            {user.premium_expiry && (
+                              <div className="flex items-center gap-1 text-xs text-gray-500">
+                                <Calendar className="w-3 h-3" />
+                                {isExpired ? (
+                                  <span className="text-red-600">Expired {formatDate(user.premium_expiry)}</span>
+                                ) : (
+                                  <span>{daysLeft}d left</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold text-gray-600 bg-gray-50">
+                            Free
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getAccountStatusColor(user.account_status)}`}>
+                          {user.account_status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => loadUserDetails(user.user.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-600 hover:bg-teal-50 rounded-lg transition"
+                          disabled={loading}
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -609,7 +787,9 @@ const UserManagement: React.FC = () => {
             <div className="p-6 space-y-6">
               {/* User Header */}
               <div className="flex items-start gap-4">
-                <div className="w-20 h-20 rounded-full bg-teal-500 flex items-center justify-center text-white text-3xl font-bold">
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl font-bold ${
+                  userDetails.profile.gender?.toLowerCase() === 'male' ? 'bg-blue-500' : 'bg-pink-500'
+                }`}>
                   {userDetails.profile.username?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <div className="flex-1">
@@ -618,16 +798,90 @@ const UserManagement: React.FC = () => {
                     {userDetails.profile.verified && <CheckCircle className="w-5 h-5 text-blue-500" />}
                   </h3>
                   <p className="text-gray-500">{userDetails.profile.email}</p>
-                  <div className="flex items-center gap-2 mt-2">
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
                     <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getAccountStatusColor(userDetails.profile.account_status)}`}>
                       {userDetails.profile.account_status}
                     </span>
-                    {userDetails.profile.premium && (
-                      <span className="px-2.5 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full">Premium</span>
+                    {userDetails.profile.premium && !isPremiumExpired(userDetails.profile.premium_expiry) && (
+                      <span className="px-2.5 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full flex items-center gap-1">
+                        <Crown className="w-3 h-3 fill-yellow-600" />
+                        Premium
+                      </span>
+                    )}
+                    {userDetails.profile.gender && (
+                      <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${
+                        userDetails.profile.gender?.toLowerCase() === 'male' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'bg-pink-100 text-pink-700'
+                      }`}>
+                        {userDetails.profile.gender}
+                      </span>
                     )}
                   </div>
                 </div>
               </div>
+
+              {/* Premium Status Card */}
+              {userDetails.profile.gender?.toLowerCase() === 'male' && (
+                <div className={`rounded-xl border-2 p-4 ${
+                  userDetails.profile.premium && !isPremiumExpired(userDetails.profile.premium_expiry)
+                    ? 'bg-yellow-50 border-yellow-200'
+                    : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Crown className={`w-5 h-5 ${
+                        userDetails.profile.premium && !isPremiumExpired(userDetails.profile.premium_expiry)
+                          ? 'text-yellow-600 fill-yellow-500'
+                          : 'text-gray-400'
+                      }`} />
+                      <span className="font-semibold text-gray-900">Premium Membership</span>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-1 rounded ${
+                      userDetails.profile.premium && !isPremiumExpired(userDetails.profile.premium_expiry)
+                        ? 'bg-yellow-200 text-yellow-800'
+                        : 'bg-gray-200 text-gray-700'
+                    }`}>
+                      {userDetails.profile.premium && !isPremiumExpired(userDetails.profile.premium_expiry) ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  
+                  {userDetails.profile.premium_expiry && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <span className="text-gray-600">
+                          Expires: {formatDate(userDetails.profile.premium_expiry)}
+                        </span>
+                      </div>
+                      {!isPremiumExpired(userDetails.profile.premium_expiry) && (
+                        <div className="text-sm text-gray-600">
+                          {getDaysUntilExpiry(userDetails.profile.premium_expiry)} days remaining
+                        </div>
+                      )}
+                      {isPremiumExpired(userDetails.profile.premium_expiry) && (
+                        <div className="text-sm text-red-600 font-medium">
+                          Expired {Math.abs(getDaysUntilExpiry(userDetails.profile.premium_expiry))} days ago
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {!userDetails.profile.premium && (
+                    <p className="text-sm text-gray-600">This user is not a premium member</p>
+                  )}
+                </div>
+              )}
+
+              {/* Note for female users */}
+              {userDetails.profile.gender?.toLowerCase() === 'female' && (
+                <div className="bg-pink-50 border border-pink-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-pink-800">
+                    <AlertTriangle className="w-5 h-5" />
+                    <span className="text-sm font-medium">Premium features are only available for male users</span>
+                  </div>
+                </div>
+              )}
 
               {/* User Info Grid */}
               <div className="grid grid-cols-2 gap-4">
@@ -716,7 +970,7 @@ const UserManagement: React.FC = () => {
                     {userDetails.admin_actions.slice(0, 5).map((action: AdminAction) => (
                       <div key={action.id} className="bg-white rounded-lg p-3 flex items-center justify-between">
                         <div>
-                          <span className="text-xs font-semibold text-gray-700 capitalize">{action.action_type}</span>
+                          <span className="text-xs font-semibold text-gray-700 capitalize">{action.action_type.replace('_', ' ')}</span>
                           <p className="text-xs text-gray-600 mt-0.5">{action.reason}</p>
                         </div>
                         <div className="text-right">
@@ -730,7 +984,7 @@ const UserManagement: React.FC = () => {
               )}
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
                 {userDetails.profile.account_status === 'active' && (
                   <>
                     <button
@@ -782,6 +1036,31 @@ const UserManagement: React.FC = () => {
                   </button>
                 )}
 
+                {/* Premium Management - Only for Male Users */}
+                {userDetails.profile.gender?.toLowerCase() === 'male' && (
+                  <>
+                    {!userDetails.profile.premium || isPremiumExpired(userDetails.profile.premium_expiry) ? (
+                      <button
+                        onClick={() => handleGrantPremium(userDetails.profile.user.id)}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-xl hover:opacity-90 transition font-semibold"
+                        disabled={loading}
+                      >
+                        <Crown className="w-4 h-4" />
+                        Grant Premium
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleRevokePremium(userDetails.profile.user.id)}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition font-semibold"
+                        disabled={loading}
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Revoke Premium
+                      </button>
+                    )}
+                  </>
+                )}
+
                 <button
                   onClick={() => handleUserActionWithReason(userDetails.profile.user.id, 'delete')}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-red-600 rounded-xl hover:bg-red-50 transition font-semibold"
@@ -798,11 +1077,108 @@ const UserManagement: React.FC = () => {
                 <ul className="text-xs text-gray-700 space-y-1">
                   <li>• Profile Complete: {userDetails.profile.profile_complete ? 'Yes' : 'No'}</li>
                   <li>• Verification: {userDetails.profile.verified ? 'Verified' : 'Not Verified'}</li>
-                  <li>• Membership: {userDetails.profile.premium ? 'Premium' : 'Free'}</li>
+                  <li>• Membership: {userDetails.profile.premium && !isPremiumExpired(userDetails.profile.premium_expiry) ? 'Premium' : 'Free'}</li>
                   <li>• Current Status: {userDetails.profile.status}</li>
                   <li>• Reports Filed By User: {userDetails.reports_made?.length || 0}</li>
                   <li>• Reports Against User: {userDetails.reports_received?.length || 0}</li>
+                  {userDetails.profile.premium_expiry && (
+                    <li>• Premium Expiry: {formatDate(userDetails.profile.premium_expiry)} {isPremiumExpired(userDetails.profile.premium_expiry) && '(Expired)'}</li>
+                  )}
                 </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Grant Modal */}
+      {showPremiumModal && userDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                <Crown className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Grant Premium Access</h3>
+                <p className="text-sm text-gray-500">Set premium expiry date for {userDetails.profile.username}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Quick Duration Buttons */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Quick Select Duration
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[30, 90, 180, 365].map((days) => (
+                    <button
+                      key={days}
+                      onClick={() => handlePremiumDurationChange(days)}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                        premiumDuration === days
+                          ? 'bg-teal-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {days}d
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Date Picker */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Expiry Date
+                </label>
+                <input
+                  type="date"
+                  value={premiumExpiryDate}
+                  onChange={(e) => setPremiumExpiryDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Preview */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-4 h-4 text-yellow-600" />
+                  <span className="text-sm font-semibold text-yellow-900">Premium Preview</span>
+                </div>
+                <p className="text-sm text-yellow-800">
+                  Premium will expire on: <strong>{formatDate(premiumExpiryDate)}</strong>
+                </p>
+                {premiumExpiryDate && (
+                  <p className="text-xs text-yellow-700 mt-1">
+                    Duration: {Math.ceil((new Date(premiumExpiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                  </p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleSubmitPremium}
+                  disabled={!premiumExpiryDate || loading}
+                  className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3 rounded-xl hover:opacity-90 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Crown className="w-4 h-4" />
+                  {loading ? 'Granting...' : 'Grant Premium'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPremiumModal(false);
+                    setPremiumExpiryDate('');
+                    setPremiumDuration(30);
+                  }}
+                  disabled={loading}
+                  className="px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>

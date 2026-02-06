@@ -245,101 +245,117 @@ const PremiumPage = () => {
     }
   };
 
-  // const handlePurchase = async (planId: string) => {
-  //   if (promoDiscount) {
-  //       // Vikas's Promo Logic
-  //       const authData = getAuthToken();
-  //       if (!authData) return alert('Please log in first.');
-        
-  //       try {
-  //           const response = await fetch('http://127.0.0.1:8000/api/promo/redeem/', {
-  //               method: 'POST',
-  //               headers: {
-  //                   'Authorization': `${authData.type} ${authData.token}`,
-  //                   'Content-Type': 'application/json',
-  //               },
-  //               body: JSON.stringify({ code: promoDiscount.code, plan_id: planId }),
-  //           });
-  //           const data = await response.json();
-  //           if (response.ok) {
-  //               alert(`Success! Plan activated using ${promoDiscount.code}`);
-  //               return;
-  //           }
-  //       } catch (e) { console.error(e); }
-  //   }
-  //   alert(`Proceeding to payment for plan ${planId}`);
-  // };
-
   const handlePurchase = async (planId: string) => {
-  try {
-    const authData = getAuthToken();
-    if (!authData) {
-      alert("Please log in first.");
-      return;
-    }
-
-    // 1️⃣ Create Razorpay Order
-    const orderRes = await fetch(
-      "http://127.0.0.1:8000/api/create-order/",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `${authData.type} ${authData.token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          plan_id: planId,
-          promo_code: promoDiscount?.code || null,
-        }),
+    try {
+      const authData = getAuthToken();
+      if (!authData) {
+        alert("Please log in first.");
+        return;
       }
-    );
 
-    if (!orderRes.ok) throw new Error("Order creation failed");
-
-    const order = await orderRes.json();
-
-    // 2️⃣ Open Razorpay Checkout
-    const rzp = new window.Razorpay({
-      key: order.razorpay_key,
-      amount: order.amount,
-      currency: order.currency,
-      order_id: order.order_id,
-      name: "The Dating App",
-      description: order.plan_name,
-      handler: async (response: any) => {
-        const verifyRes = await fetch(
-          "http://127.0.0.1:8000/api/verify/",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `${authData.type} ${authData.token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              ...response,
-              plan_id: planId,
-            }),
-          }
-        );
-
-        if (!verifyRes.ok) {
-          alert("Payment verification failed");
-          return;
+      // 1️⃣ Create Order (or activate FREE plan)
+      const orderRes = await fetch(
+        "http://127.0.0.1:8000/api/create-order/",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `${authData.type} ${authData.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            plan_id: planId,
+            promo_code: promoDiscount?.code || null,
+          }),
         }
+      );
 
-        alert("🎉 Premium activated!");
+      if (!orderRes.ok) {
+        const errorData = await orderRes.json();
+        throw new Error(errorData.error || "Order creation failed");
+      }
+
+      const order = await orderRes.json();
+
+      // ✅ CRITICAL FIX: Handle FREE plan activation
+      if (order.free_activation) {
+        alert(`🎉 ${order.message}\n\n` +
+              `Plan: ${order.plan.name}\n` +
+              `Duration: ${order.plan.duration}\n` +
+              `Expires: ${new Date(order.expires_at).toLocaleDateString()}`);
+        
+        // Redirect to success page
         navigate("/premium-success");
-      },
-      theme: { color: "#00B4D8" },
-    });
+        return;
+      }
 
-    rzp.open();
-  } catch (err) {
-    console.error(err);
-    alert("Something went wrong. Try again.");
-  }
-};
+      // 2️⃣ For paid plans: Open Razorpay Checkout
+      const rzp = new (window as any).Razorpay({
+        key: order.razorpay_key,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.order_id,
+        name: "The Dating App",
+        description: `${order.plan_name} - ${order.plan_duration}`,
+        
+        // Payment success handler
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await fetch(
+              "http://127.0.0.1:8000/api/verify/",
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `${authData.type} ${authData.token}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  plan_id: planId,
+                }),
+              }
+            );
 
+            if (!verifyRes.ok) {
+              const errorData = await verifyRes.json();
+              throw new Error(errorData.error || "Payment verification failed");
+            }
+
+            const verifyData = await verifyRes.json();
+            
+            alert(`🎉 ${verifyData.message}\n\n` +
+                  `Plan: ${verifyData.plan.name}\n` +
+                  `Duration: ${verifyData.plan.duration}\n` +
+                  `Expires: ${new Date(verifyData.expires_at).toLocaleDateString()}`);
+            
+            navigate("/premium-success");
+            
+          } catch (err) {
+            console.error("Verification error:", err);
+            alert("Payment verification failed. Please contact support.");
+          }
+        },
+        
+        // Modal closed without payment
+        modal: {
+          ondismiss: () => {
+            console.log("Payment cancelled by user");
+          }
+        },
+        
+        theme: { 
+          color: "#00B4D8" 
+        },
+      });
+
+      rzp.open();
+      
+    } catch (err) {
+      console.error("Purchase error:", err);
+      alert(err instanceof Error ? err.message : "Something went wrong. Try again.");
+    }
+  };
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
