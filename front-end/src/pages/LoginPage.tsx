@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import OtpVerification from "@/components/auth/OtpVerification";
-import ForgotPassword from "@/components/auth/ForgotPassword";
-import ResetPasswordOTP from "@/components/auth/ResetPasswordOTP";
-import NewPassword from "@/components/auth/NewPassword";
+import ForgotPassword from "@/components/auth/Forgotpassword";
+import ResetPasswordOTP from "@/components/auth/Resetpasswordotp";
+import NewPassword from "@/components/auth/Newpassword";
 
 type AuthView = "login" | "signup" | "otp" | "forgot-password" | "reset-otp" | "new-password";
 
