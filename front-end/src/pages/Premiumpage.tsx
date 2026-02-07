@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import TopBar from "@/components/layout/TopBar";
 
 // --- THEME CONSTANTS ---
 const PRIMARY_GRADIENT = "bg-gradient-to-r from-[#0095E0] via-[#00B4D8] to-[#00C98B]";
@@ -202,13 +203,42 @@ const PromoCodeInput: React.FC<PromoCodeInputProps> = ({ selectedPlan, onPromoAp
 };
 
 // --- MAIN PAGE ---
-const PremiumPage = () => {
+interface PremiumPageProps {
+  onLogout?: () => void;
+}
+
+const PremiumPage = ({ onLogout }: PremiumPageProps) => {
   const navigate = useNavigate();
   const [plans, setPlans] = useState<PremiumPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>("");
   const [promoDiscount, setPromoDiscount] = useState<PromoDiscount | null>(null);
+  const [userName, setUserName] = useState("User");
+
+  // Fetch user profile for TopBar
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const authData = getAuthToken();
+        if (!authData) return;
+
+        const response = await fetch('http://127.0.0.1:8000/api/profile/', {
+          headers: {
+            'Authorization': `${authData.type} ${authData.token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUserName(data.firstName || data.first_name || "User");
+        }
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
+      }
+    };
+    fetchUserProfile();
+  }, []);
 
   useEffect(() => {
     fetchPremiumData();
@@ -380,21 +410,10 @@ const PremiumPage = () => {
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans pb-20">
       
-      {/* --- Header --- */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100/50">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <button 
-            onClick={() => navigate(-1)} 
-            className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full hover:bg-gray-50 text-slate-600 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <span className="font-bold text-lg text-slate-900">Premium</span>
-          <div className="w-10" /> {/* Spacer for centering */}
-        </div>
-      </div>
+      {/* --- TopBar (imported from HomePage) --- */}
+      <TopBar userName={userName} onLogout={onLogout} />
 
-      <div className="max-w-6xl mx-auto px-4 pt-8 pb-12">
+      <div className="max-w-6xl mx-auto px-4 pt-24 pb-12">
         
         {/* --- Hero --- */}
         <div className="text-center mb-12">

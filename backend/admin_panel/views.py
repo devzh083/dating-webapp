@@ -1633,7 +1633,7 @@ class RedeemPromoCodeView(MultipleAuthenticationView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# RAZORPAY PAYMENT HANDLING - WITH FREE PLAN SUPPORT
+# RAZORPAY PAYMENT HANDLING - WITH FREE PLAN SUPPORT (✅ FIXED)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CreateOrderView(MultipleAuthenticationView):
@@ -1664,10 +1664,20 @@ class CreateOrderView(MultipleAuthenticationView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
+            # ✅ FIX: Get profile using direct query
+            try:
+                profile = UserProfile.objects.select_related('user').get(user=request.user)
+            except UserProfile.DoesNotExist:
+                return Response(
+                    {'error': 'User profile not found. Please complete your profile first.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             # Calculate final amount
             original_amount = float(plan.price)
             final_amount = original_amount
             promo_discount = None
+            promo = None  # Initialize promo variable
             
             # Apply promo code if provided
             if promo_code:
@@ -1713,8 +1723,6 @@ class CreateOrderView(MultipleAuthenticationView):
             if final_amount == 0:
                 # Directly activate premium without payment
                 with transaction.atomic():
-                    # 1. Update user profile to premium
-                    profile = request.user.userprofile
                     profile.premium = True
                     profile.premium_plan = plan.name
                     profile.premium_activated_at = timezone.now()
@@ -1731,7 +1739,7 @@ class CreateOrderView(MultipleAuthenticationView):
                     profile.save()
                     
                     # 2. Mark promo code as used
-                    if promo_code:
+                    if promo:
                         promo.use_code(request.user)
                 
                 return Response({
@@ -1834,9 +1842,17 @@ class VerifyPaymentView(MultipleAuthenticationView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
+            # ✅ FIX: Get profile using direct query
+            try:
+                profile = UserProfile.objects.select_related('user').get(user=request.user)
+            except UserProfile.DoesNotExist:
+                return Response(
+                    {'error': 'User profile not found'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             # Activate premium subscription
             with transaction.atomic():
-                profile = request.user.userprofile
                 profile.premium = True
                 profile.premium_plan = plan.name
                 profile.premium_activated_at = timezone.now()
