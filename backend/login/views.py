@@ -1,3 +1,4 @@
+from datetime import timedelta, timezone
 from decimal import Decimal
 from rest_framework import status
 from rest_framework.views import APIView
@@ -10,8 +11,9 @@ from django.contrib.auth import authenticate, get_user_model
 from django.conf import settings
 from django.shortcuts import redirect
 from django.core.mail import send_mail
+from django.db import transaction
 from django.core.cache import cache
-from .models import Match, Like, Payment
+from .models import Match, Like, Notification, Payment, UserSubscription
 
 import hmac
 import hashlib
@@ -30,7 +32,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from admin_panel.models import PremiumPlan, PromoCode, UserReport
-from login.serializers import CreateUserReportSerializer
+from login.serializers import CreateUserReportSerializer, NotificationSerializer
 from login.models import Match
 
 from config.firebase import db
@@ -1029,6 +1031,7 @@ class MatchRecommendationsView(APIView):
 
 
 #         return Response(result, status=status.HTTP_200_OK)
+
 class LikeProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1042,37 +1045,68 @@ class LikeProfileView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if from_email == to_email:
+            return Response(
+                {"error": "You cannot like yourself"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 🔁 Send like via Firebase (or any matching engine)
         result = FirebaseLikeManager.send_like(
             from_email=from_email,
             to_email=to_email
         )
 
-        # 🔔 If matched → notify both users
+        # ❤️ MATCH CREATED
         if result.get("status") == "matched":
-            match = result["match"]
+            match_data = result["match"]
 
+            with transaction.atomic():
+                match = Match.objects.get(id=match_data["match_id"])
+
+                # 🔔 Create notifications (per user)
+                Notification.objects.bulk_create([
+                    Notification(
+                        user=from_email,
+                        type="MATCH_CREATED",
+                        match=match,
+                        chat_id=match_data["chat_id"]
+                    ),
+                    Notification(
+                        user=to_email,
+                        type="MATCH_CREATED",
+                        match=match,
+                        chat_id=match_data["chat_id"]
+                    )
+                ])
+
+            # ⚡ Realtime push (socket / firebase)
             notify_user(from_email, {
                 "type": "MATCH_CREATED",
-                "match_id": match["match_id"],
-                "chat_id": match["chat_id"],
-                "from_email": to_email,
+                "match_id": match.id,
+                "chat_id": match.chat_id,
+                "other_user": to_email
             })
 
             notify_user(to_email, {
                 "type": "MATCH_CREATED",
-                "match_id": match["match_id"],
-                "chat_id": match["chat_id"],
-                "from_email": from_email,
+                "match_id": match.id,
+                "chat_id": match.chat_id,
+                "other_user": from_email
             })
 
-            # 🔥 VERY IMPORTANT: flatten response for frontend
+            # 📦 Frontend-friendly response
             return Response({
                 "status": "matched",
-                "match_id": match["match_id"],
-                "chat_id": match["chat_id"],
+                "match_id": match.id,
+                "chat_id": match.chat_id
             }, status=status.HTTP_200_OK)
 
-        return Response(result, status=status.HTTP_200_OK)
+        # 👍 Like sent, but no match yet
+        return Response({
+            "status": "liked",
+            "message": "Like sent successfully"
+        }, status=status.HTTP_200_OK)
 
 
 
@@ -1412,39 +1446,93 @@ class CreateOrderView(APIView):
         })
 
 
+
 class VerifyPaymentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        user = request.user
         data = request.data
 
-        order_id = data.get("razorpay_order_id")
-        payment_id = data.get("razorpay_payment_id")
-        signature = data.get("razorpay_signature")
+        order_id = data["razorpay_order_id"]
+        payment_id = data["razorpay_payment_id"]
+        signature = data["razorpay_signature"]
+        plan_id = data["plan_id"]
+        duration = int(data["duration"])  # months
 
-        body = f"{order_id}|{payment_id}"
-
+        # 1️⃣ Signature verification
+        payload = f"{order_id}|{payment_id}"
         expected_signature = hmac.new(
             settings.RAZORPAY_KEY_SECRET.encode(),
-            body.encode(),
+            payload.encode(),
             hashlib.sha256
         ).hexdigest()
 
         if expected_signature != signature:
-            return Response({"error": "Invalid signature"}, status=400)
+            return Response({"error": "Invalid payment"}, status=400)
 
-        # Activate premium
-        # (example)
-        request.user.profile.is_premium = True
-        request.user.profile.save()
-
-        Payment.objects.create(
-            user=request.user,
-            plan=PremiumPlan.objects.get(plan_id=request.data.get("plan_id", "")),
-            razorpay_order_id=order_id,
-            razorpay_payment_id=payment_id,
-            amount=0,  # optional
-            status="SUCCESS"
+        # 2️⃣ Create subscription
+        UserSubscription.objects.update_or_create(
+            user=user,
+            defaults={
+                "plan_id": plan_id,
+                "razorpay_order_id": order_id,
+                "razorpay_payment_id": payment_id,
+                "razorpay_signature": signature,
+                "end_date": timezone.now() + timedelta(days=30 * duration),
+                "is_active": True,
+            }
         )
 
-        return Response({"status": "success"})
+        return Response({"success": True})
+
+class MarkNotificationReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        notification_id = request.data.get("notification_id")
+        email = request.user.email.lower()
+
+        Notification.objects.filter(
+            id=notification_id,
+            user=email
+        ).update(is_read=True)
+
+        return Response({"status": "ok"}, status=200)
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        email = request.user.email.lower()
+
+        notifications = Notification.objects.filter(
+            user=email,
+            is_read=False
+        )
+
+        return Response(NotificationSerializer(notifications, many=True).data)
+
+class MarkAllNotificationsReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        email = request.user.email.lower()
+
+        Notification.objects.filter(user=email, is_read=False).update(is_read=True)
+
+        return Response({"status": "all_read"})
+
+
+class UnreadNotificationCountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        email = request.user.email.lower()
+
+        count = Notification.objects.filter(
+            user=email,
+            is_read=False
+        ).count()
+
+        return Response({"unread_count": count})

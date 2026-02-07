@@ -328,7 +328,7 @@ const PremiumPage = () => {
         }
 
         alert("🎉 Premium activated!");
-        navigate("/premium-success");
+        navigate("/");
       },
       theme: { color: "#00B4D8" },
     });
