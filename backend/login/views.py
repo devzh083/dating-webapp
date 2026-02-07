@@ -63,6 +63,20 @@ from .models_photos import UserPhoto  # <-- your ImageField model
 
 User = get_user_model()
 
+# ---------- HELPER: Fetch Premium Status from SQL ----------
+def get_premium_status(user):
+    """
+    Helper to safely fetch premium status from the SQL UserProfile table.
+    This bridges the gap between Firebase data and SQL billing status.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    try:
+        profile = UserProfile.objects.get(user=user)
+        return profile.premium
+    except UserProfile.DoesNotExist:
+        return False
+
 # ---------- OTP helpers ----------
 def generate_otp(length=6):
     digits = string.digits
@@ -96,7 +110,6 @@ def send_otp_email(email, otp):
                     
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin: 0 auto;">
                         
-                        <!-- Header -->
                         <tr>
                             <td style="padding: 0 0 30px 0; text-align: left;">
                                 <h1 style="margin: 0; font-size: 28px; font-weight: 700; background: linear-gradient(90deg, #0095E0 0%, #00C98B 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
@@ -105,14 +118,12 @@ def send_otp_email(email, otp):
                             </td>
                         </tr>
 
-                        <!-- Main Content -->
                         <tr>
                             <td style="padding: 0 0 30px 0;">
                                 <h2 style="margin: 0 0 20px 0; color: #000000; font-size: 24px; font-weight: 700; line-height: 1.3;">
                                     Enter this code to sign in
                                 </h2>
                                 
-                                <!-- OTP Code Display (Netflix-style) -->
                                 <div style="margin: 30px 0; text-align: left;">
                                     <span style="display: inline-block; color: #000000; font-size: 48px; font-weight: 700; letter-spacing: 12px; padding: 20px 0;">
                                         {otp_digits}
@@ -137,7 +148,6 @@ def send_otp_email(email, otp):
                             </td>
                         </tr>
 
-                        <!-- Signature -->
                         <tr>
                             <td style="padding: 20px 0 40px 0;">
                                 <p style="margin: 0; color: #000000; font-size: 16px; font-weight: 600;">
@@ -146,7 +156,6 @@ def send_otp_email(email, otp):
                             </td>
                         </tr>
 
-                        <!-- Footer Links -->
                         <tr>
                             <td style="padding: 20px 0 0 0; border-top: 1px solid #e6e6e6;">
                                 <p style="margin: 0 0 15px 0; color: #737373; font-size: 13px; line-height: 1.6;">
@@ -294,7 +303,10 @@ class LoginView(APIView):
         refresh = RefreshToken.for_user(user)
         email = user.username
         firebase_user = FirebaseAuthManager.get_user_by_email(email)
-        profile = FirebaseProfileManager.get_profile(email)
+        profile = FirebaseProfileManager.get_profile(email) or {}
+
+        # ✅ INJECT PREMIUM STATUS FROM SQL
+        profile['premium'] = get_premium_status(user)
 
         is_verified = firebase_user.get("is_verified", False) if firebase_user else False
 
@@ -307,7 +319,7 @@ class LoginView(APIView):
                     "email": email,
                     "is_verified": is_verified,
                     "firebase_user": firebase_user or {},
-                    "profile": profile or {},
+                    "profile": profile,
                 },
             },
             status=status.HTTP_200_OK,
@@ -358,6 +370,9 @@ class ProfileView(APIView):
         FirebaseProfileManager.create_profile(email, **data)
         updated_profile = FirebaseProfileManager.get_profile(email) or {}
 
+        # ✅ RETURN PREMIUM STATUS TO FRONTEND
+        updated_profile['premium'] = get_premium_status(request.user)
+
         return Response(
             {
                 "message": "Profile saved",
@@ -369,14 +384,26 @@ class ProfileView(APIView):
         )
 
 
-
 class ProfileDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, email):
         profile = FirebaseProfileManager.get_profile(email)
         if profile:
+            # --------------------------------------------------------
+            # ✅ UPDATE: Fetch Premium Status from SQL Database
+            # --------------------------------------------------------
+            try:
+                # Find user by email (username is email in this system)
+                user_obj = User.objects.get(username=email)
+                sql_profile = UserProfile.objects.get(user=user_obj)
+                profile['premium'] = sql_profile.premium
+            except (User.DoesNotExist, UserProfile.DoesNotExist):
+                profile['premium'] = False
+            # --------------------------------------------------------
+
             return Response(profile, status=status.HTTP_200_OK)
+        
         return Response(
             {"error": "Profile not found"},
             status=status.HTTP_404_NOT_FOUND,
@@ -488,17 +515,27 @@ class AuthStatusView(APIView):
         email = request.user.username
         profile = FirebaseProfileManager.get_profile(email)
         firebase_user = FirebaseAuthManager.get_user_by_email(email)
+        
+        # --------------------------------------------------------
+        # ✅ UPDATE: Fetch Premium Status from SQL Database
+        # --------------------------------------------------------
+        if profile is None:
+            profile = {}
+            
+        # Inject premium status
+        profile['premium'] = get_premium_status(request.user)
+        # --------------------------------------------------------
 
         return Response(
             {
                 "email": email,
-                "profile_exists": bool(profile),
-                "has_profile": bool(profile),
+                "profile_exists": bool(profile) and bool(profile.get('firstName')), # Basic check
+                "has_profile": bool(profile) and bool(profile.get('firstName')),
                 "is_verified": firebase_user.get("is_verified", False)
                 if firebase_user
                 else False,
                 "firebase_user": firebase_user or {},
-                "profile": profile or {},
+                "profile": profile,
             },
             status=status.HTTP_200_OK,
         )
@@ -698,7 +735,10 @@ class VerifyLoginOTPView(APIView):
 
         refresh = RefreshToken.for_user(user)
         email = user.username
-        profile = FirebaseProfileManager.get_profile(email)
+        profile = FirebaseProfileManager.get_profile(email) or {}
+        
+        # ✅ INJECT SQL PREMIUM STATUS
+        profile['premium'] = get_premium_status(user)
 
         return Response(
             {
@@ -709,7 +749,7 @@ class VerifyLoginOTPView(APIView):
                     "email": email,
                     "is_verified": True,
                     "firebase_user": firebase_user or {},
-                    "profile": profile or {},
+                    "profile": profile,
                 },
             },
             status=status.HTTP_200_OK,
@@ -879,10 +919,6 @@ def serialize_profile(profile: UserProfile) -> dict:
     }
 
 
-
-
-
-
 class MatchRecommendationsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -991,44 +1027,7 @@ class MatchRecommendationsView(APIView):
         results.sort(key=lambda x: x["similarity"], reverse=True)
         return Response(results)
 
-# class LikeProfileView(APIView):
-#     permission_classes = [IsAuthenticated]
 
-#     def post(self, request):
-#         from_email = request.user.username
-#         to_email = request.data.get("to_email")
-
-#         if not to_email:
-#             return Response(
-#                 {"error": "to_email is required"},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-
-#         result = FirebaseLikeManager.send_like(
-#             from_email=from_email,
-#             to_email=to_email
-#         )
-
-#         if result.get("status") == "matched":
-#             match = result.get("match")
-
-#             try:
-#                 to_user = User.objects.get(username=to_email)
-#             except User.DoesNotExist:
-#                 pass
-#             else:
-#                 notify_user(
-#                     to_user.id,
-#                     {
-#                         "type": "MATCH_CREATED",
-#                         "match_id": match["match_id"],
-#                         "chat_id": match["chat_id"],
-#                         "from_email": from_email,
-#                     }
-#                 )
-
-
-#         return Response(result, status=status.HTTP_200_OK)
 class LikeProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1075,46 +1074,6 @@ class LikeProfileView(APIView):
         return Response(result, status=status.HTTP_200_OK)
 
 
-
-# class MatchedChatsView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def get(self, request):
-#         my_email = request.user.username
-
-#         matches_ref = (
-#             db.collection("matches")
-#             .where("users", "array_contains", my_email)
-#         )
-
-#         chats = []
-
-#         for match_doc in matches_ref.stream():
-#             match = match_doc.to_dict() or {}
-
-#             chat_id = match.get("chat_id")
-#             users = match.get("users", [])
-
-#             # Enforce invariant: active chat must exist
-#             if not chat_id or len(users) != 2:
-#                 continue
-
-#             other_email = users[0] if users[1] == my_email else users[1]
-
-#             profile = FirebaseProfileManager.get_profile(other_email) or {}
-
-#             chats.append({
-#                 "chat_id": chat_id,
-#                 "email": other_email,
-#                 "first_name": profile.get("firstName"),
-#                 "profile_photo": (
-#                     profile.get("photos", [None])[0]
-#                     if profile.get("photos")
-#                     else None
-#                 ),
-#             })
-
-#         return Response(chats, status=status.HTTP_200_OK)
 
 class MatchedChatsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1167,6 +1126,7 @@ class MatchedChatsView(APIView):
             })
 
         return Response(chats, status=status.HTTP_200_OK)
+
 
 class ChatMessagesView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1253,6 +1213,7 @@ class SendChatMessageView(APIView):
 
         return Response({"status": "sent"}, status=status.HTTP_201_CREATED)
 
+
 class BlockUserView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1272,6 +1233,7 @@ class BlockUserView(APIView):
         )
 
         return Response({"status": "blocked"}, status=status.HTTP_200_OK)
+
 
 class UnblockUserView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1307,6 +1269,7 @@ class MarkChatReadView(APIView):
         )
 
         return Response({"status": "ok"}, status=status.HTTP_200_OK)
+
 
 class CreateUserReportView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1364,8 +1327,6 @@ class CreateUserReportView(APIView):
             {"message": "Report submitted successfully"},
             status=status.HTTP_201_CREATED
         )
-
-
 
 
 class CreateOrderView(APIView):
@@ -1433,10 +1394,13 @@ class VerifyPaymentView(APIView):
         if expected_signature != signature:
             return Response({"error": "Invalid signature"}, status=400)
 
-        # Activate premium
-        # (example)
-        request.user.profile.is_premium = True
-        request.user.profile.save()
+        # Activate premium in SQL (The source of truth)
+        try:
+            profile = UserProfile.objects.get(user=request.user)
+            profile.premium = True
+            profile.save()
+        except UserProfile.DoesNotExist:
+            pass  # Should generally not happen for authenticated users
 
         Payment.objects.create(
             user=request.user,
@@ -1448,3 +1412,42 @@ class VerifyPaymentView(APIView):
         )
 
         return Response({"status": "success"})
+
+
+# ✅✅✅ NEW NOTIFICATIONS VIEW ✅✅✅
+class UserNotificationsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # 1. Get current user email
+        user_email = request.user.email.lower()
+        if not user_email:
+            user_email = request.user.username.lower()
+
+        # 2. Fetch ALL Matches where user is either A or B
+        matches = Match.objects.filter(
+            Q(user_a=user_email) | Q(user_b=user_email)
+        ).order_by('-created_at')
+
+        notifications = []
+
+        for match in matches:
+            # Determine the "other" person
+            other_email = match.user_b if match.user_a == user_email else match.user_a
+            
+            # Fetch their profile details (Name) from Firebase Manager
+            profile_data = FirebaseProfileManager.get_profile(other_email) or {}
+            
+            # Fallback name if profile is missing
+            display_name = profile_data.get("firstName") or other_email.split('@')[0]
+            
+            notifications.append({
+                "id": match.id,
+                "type": "match",
+                "user": display_name,
+                "text": "It's a match! Start chatting now.",
+                "created_at": match.created_at, 
+                "chat_id": match.chat.id if match.chat else None
+            })
+
+        return Response(notifications, status=status.HTTP_200_OK)

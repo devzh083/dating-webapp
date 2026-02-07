@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { Heart, Send, PenLine, Crown, ArrowRight, Lock, X } from "lucide-react"; 
+import { Heart, Send, PenLine, Crown, ArrowRight, Lock, RotateCw } from "lucide-react"; 
 
 /* ---------------- COMPONENTS ---------------- */
 import TopBar from "@/components/layout/TopBar";
@@ -60,11 +60,11 @@ const HomePage = ({ onLogout }: HomePageProps) => {
   /* -------- STATE -------- */
   const [profiles, setProfiles] = useState<SwipeProfile[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userName, setUserName] = useState("User");
-
-  // ✅ STATIC BANNER STATE: Default is TRUE (Show banner)
-  const [showPremiumBanner, setShowPremiumBanner] = useState(true);
+  
+  // Stores full user profile data
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   // Story Submission State
   const [storyText, setStoryText] = useState("");
@@ -80,17 +80,22 @@ const HomePage = ({ onLogout }: HomePageProps) => {
   const MAX_STORY_LENGTH = 500;
 
   /* -------- 1. FETCH USER PROFILE -------- */
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const result = await profileService.getProfile();
-        if (result.exists && result.data) {
-          setUserName(result.data.firstName);
-        }
-      } catch (err) {
-        console.error("Error fetching user profile:", err);
+  const fetchUserProfile = async () => {
+    try {
+      setLoadingProfile(true);
+      const result = await profileService.getProfile();
+      if (result.exists && result.data) {
+        console.log("👤 USER PROFILE:", result.data);
+        setUserProfile(result.data);
       }
-    };
+    } catch (err) {
+      console.error("Error fetching user profile:", err);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  useEffect(() => {
     fetchUserProfile();
   }, []);
 
@@ -135,7 +140,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
     fetchMatches();
   }, []);
 
-  /* -------- 3. WEBSOCKET -------- */
+  /* -------- 3. WEBSOCKET REALTIME -------- */
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) return;
@@ -241,12 +246,27 @@ const HomePage = ({ onLogout }: HomePageProps) => {
     }
   };
 
+  /* -------- LOGIC: ACCESS CONTROL -------- */
+  
+  // 1. Identify Gender
+  const gender = userProfile?.gender?.toLowerCase() || "";
+  const isMale = gender === 'male' || gender === 'man' || gender === 'm';
+  const isFemale = gender === 'female' || gender === 'woman' || gender === 'f';
+
+  // 2. Identify Premium Status
+  const isPremium = !!userProfile?.premium;
+
+  // 3. Determine if Paywalled (Male + Not Premium)
+  // If loading, assume false until data arrives to avoid flickering
+  const isPaywalled = !loadingProfile && isMale && !isPremium;
+
   /* ================= RENDER ================= */
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white pt-16 md:pt-20 overflow-x-hidden">
-      <TopBar userName={userName} onLogout={onLogout} />
+      <TopBar userName={userProfile?.firstName || "User"} onLogout={onLogout} />
 
+      {/* Match Modal Overlay */}
       {showMatchModal && matchProfile && matchChatId && (
         <MatchModal profile={matchProfile} chatId={matchChatId} onComplete={handleMatchComplete} />
       )}
@@ -258,7 +278,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-gray-900 mb-4 leading-tight">
             Find Your Vibe, <br className="hidden xs:block md:hidden" />
             <span className="text-teal-500 inline-flex items-center gap-2 flex-wrap justify-center">
-              {userName}
+              {userProfile?.firstName || "User"}
               <Heart className="w-8 h-8 md:w-12 md:h-12 fill-current text-teal-500" />
             </span>
           </h1>
@@ -267,25 +287,29 @@ const HomePage = ({ onLogout }: HomePageProps) => {
           </p>
         </div>
 
-        {/* 2. Swipe Deck Section (OR STATIC PREMIUM BANNER) */}
+        {/* 2. Swipe Deck OR Paywall */}
         <div className="mb-12 md:mb-20 max-w-md md:max-w-4xl mx-auto w-full">
           <div className="relative">
-            {/* Background Blob */}
             <div className="hidden sm:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-gradient-to-r from-teal-200/20 to-purple-200/20 blur-3xl rounded-full pointer-events-none -z-10" />
             
-            {/* ✅ STATIC PREMIUM BANNER (SHOWN BY DEFAULT) */}
-            {showPremiumBanner ? (
+            {/* --- LOADING STATE --- */}
+            {loadingProfile ? (
+                <div className="flex flex-col items-center justify-center h-[400px] w-full bg-white rounded-[32px] md:rounded-[40px] border border-gray-100 shadow-xl p-4">
+                    <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-teal-500 mb-4"></div>
+                    <p className="text-sm md:text-base text-gray-500 font-medium">Loading profile...</p>
+                </div>
+            ) : isPaywalled ? (
+                // --- 🔒 PAYWALL BANNER (FOR FREE MALE USERS) ---
                 <div className="flex flex-col items-center justify-center min-h-[400px] w-full bg-white rounded-[32px] md:rounded-[40px] border border-gray-100 shadow-xl p-8 text-center relative overflow-hidden group animate-in fade-in zoom-in-95 duration-300">
-                    {/* Blur Background */}
                     <div className="absolute inset-0 bg-slate-50/80 backdrop-blur-sm z-0"></div>
                     
-                    {/* ✅ CLOSE BUTTON */}
+                    {/* ✅ REFRESH BUTTON (Testing Helper) */}
                     <button 
-                        onClick={() => setShowPremiumBanner(false)}
-                        className="absolute top-4 right-4 z-20 p-2 text-gray-400 hover:text-gray-600 hover:bg-white rounded-full transition-all duration-300 shadow-sm"
-                        title="Close Banner"
+                        onClick={fetchUserProfile}
+                        className="absolute top-4 right-4 z-20 p-2 text-gray-500 hover:text-teal-600 bg-white/80 rounded-full shadow-sm hover:shadow-md transition-all"
+                        title="Refresh Profile Status"
                     >
-                        <X className="w-6 h-6" />
+                        <RotateCw className="w-5 h-5" />
                     </button>
 
                     <div className="relative z-10 flex flex-col items-center">
@@ -325,7 +349,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
                     </div>
                 </div>
             ) : (
-                /* --- SWIPE DECK OR EMPTY STATE (SHOWN AFTER DISMISSAL) --- */
+                // --- 🔓 SWIPE DECK (FOR FEMALE or PREMIUM MALE) ---
                 loadingMatches ? (
                     <div className="flex flex-col items-center justify-center h-[400px] w-full bg-white rounded-[32px] md:rounded-[40px] border border-gray-100 shadow-xl p-4">
                         <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-teal-500 mb-4"></div>
@@ -377,16 +401,19 @@ const HomePage = ({ onLogout }: HomePageProps) => {
           <ProfileCompletion />
         </div>
 
-        {/* 5. Info Banners Grid */}
+        {/* 5. Info Banners Grid (Hide Premium Ad for Females) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-w-5xl mx-auto mb-16 px-2 md:px-0">
           <div className="h-full min-h-[180px]">
             <NearbyBanner />
           </div>
-          <div className="h-full min-h-[180px] flex items-center justify-center bg-gradient-to-br from-orange-500 to-rose-500 rounded-[24px] p-1 shadow-xl">
-            <div className="w-full h-full bg-white/10 backdrop-blur-sm rounded-[20px] p-1 text-white flex flex-col justify-center">
-                <PremiumBanner /> 
-            </div>
-          </div>
+          {/* Only show "Get Premium" banner if NOT female */}
+          {!isFemale && (
+              <div className="h-full min-h-[180px] flex items-center justify-center bg-gradient-to-br from-orange-500 to-rose-500 rounded-[24px] p-1 shadow-xl">
+                <div className="w-full h-full bg-white/10 backdrop-blur-sm rounded-[20px] p-1 text-white flex flex-col justify-center">
+                    <PremiumBanner /> 
+                </div>
+              </div>
+          )}
         </div>
 
         {/* 6. Expert Tips Section */}

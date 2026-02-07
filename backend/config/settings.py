@@ -111,9 +111,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "dating_app_db",
+        "NAME": "dating_app",
         "USER": "dating_user",
-        "PASSWORD": "DatingUser@2026!",
+        "PASSWORD": "Deva@2026",
         "HOST": "127.0.0.1",
         "PORT": "3306",
     }
@@ -249,4 +249,4 @@ CACHES = {
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 
-print("Razorpay Key:", os.getenv("RAZORPAY_KEY_ID"))
+print("Razorpay Key:", RAZORPAY_KEY_ID)

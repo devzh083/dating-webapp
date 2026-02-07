@@ -162,18 +162,13 @@ export default function OnboardingFlow({
       await profileService.saveProfile(data);
       localStorage.removeItem("onboardingData");
       
-      // ✅ GENDER GATEKEEPER LOGIC
-      if (data.gender && data.gender.toLowerCase() === 'male') {
-          // Male users -> Must buy premium
-          navigate("/premium", { replace: true });
+      // ✅ ALWAYS Redirect to Home. Home Page handles the Paywall logic.
+      if (onComplete) {
+        onComplete();
       } else {
-          // Female users -> Free Access
-          if (onComplete) {
-            onComplete();
-          } else {
-            navigate("/home", { replace: true });
-          }
+        navigate("/home", { replace: true });
       }
+
     } catch (err) {
       console.error("❌ Profile save failed:", err);
       setError("Failed to save profile. Please try again.");
