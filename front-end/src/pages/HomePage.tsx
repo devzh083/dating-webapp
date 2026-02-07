@@ -85,7 +85,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
       setLoadingProfile(true);
       const result = await profileService.getProfile();
       if (result.exists && result.data) {
-        console.log("👤 USER PROFILE:", result.data);
+        console.log("👤 USER PROFILE LOADED:", result.data);
         setUserProfile(result.data);
       }
     } catch (err) {
@@ -248,16 +248,13 @@ const HomePage = ({ onLogout }: HomePageProps) => {
 
   /* -------- LOGIC: ACCESS CONTROL -------- */
   
-  // 1. Identify Gender
   const gender = userProfile?.gender?.toLowerCase() || "";
   const isMale = gender === 'male' || gender === 'man' || gender === 'm';
   const isFemale = gender === 'female' || gender === 'woman' || gender === 'f';
-
-  // 2. Identify Premium Status
   const isPremium = !!userProfile?.premium;
 
-  // 3. Determine if Paywalled (Male + Not Premium)
-  // If loading, assume false until data arrives to avoid flickering
+  // Paywall Condition: If Male AND Not Premium -> Show Banner
+  // Only calculate this if profile has finished loading
   const isPaywalled = !loadingProfile && isMale && !isPremium;
 
   /* ================= RENDER ================= */
@@ -303,7 +300,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
                 <div className="flex flex-col items-center justify-center min-h-[400px] w-full bg-white rounded-[32px] md:rounded-[40px] border border-gray-100 shadow-xl p-8 text-center relative overflow-hidden group animate-in fade-in zoom-in-95 duration-300">
                     <div className="absolute inset-0 bg-slate-50/80 backdrop-blur-sm z-0"></div>
                     
-                    {/* ✅ REFRESH BUTTON (Testing Helper) */}
+                    {/* ✅ REFRESH BUTTON (For Testing & State Sync) */}
                     <button 
                         onClick={fetchUserProfile}
                         className="absolute top-4 right-4 z-20 p-2 text-gray-500 hover:text-teal-600 bg-white/80 rounded-full shadow-sm hover:shadow-md transition-all"

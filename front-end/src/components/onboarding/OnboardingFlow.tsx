@@ -1,17 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import TopBar from "@/components/layout/TopBar";
 import { useNavigate, useLocation } from "react-router-dom";
 import Step1BasicInfo from "./steps/Step1BasicInfo";
 import Step2Orientation from "./steps/Step2Orientation";
-import Step3Lifestyle from "./steps/Step3Lifestyle";
-import Step4Communication from "./steps/Step4Communication";
-import Step5Interests from "./steps/Step5Interests";
-import Step6Location from "./steps/Step6Location";
-import Step7Photos from "./steps/Step7Photos";
-import Step8Bio from "./steps/Step8Bio";
-import Step9Social from "./steps/Step9Social";
-import Step10Review from "./steps/Step10Review";
+import Step3Distance from "./steps/Step3Distance";
+import Step4Lifestyle from "./steps/Step4Lifestyle";
+import Step5Communication from "./steps/Step5Communication";
+import Step6Interests from "./steps/Step6Interests";
+import Step7Location from "./steps/Step7Location";
+import Step8Photos from "./steps/Step8Photos";
+import Step9Bio from "./steps/Step9Bio";
+import Step10Social from "./steps/Step10Social";
+import Step11Review from "./steps/Step11Review";
 import { profileService } from "../../services/profileService";
 
 export type OnboardingData = {
@@ -74,7 +75,7 @@ const initialData: OnboardingData = {
   },
 };
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 11;
 
 export default function OnboardingFlow({ 
   onComplete, 
@@ -87,11 +88,11 @@ export default function OnboardingFlow({
   const [data, setData] = useState<OnboardingData>(initialData);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Load saved data from localStorage on mount
   useEffect(() => {
     const savedData = localStorage.getItem("onboardingData");
     if (savedData) {
@@ -107,10 +108,12 @@ export default function OnboardingFlow({
     }
   }, []);
 
+  // Save to localStorage whenever data changes
   useEffect(() => {
     localStorage.setItem("onboardingData", JSON.stringify(data));
   }, [data]);
 
+  // Load existing profile from API
   useEffect(() => {
     loadExistingProfile();
     const state = location.state as { startStep?: number } | null;
@@ -126,7 +129,20 @@ export default function OnboardingFlow({
 
       if (result?.exists && result?.data) {
         console.log("✅ Existing profile loaded:", result.data);
-        setData({ ...initialData, ...result.data });
+        
+        // Merge with initialData to ensure all fields exist
+        const mergedData = {
+          ...initialData,
+          ...result.data,
+          // Ensure arrays and objects are properly initialized
+          interestedIn: result.data.interestedIn || [],
+          communicationStyle: result.data.communicationStyle || [],
+          interests: result.data.interests || [],
+          photos: result.data.photos || [],
+          socialAccounts: result.data.socialAccounts || initialData.socialAccounts,
+        };
+        
+        setData(mergedData);
       }
     } catch (err) {
       console.error("⚠️ Failed to load profile:", err);
@@ -135,11 +151,27 @@ export default function OnboardingFlow({
     }
   };
 
+  // Auto-save data to backend
+  const autoSaveData = useCallback(async () => {
+    try {
+      setIsSaving(true);
+      await profileService.saveProfile(data);
+      console.log("✅ Auto-saved profile data");
+    } catch (err) {
+      console.error("❌ Auto-save failed:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [data]);
+
   const setStepData = (patch: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...patch }));
   };
 
-  const goNext = () => {
+  const goNext = async () => {
+    // Auto-save before moving to next step
+    await autoSaveData();
+    
     if (step < TOTAL_STEPS) {
       setStep((s) => s + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -151,46 +183,88 @@ export default function OnboardingFlow({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    // Auto-save even when skipping
+    await autoSaveData();
     goNext();
+  };
+
+  // Handle clicking on the progress bar to jump to pending step
+  const handleStepClick = (targetStep: number) => {
+    if (targetStep >= 1 && targetStep <= TOTAL_STEPS) {
+      setStep(targetStep);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const saveProfileAndFinish = async () => {
     try {
       setIsSaving(true);
-      setError(null);
       await profileService.saveProfile(data);
       localStorage.removeItem("onboardingData");
       
-      // ✅ ALWAYS Redirect to Home. Home Page handles the Paywall logic.
       if (onComplete) {
         onComplete();
+      }
+
+      // ✅ GENDER GATEKEEPER LOGIC
+      // Normalize gender check (handle "Male", "male", "Man", "man")
+      const gender = data.gender ? data.gender.toLowerCase() : "";
+      
+      if (gender === 'man' || gender === 'male' || gender === 'm') {
+          // Male users -> Redirect to Premium Page
+          navigate("/premium", { replace: true });
       } else {
-        navigate("/home", { replace: true });
+          // Female users -> Redirect to Home Page
+          navigate("/home", { replace: true });
       }
 
     } catch (err) {
       console.error("❌ Profile save failed:", err);
-      setError("Failed to save profile. Please try again.");
     } finally {
       setIsSaving(false);
     }
   };
 
   const renderStep = () => {
+    // Common props for all steps
+    const commonProps = {
+      data,
+      onChange: setStepData,
+      onNext: goNext,
+      onBack: goBack,
+      onSkip: handleSkip,
+      isSaving,
+      onboardingData: data, // Full data for progress calculation
+      onStepClick: handleStepClick,
+    };
+
     switch (step) {
-      case 1: return <Step1BasicInfo data={data} onChange={setStepData} onNext={goNext} onSkip={handleSkip} />;
-      case 2: return <Step2Orientation data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 3: return <Step3Lifestyle data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 4: return <Step4Communication data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 5: return <Step5Interests data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 6: return <Step6Location data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 7: return <Step7Photos data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 8: return <Step8Bio data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      case 9: return <Step9Social data={data} onChange={setStepData} onNext={goNext} onBack={goBack} onSkip={handleSkip} />;
-      default: return <Step10Review data={data} onNext={saveProfileAndFinish} onBack={goBack} onSkip={handleSkip} />;
+      case 1: return <Step1BasicInfo {...commonProps} />;
+      case 2: return <Step2Orientation {...commonProps} />;
+      case 3: return <Step3Distance {...commonProps} />;
+      case 4: return <Step4Lifestyle {...commonProps} />;
+      case 5: return <Step5Communication {...commonProps} />;
+      case 6: return <Step6Interests {...commonProps} />;
+      case 7: return <Step7Location {...commonProps} />;
+      case 8: return <Step8Photos {...commonProps} />;
+      case 9: return <Step9Bio {...commonProps} />;
+      case 10: return <Step10Social {...commonProps} />;
+      case 11: return <Step11Review {...commonProps} onNext={saveProfileAndFinish} />;
+      default: return <Step1BasicInfo {...commonProps} />;
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

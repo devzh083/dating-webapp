@@ -1,3 +1,4 @@
+from datetime import timedelta, timezone
 from decimal import Decimal
 from rest_framework import status
 from rest_framework.views import APIView
@@ -10,8 +11,9 @@ from django.contrib.auth import authenticate, get_user_model
 from django.conf import settings
 from django.shortcuts import redirect
 from django.core.mail import send_mail
+from django.db import transaction
 from django.core.cache import cache
-from .models import Match, Like, Payment
+from .models import Match, Like, Notification, Payment, UserSubscription
 
 import hmac
 import hashlib
@@ -30,7 +32,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from admin_panel.models import PremiumPlan, PromoCode, UserReport
-from login.serializers import CreateUserReportSerializer
+from login.serializers import CreateUserReportSerializer, NotificationSerializer
 from login.models import Match
 
 from config.firebase import db
@@ -227,7 +229,294 @@ def is_blocked(sender, receiver):
 
 
 # ---------- Auth / Profile Views ----------
+# Add this function after send_otp_email() in your views.py
 
+def send_password_reset_email(email, otp):
+    """Send password reset OTP email"""
+    subject = "Reset Your Password - The Dating App"
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER)
+    
+    # Format OTP digits with spaces
+    otp_digits = ' '.join(list(str(otp)))
+    
+    html_message = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Reset Your Password</title>
+    </head>
+    <body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; background-color: #ffffff;">
+        
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; width: 100%;">
+            <tr>
+                <td align="center" style="padding: 40px 20px;">
+                    
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin: 0 auto;">
+                        
+                        <!-- Header -->
+                        <tr>
+                            <td style="padding: 0 0 30px 0; text-align: left;">
+                                <h1 style="margin: 0; font-size: 28px; font-weight: 700; background: linear-gradient(90deg, #0095E0 0%, #00C98B 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                                    The Dating App
+                                </h1>
+                            </td>
+                        </tr>
+
+                        <!-- Main Content -->
+                        <tr>
+                            <td style="padding: 0 0 30px 0;">
+                                <h2 style="margin: 0 0 20px 0; color: #000000; font-size: 24px; font-weight: 700; line-height: 1.3;">
+                                    Reset your password
+                                </h2>
+                                
+                                <p style="margin: 0 0 20px 0; color: #000000; font-size: 16px; line-height: 1.5;">
+                                    We received a request to reset your password. Enter this code to continue:
+                                </p>
+
+                                <!-- OTP Code Display -->
+                                <div style="margin: 30px 0; text-align: left;">
+                                    <span style="display: inline-block; color: #000000; font-size: 48px; font-weight: 700; letter-spacing: 12px; padding: 20px 0;">
+                                        {otp_digits}
+                                    </span>
+                                </div>
+
+                                <p style="margin: 0 0 20px 0; color: #000000; font-size: 16px; line-height: 1.5;">
+                                    This code will expire in <strong>5 minutes</strong>.
+                                </p>
+
+                                <p style="margin: 0 0 20px 0; color: #737373; font-size: 14px; line-height: 1.5;">
+                                    If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+                                </p>
+
+                                <p style="margin: 0; color: #737373; font-size: 14px; line-height: 1.5;">
+                                    For security, please don't share this code with anyone.
+                                </p>
+                            </td>
+                        </tr>
+
+                        <!-- Signature -->
+                        <tr>
+                            <td style="padding: 20px 0 40px 0;">
+                                <p style="margin: 0; color: #000000; font-size: 16px; font-weight: 600;">
+                                    The Dating App team
+                                </p>
+                            </td>
+                        </tr>
+
+                        <!-- Footer Links -->
+                        <tr>
+                            <td style="padding: 20px 0 0 0; border-top: 1px solid #e6e6e6;">
+                                <p style="margin: 0 0 15px 0; color: #737373; font-size: 13px; line-height: 1.6;">
+                                    <a href="#" style="color: #0095E0; text-decoration: none;">Help Centre</a> | 
+                                    <a href="#" style="color: #0095E0; text-decoration: none;">Terms of Use</a> | 
+                                    <a href="#" style="color: #0095E0; text-decoration: none;">Privacy</a>
+                                </p>
+                                
+                                <p style="margin: 0; color: #737373; font-size: 11px; line-height: 1.5;">
+                                    This message was emailed to {email} by The Dating App.
+                                </p>
+                                
+                                <p style="margin: 10px 0 0 0; color: #737373; font-size: 11px; line-height: 1.5;">
+                                    Made with ❤️ in Hyderabad
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    plain_message = f"""
+The Dating App
+
+Reset your password
+
+We received a request to reset your password. Enter this code to continue:
+
+{otp_digits}
+
+This code will expire in 5 minutes.
+
+If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+
+For security, please don't share this code with anyone.
+
+The Dating App team
+
+---
+Help Centre | Terms of Use | Privacy
+
+This message was emailed to {email} by The Dating App.
+Made with ❤️ in Hyderabad
+    """.strip()
+
+    send_mail(
+        subject=subject,
+        message=plain_message,
+        from_email=from_email,
+        recipient_list=[email],
+        html_message=html_message
+    )
+
+
+# ---------- Password Reset Views ----------
+# Add these views at the end of your views.py file
+
+class ForgotPasswordView(APIView):
+    """
+    Step 1: User enters email, receives OTP for password reset
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        
+        if not email:
+            return Response(
+                {"detail": "Email is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check if user exists
+        try:
+            user = User.objects.get(username=email)
+        except User.DoesNotExist:
+            # For security, don't reveal if email exists
+            # But still return success to prevent user enumeration
+            return Response(
+                {"message": "If this email exists, a password reset code has been sent"},
+                status=status.HTTP_200_OK,
+            )
+
+        # Generate OTP
+        otp = generate_otp()
+        
+        # Send password reset email
+        send_password_reset_email(email, otp)
+        
+        # Cache OTP with different key than login OTP
+        cache.set(f"reset_otp_{email}", otp, timeout=300)  # 5 minutes
+
+        return Response(
+            {"message": "Password reset code sent to your email"},
+            status=status.HTTP_200_OK,
+        )
+
+
+class VerifyResetOTPView(APIView):
+    """
+    Step 2: Verify OTP before allowing password reset
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        otp = request.data.get("otp")
+
+        if not email or not otp:
+            return Response(
+                {"detail": "Email and OTP are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cache_key = f"reset_otp_{email}"
+        saved_otp = cache.get(cache_key)
+
+        if not saved_otp:
+            return Response(
+                {"detail": "OTP expired or not found"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if str(saved_otp) != str(otp):
+            return Response(
+                {"detail": "Invalid OTP"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # OTP verified - generate a temporary token for password reset
+        reset_token = generate_otp(length=32)  # Longer token for security
+        cache.set(f"reset_token_{email}", reset_token, timeout=600)  # 10 minutes
+        
+        # Don't delete OTP yet - will delete after password is actually reset
+        
+        return Response(
+            {
+                "message": "OTP verified",
+                "reset_token": reset_token,
+                "email": email,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResetPasswordView(APIView):
+    """
+    Step 3: Actually reset the password using the verified token
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        reset_token = request.data.get("reset_token")
+        new_password = request.data.get("new_password")
+        confirm_password = request.data.get("confirm_password")
+
+        if not all([email, reset_token, new_password, confirm_password]):
+            return Response(
+                {"detail": "All fields are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if new_password != confirm_password:
+            return Response(
+                {"detail": "Passwords do not match"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(new_password) < 8:
+            return Response(
+                {"detail": "Password must be at least 8 characters"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Verify reset token
+        cache_key = f"reset_token_{email}"
+        saved_token = cache.get(cache_key)
+
+        if not saved_token or saved_token != reset_token:
+            return Response(
+                {"detail": "Invalid or expired reset token"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get user and reset password
+        try:
+            user = User.objects.get(username=email)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Set new password
+        user.set_password(new_password)
+        user.save()
+
+        # Clean up cache
+        cache.delete(cache_key)
+        cache.delete(f"reset_otp_{email}")
+
+        return Response(
+            {"message": "Password reset successful. You can now login with your new password."},
+            status=status.HTTP_200_OK,
+        )
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -1028,6 +1317,42 @@ class MatchRecommendationsView(APIView):
         return Response(results)
 
 
+#     def post(self, request):
+#         from_email = request.user.username
+#         to_email = request.data.get("to_email")
+
+#         if not to_email:
+#             return Response(
+#                 {"error": "to_email is required"},
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         result = FirebaseLikeManager.send_like(
+#             from_email=from_email,
+#             to_email=to_email
+#         )
+
+#         if result.get("status") == "matched":
+#             match = result.get("match")
+
+#             try:
+#                 to_user = User.objects.get(username=to_email)
+#             except User.DoesNotExist:
+#                 pass
+#             else:
+#                 notify_user(
+#                     to_user.id,
+#                     {
+#                         "type": "MATCH_CREATED",
+#                         "match_id": match["match_id"],
+#                         "chat_id": match["chat_id"],
+#                         "from_email": from_email,
+#                     }
+#                 )
+
+
+#         return Response(result, status=status.HTTP_200_OK)
+
 class LikeProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1041,37 +1366,68 @@ class LikeProfileView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if from_email == to_email:
+            return Response(
+                {"error": "You cannot like yourself"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 🔁 Send like via Firebase (or any matching engine)
         result = FirebaseLikeManager.send_like(
             from_email=from_email,
             to_email=to_email
         )
 
-        # 🔔 If matched → notify both users
+        # ❤️ MATCH CREATED
         if result.get("status") == "matched":
-            match = result["match"]
+            match_data = result["match"]
 
+            with transaction.atomic():
+                match = Match.objects.get(id=match_data["match_id"])
+
+                # 🔔 Create notifications (per user)
+                Notification.objects.bulk_create([
+                    Notification(
+                        user=from_email,
+                        type="MATCH_CREATED",
+                        match=match,
+                        chat_id=match_data["chat_id"]
+                    ),
+                    Notification(
+                        user=to_email,
+                        type="MATCH_CREATED",
+                        match=match,
+                        chat_id=match_data["chat_id"]
+                    )
+                ])
+
+            # ⚡ Realtime push (socket / firebase)
             notify_user(from_email, {
                 "type": "MATCH_CREATED",
-                "match_id": match["match_id"],
-                "chat_id": match["chat_id"],
-                "from_email": to_email,
+                "match_id": match.id,
+                "chat_id": match.chat_id,
+                "other_user": to_email
             })
 
             notify_user(to_email, {
                 "type": "MATCH_CREATED",
-                "match_id": match["match_id"],
-                "chat_id": match["chat_id"],
-                "from_email": from_email,
+                "match_id": match.id,
+                "chat_id": match.chat_id,
+                "other_user": from_email
             })
 
-            # 🔥 VERY IMPORTANT: flatten response for frontend
+            # 📦 Frontend-friendly response
             return Response({
                 "status": "matched",
-                "match_id": match["match_id"],
-                "chat_id": match["chat_id"],
+                "match_id": match.id,
+                "chat_id": match.chat_id
             }, status=status.HTTP_200_OK)
 
-        return Response(result, status=status.HTTP_200_OK)
+        # 👍 Like sent, but no match yet
+        return Response({
+            "status": "liked",
+            "message": "Like sent successfully"
+        }, status=status.HTTP_200_OK)
 
 
 
@@ -1373,26 +1729,30 @@ class CreateOrderView(APIView):
         })
 
 
+
 class VerifyPaymentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        user = request.user
         data = request.data
 
-        order_id = data.get("razorpay_order_id")
-        payment_id = data.get("razorpay_payment_id")
-        signature = data.get("razorpay_signature")
+        order_id = data["razorpay_order_id"]
+        payment_id = data["razorpay_payment_id"]
+        signature = data["razorpay_signature"]
+        plan_id = data["plan_id"]
+        duration = int(data["duration"])  # months
 
-        body = f"{order_id}|{payment_id}"
-
+        # 1️⃣ Signature verification
+        payload = f"{order_id}|{payment_id}"
         expected_signature = hmac.new(
             settings.RAZORPAY_KEY_SECRET.encode(),
-            body.encode(),
+            payload.encode(),
             hashlib.sha256
         ).hexdigest()
 
         if expected_signature != signature:
-            return Response({"error": "Invalid signature"}, status=400)
+            return Response({"error": "Invalid payment"}, status=400)
 
         # Activate premium in SQL (The source of truth)
         try:
@@ -1451,3 +1811,68 @@ class UserNotificationsView(APIView):
             })
 
         return Response(notifications, status=status.HTTP_200_OK)
+        # 2️⃣ Create subscription
+        UserSubscription.objects.update_or_create(
+            user=user,
+            defaults={
+                "plan_id": plan_id,
+                "razorpay_order_id": order_id,
+                "razorpay_payment_id": payment_id,
+                "razorpay_signature": signature,
+                "end_date": timezone.now() + timedelta(days=30 * duration),
+                "is_active": True,
+            }
+        )
+
+        return Response({"success": True})
+
+class MarkNotificationReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        notification_id = request.data.get("notification_id")
+        email = request.user.email.lower()
+
+        Notification.objects.filter(
+            id=notification_id,
+            user=email
+        ).update(is_read=True)
+
+        return Response({"status": "ok"}, status=200)
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        email = request.user.email.lower()
+
+        notifications = Notification.objects.filter(
+            user=email,
+            is_read=False
+        )
+
+        return Response(NotificationSerializer(notifications, many=True).data)
+
+class MarkAllNotificationsReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        email = request.user.email.lower()
+
+        Notification.objects.filter(user=email, is_read=False).update(is_read=True)
+
+        return Response({"status": "all_read"})
+
+
+class UnreadNotificationCountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        email = request.user.email.lower()
+
+        count = Notification.objects.filter(
+            user=email,
+            is_read=False
+        ).count()
+
+        return Response({"unread_count": count})
