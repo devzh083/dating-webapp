@@ -405,3 +405,20 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=8, decimal_places=2)
     status = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
+
+class Notification(models.Model):
+    user = models.EmailField()  # receiver
+    type = models.CharField(max_length=50)
+    match = models.ForeignKey(
+        Match,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+    chat_id = models.IntegerField(null=True, blank=True)
+
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

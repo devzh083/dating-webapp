@@ -11,12 +11,12 @@ from django.conf import settings
 from django.shortcuts import redirect
 from django.core.mail import send_mail
 from django.core.cache import cache
-from .models import Match, Like, Payment
+from .models import Match, Like, Notification, Payment
 
 import hmac
 import hashlib
 from django.conf import settings
-
+from django.db import transaction
 
 import urllib.parse
 import requests
@@ -30,7 +30,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from admin_panel.models import PremiumPlan, PromoCode, UserReport
-from login.serializers import CreateUserReportSerializer
+from login.serializers import CreateUserReportSerializer, NotificationSerializer
 from login.models import Match
 
 from config.firebase import db
@@ -1041,38 +1041,68 @@ class LikeProfileView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if from_email == to_email:
+            return Response(
+                {"error": "You cannot like yourself"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 🔁 Send like via Firebase (or any matching engine)
         result = FirebaseLikeManager.send_like(
             from_email=from_email,
             to_email=to_email
         )
 
-        # 🔔 If matched → notify both users
+        # ❤️ MATCH CREATED
         if result.get("status") == "matched":
-            match = result["match"]
+            match_data = result["match"]
 
+            with transaction.atomic():
+                match = Match.objects.get(id=match_data["match_id"])
+
+                # 🔔 Create notifications (per user)
+                Notification.objects.bulk_create([
+                    Notification(
+                        user=from_email,
+                        type="MATCH_CREATED",
+                        match=match,
+                        chat_id=match_data["chat_id"]
+                    ),
+                    Notification(
+                        user=to_email,
+                        type="MATCH_CREATED",
+                        match=match,
+                        chat_id=match_data["chat_id"]
+                    )
+                ])
+
+            # ⚡ Realtime push (socket / firebase)
             notify_user(from_email, {
                 "type": "MATCH_CREATED",
-                "match_id": match["match_id"],
-                "chat_id": match["chat_id"],
-                "from_email": to_email,
+                "match_id": match.id,
+                "chat_id": match.chat_id,
+                "other_user": to_email
             })
 
             notify_user(to_email, {
                 "type": "MATCH_CREATED",
-                "match_id": match["match_id"],
-                "chat_id": match["chat_id"],
-                "from_email": from_email,
+                "match_id": match.id,
+                "chat_id": match.chat_id,
+                "other_user": from_email
             })
 
-            # 🔥 VERY IMPORTANT: flatten response for frontend
+            # 📦 Frontend-friendly response
             return Response({
                 "status": "matched",
-                "match_id": match["match_id"],
-                "chat_id": match["chat_id"],
+                "match_id": match.id,
+                "chat_id": match.chat_id
             }, status=status.HTTP_200_OK)
 
-        return Response(result, status=status.HTTP_200_OK)
-
+        # 👍 Like sent, but no match yet
+        return Response({
+            "status": "liked",
+            "message": "Like sent successfully"
+        }, status=status.HTTP_200_OK)
 
 
 class MatchedChatsView(APIView):
@@ -1451,3 +1481,53 @@ class UserNotificationsView(APIView):
             })
 
         return Response(notifications, status=status.HTTP_200_OK)
+
+class MarkNotificationReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        notification_id = request.data.get("notification_id")
+        email = request.user.email.lower()
+
+        Notification.objects.filter(
+            id=notification_id,
+            user=email
+        ).update(is_read=True)
+
+        return Response({"status": "ok"}, status=200)
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        email = request.user.email.lower()
+
+        notifications = Notification.objects.filter(
+            user=email,
+            is_read=False
+        )
+
+        return Response(NotificationSerializer(notifications, many=True).data)
+
+class UnreadNotificationCountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        email = request.user.email.lower()
+
+        count = Notification.objects.filter(
+            user=email,
+            is_read=False
+        ).count()
+
+        return Response({"unread_count": count})
+
+class MarkAllNotificationsReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        email = request.user.email.lower()
+
+        Notification.objects.filter(user=email, is_read=False).update(is_read=True)
+
+        return Response({"status": "all_read"})

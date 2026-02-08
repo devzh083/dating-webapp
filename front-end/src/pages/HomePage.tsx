@@ -17,6 +17,12 @@ import Footer from "@/components/layout/Footer";
 
 /* ---------------- SERVICES & TYPES ---------------- */
 import { profileService } from "@/services/profileService";
+import { OnboardingData } from "@/components/onboarding/OnboardingFlow";
+
+interface ExtendedOnboardingData extends OnboardingData {
+  isPremium: boolean;
+}
+
 
 interface MatchApiResponse {
   similarity: number;
@@ -64,7 +70,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
   const [error, setError] = useState<string | null>(null);
   
   // Stores full user profile data
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<ExtendedOnboardingData | null>(null);
 
   // Story Submission State
   const [storyText, setStoryText] = useState("");
@@ -81,26 +87,54 @@ const HomePage = ({ onLogout }: HomePageProps) => {
 
   /* -------- 1. FETCH USER PROFILE -------- */
   const fetchUserProfile = async () => {
-    try {
-      setLoadingProfile(true);
-      const result = await profileService.getProfile();
-      if (result.exists && result.data) {
-        console.log("👤 USER PROFILE LOADED:", result.data);
-        setUserProfile(result.data);
-      }
-    } catch (err) {
-      console.error("Error fetching user profile:", err);
-    } finally {
-      setLoadingProfile(false);
+  try {
+    setLoadingProfile(true);
+
+    const result = await profileService.getProfile();
+
+    if (result.exists && result.data) {
+      console.log("👤 USER PROFILE LOADED:", result.data);
+
+      const normalizedProfile: ExtendedOnboardingData = {
+        ...result.data,
+        // ⛔ premium is NOT in OnboardingData, extract safely
+        isPremium: Boolean((result as any)?.data?.premium),
+      };
+
+      setUserProfile(normalizedProfile);
     }
-  };
+  } catch (err) {
+    console.error("Error fetching user profile:", err);
+  } finally {
+    setLoadingProfile(false);
+  }
+};
+
 
   useEffect(() => {
     fetchUserProfile();
   }, []);
 
+  const gender = userProfile?.gender?.toLowerCase() || "";
+  const isMale = ["male", "man", "m"].includes(gender);
+  const isFemale = ["female", "woman", "f"].includes(gender);
+
+  const isPremium = userProfile?.isPremium === true;
+
+  const isPaywalled =
+    !loadingProfile && userProfile !== null && isMale && !isPremium;
+
+
+  
   /* -------- 2. FETCH MATCHES -------- */
-  useEffect(() => {
+   useEffect(() => {
+    if (loadingProfile) return;
+
+    if (isPaywalled) {
+      setLoadingMatches(false);
+      return;
+    }
+
     const fetchMatches = async () => {
       try {
         setLoadingMatches(true);
@@ -126,7 +160,8 @@ const HomePage = ({ onLogout }: HomePageProps) => {
               item.profile.first_name ||
               "No description available",
             conversationHook:
-              item.profile.conversation_starter || "Tell me about yourself!",
+              item.profile.conversation_starter ||
+              "Tell me about yourself!",
             vibeTags: getRandomInterests(item.profile.interests),
           }))
         );
@@ -138,7 +173,7 @@ const HomePage = ({ onLogout }: HomePageProps) => {
     };
 
     fetchMatches();
-  }, []);
+  }, [loadingProfile, isPaywalled]);
 
   /* -------- 3. WEBSOCKET REALTIME -------- */
   useEffect(() => {
@@ -248,14 +283,19 @@ const HomePage = ({ onLogout }: HomePageProps) => {
 
   /* -------- LOGIC: ACCESS CONTROL -------- */
   
-  const gender = userProfile?.gender?.toLowerCase() || "";
-  const isMale = gender === 'male' || gender === 'man' || gender === 'm';
-  const isFemale = gender === 'female' || gender === 'woman' || gender === 'f';
-  const isPremium = !!userProfile?.premium;
+  // const gender = userProfile?.gender?.toLowerCase() || "";
+  // const isMale = ["male", "man", "m"].includes(gender);
+  // const isFemale = ["female", "woman", "f"].includes(gender);
 
-  // Paywall Condition: If Male AND Not Premium -> Show Banner
-  // Only calculate this if profile has finished loading
-  const isPaywalled = !loadingProfile && isMale && !isPremium;
+  // // 🔐 ONLY trust normalized value
+  // const isPremium = userProfile?.isPremium === true;
+
+  // // ⛔ DO NOT show paywall until profile is fully ready
+  // const isPaywalled =
+  //   !loadingProfile &&
+  //   userProfile !== null &&
+  //   isMale &&
+  //   !isPremium;
 
   /* ================= RENDER ================= */
 

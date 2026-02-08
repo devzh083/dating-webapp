@@ -42,6 +42,7 @@ export type OnboardingData = {
     twitter: string;
     linkedin: string;
   };
+  premium?: boolean;
 };
 
 const initialData: OnboardingData = {

@@ -132,6 +132,8 @@ const parseProfileData = (apiData: any): OnboardingData => {
       twitter: '',
       linkedin: '',
     }),
+
+    premium: getBooleanField('premium', 'premium', false),
   };
   
   console.log('[profileService] Parsed data:', parsed);
