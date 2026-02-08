@@ -119,4 +119,4 @@ export default function ForgotPassword({
       </div>
     </motion.div>
   );
-}
+} 
