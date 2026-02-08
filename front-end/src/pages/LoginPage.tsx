@@ -7,11 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import OtpVerification from "@/components/auth/OtpVerification";
-import ForgotPassword from "@/components/auth/Forgotpassword";
-import ResetPasswordOTP from "@/components/auth/Resetpasswordotp";
-import NewPassword from "@/components/auth/Newpassword";
 
-type AuthView = "login" | "signup" | "otp" | "forgot-password" | "reset-otp" | "new-password";
+type AuthView = "login" | "signup" | "otp";
 
 type LoginPageProps = {
   isLoggedIn?: boolean;
@@ -33,7 +30,6 @@ export default function LoginPage({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [resetToken, setResetToken] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -114,6 +110,7 @@ export default function LoginPage({
         localStorage.setItem("user_email", user.email.toLowerCase());
 
         // Check if this user is actually an admin
+        // Try to access admin endpoint with the JWT token
         const adminCheckRes = await fetch(`${API_BASE_URL}/admin/dashboard/stats/`, {
           headers: { 
             Authorization: `Bearer ${access}`,
@@ -149,7 +146,7 @@ export default function LoginPage({
       if (adminRes.ok) {
         const adminData = await adminRes.json();
         
-        // Store admin token
+        // Store admin token (Token-based auth)
         localStorage.setItem("admin_token", adminData.token);
         localStorage.setItem("admin_user", JSON.stringify(adminData.user));
         
@@ -230,19 +227,6 @@ export default function LoginPage({
     }
   };
 
-  /* ---------------- RESEND PASSWORD RESET OTP ---------------- */
-  const handleResendResetOtp = async () => {
-    try {
-      await fetch(`${API_BASE_URL}/password/forgot/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
-      });
-    } catch {
-      // optional: setErrorMsg("Failed to resend reset code");
-    }
-  };
-
   /* ---------------- GOOGLE LOGIN ---------------- */
   const handleGoogleLogin = async () => {
     setErrorMsg(null);
@@ -266,6 +250,7 @@ export default function LoginPage({
       {/* Top Bar */}
       <nav className="w-full bg-white">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-10 py-3.5">
+          {/* Left: Branding */}
           <Link to="/" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#02b2f6] flex items-center justify-center shadow-sm">
               <Heart className="w-4 h-4 text-white fill-white" />
@@ -275,6 +260,7 @@ export default function LoginPage({
             </span>
           </Link>
 
+          {/* Right: Action Button */}
           <div className="flex items-center gap-3">
             <Button
               className="rounded-full px-6 py-2 text-[12px] font-semibold text-white bg-gradient-to-r from-[#02b2f6] to-[#09cf8b] hover:opacity-90 shadow-sm"
@@ -300,42 +286,6 @@ export default function LoginPage({
               }}
               onResend={handleResendOtp}
               onBack={() => setView("login")}
-            />
-          ) : view === "forgot-password" ? (
-            <ForgotPassword
-              key="forgot-password"
-              apiBaseUrl={API_BASE_URL}
-              onBack={() => setView("login")}
-              onOtpSent={(resetEmail) => {
-                setEmail(resetEmail);
-                setView("reset-otp");
-              }}
-            />
-          ) : view === "reset-otp" ? (
-            <ResetPasswordOTP
-              key="reset-otp"
-              email={email}
-              apiBaseUrl={API_BASE_URL}
-              onVerified={(verifiedEmail, token) => {
-                setEmail(verifiedEmail);
-                setResetToken(token);
-                setView("new-password");
-              }}
-              onBack={() => setView("forgot-password")}
-              onResend={handleResendResetOtp}
-            />
-          ) : view === "new-password" ? (
-            <NewPassword
-              key="new-password"
-              email={email}
-              resetToken={resetToken}
-              apiBaseUrl={API_BASE_URL}
-              onSuccess={() => {
-                setView("login");
-                setPassword("");
-                setEmail("");
-              }}
-              onBack={() => setView("reset-otp")}
             />
           ) : view === "signup" ? (
             /* ---------------- SIGNUP VIEW ---------------- */
@@ -563,17 +513,6 @@ export default function LoginPage({
                         )}
                       </button>
                     </div>
-                  </div>
-
-                  {/* Forgot Password Link */}
-                  <div className="text-right">
-                    <button
-                      type="button"
-                      onClick={() => setView("forgot-password")}
-                      className="text-[11px] text-[#16a3ff] hover:underline font-medium"
-                    >
-                      Forgot password?
-                    </button>
                   </div>
 
                   {errorMsg && (

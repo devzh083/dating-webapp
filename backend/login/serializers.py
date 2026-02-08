@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Match, Message, Notification
+from .models import Match, Message
 from admin_panel.models import UserReport
 from django.contrib.auth.models import User
 
@@ -53,31 +53,3 @@ class CreateUserReportSerializer(serializers.Serializer):
     chat_id = serializers.IntegerField()
     reason = serializers.CharField()
     description = serializers.CharField(required=False)
-
-class NotificationSerializer(serializers.ModelSerializer):
-    match_id = serializers.IntegerField(source="match.id", read_only=True)
-    other_user = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Notification
-        fields = [
-            "id",
-            "type",
-            "match_id",
-            "chat_id",
-            "other_user",
-            "is_read",
-            "created_at",
-        ]
-
-    def get_other_user(self, obj):
-        request = self.context.get("request")
-
-        if not request or not obj.match:
-            return None
-
-        email = request.user.email.lower()
-
-        if obj.match.user_a == email:
-            return obj.match.user_b
-        return obj.match.user_a

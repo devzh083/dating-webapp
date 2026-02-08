@@ -19,7 +19,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'gender',
             'show_gender',
             'interested_in',
-            'relationship_type',  # ✅ NEW FIELD
             'distance',
             'strict_distance',
             'drinking',
@@ -72,15 +71,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if value and value not in valid_genders:
             raise serializers.ValidationError(
                 f"Gender must be one of: {', '.join(valid_genders)}"
-            )
-        return value
-    
-    def validate_relationship_type(self, value):
-        """Validate relationship type is one of the allowed values"""
-        valid_types = ['Single', 'Committed', 'Broken up recently', 'Divorced', 'Widowed']
-        if value and value not in valid_types:
-            raise serializers.ValidationError(
-                f"Relationship type must be one of: {', '.join(valid_types)}"
             )
         return value
     

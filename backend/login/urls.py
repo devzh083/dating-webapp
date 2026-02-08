@@ -48,30 +48,6 @@ urlpatterns = [
 
     path('reports/', views.CreateUserReportView.as_view(), name='create-report'),
 
-     path(
-        "notifications/",
-        views.NotificationListView.as_view(),
-        name="notification-list",
-    ),
-    path(
-        "notifications/read/",
-        views.MarkNotificationReadView.as_view(),
-        name="notification-read",
-    ),
-    path(
-        "notifications/read-all/",
-        views.MarkAllNotificationsReadView.as_view(),
-        name="notification-read-all",
-    ),
-    path(
-        "notifications/unread-count/",
-        views.UnreadNotificationCountView.as_view(),
-        name="notification-unread-count",
-    ),
-    path("create-order/", views.CreateOrderView.as_view()),
-    path("verify-payment/", views.VerifyPaymentView.as_view()),
-
-    path("password/forgot/", views.ForgotPasswordView.as_view(), name="forgot-password"),
-    path("password/verify-otp/", views.VerifyResetOTPView.as_view(), name="verify-reset-otp"),
-    path("password/reset/", views.ResetPasswordView.as_view(), name="reset-password"),
+     path("create-order/", views.CreateOrderView.as_view()),
+    path("verify-payment/", views.VerifyPaymentView.as_view())
 ]

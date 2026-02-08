@@ -24,10 +24,7 @@ from .views import (
     # promo-code
     PromoCodeViewSet,
     ValidatePromoCodeView, 
-    RedeemPromoCodeView,
-    # ✅ Payment endpoints
-    CreateOrderView,
-    VerifyPaymentView,
+    RedeemPromoCodeView,   
 )
 
 # Create router for ViewSets
@@ -60,6 +57,7 @@ urlpatterns = [
     path('reviews/<int:pk>/reject/', RejectReviewView.as_view(), name='reject-review'),
     path('reviews/bulk_approve/', BulkApproveReviewsView.as_view(), name='bulk-approve-reviews'),
     path('reviews/bulk_reject/', BulkRejectReviewsView.as_view(), name='bulk-reject-reviews'),
+    
     
     # Include all router URLs
     path('', include(router.urls)),

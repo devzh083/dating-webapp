@@ -2,7 +2,6 @@ from datetime import datetime
 
 from django.conf import settings 
 from admin_panel.models import PremiumPlan
-from profiles.management.commands.create_sample_users import User
 from config.firebase import db
 from firebase_admin import firestore
 from django.db import models
@@ -406,34 +405,3 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=8, decimal_places=2)
     status = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
-
-# models.py
-class UserSubscription(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    plan_id = models.CharField(max_length=100)
-    razorpay_order_id = models.CharField(max_length=100)
-    razorpay_payment_id = models.CharField(max_length=100)
-    razorpay_signature = models.CharField(max_length=255)
-
-    start_date = models.DateTimeField(auto_now_add=True)
-    end_date = models.DateTimeField()
-    is_active = models.BooleanField(default=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-class Notification(models.Model):
-    user = models.EmailField()  # receiver
-    type = models.CharField(max_length=50)
-    match = models.ForeignKey(
-        Match,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True
-    )
-    chat_id = models.IntegerField(null=True, blank=True)
-
-    is_read = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-created_at"]

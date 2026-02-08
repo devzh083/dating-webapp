@@ -4,6 +4,7 @@ from django.utils import timezone
 from decimal import Decimal
 # Ensure you have the 'profiles' app. If not, comment this import out.
 from profiles.models import UserProfile 
+from profiles.models import UserProfile
 import uuid
 
 
@@ -551,7 +552,9 @@ class FooterSettings(models.Model):
         """Get or create the singleton instance"""
         obj, created = cls.objects.get_or_create(pk=1)
         return obj
+    
 
+# Add at the end of models.py, after FooterSettings
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PROMO CODE SYSTEM
@@ -667,49 +670,6 @@ class PromoCode(models.Model):
         if self.max_uses == 0:
             return 0
         return int((self.current_uses / self.max_uses) * 100)
-
-    # ✅ CRITICAL FIX: Add these methods to fix the AttributeError
-    def apply_discount(self, original_amount):
-        """
-        Apply the discount to the given amount.
-        Returns the final price after discount.
-        
-        Args:
-            original_amount: The original price (can be int, float, or Decimal)
-            
-        Returns:
-            Decimal: The final price after applying discount
-        """
-        if self.discount_percentage <= 0:
-            return Decimal(str(original_amount))
-        
-        # Convert to Decimal for precision
-        original = Decimal(str(original_amount))
-        discount_pct = Decimal(str(self.discount_percentage))
-        
-        # Calculate discount amount
-        discount_amount = (original * discount_pct) / Decimal('100')
-        
-        # Calculate final amount
-        final_amount = original - discount_amount
-        
-        # Ensure we don't return negative amounts
-        return max(Decimal('0'), final_amount)
-    
-    def get_discount_amount(self, original_amount):
-        """
-        Get the actual discount amount (not the final price).
-        
-        Args:
-            original_amount: The original price
-            
-        Returns:
-            Decimal: The discount amount
-        """
-        original = Decimal(str(original_amount))
-        discount_pct = Decimal(str(self.discount_percentage))
-        
-        return (original * discount_pct) / Decimal('100')
 
     def can_be_used_by(self, user):
         """Check if a specific user can use this code"""

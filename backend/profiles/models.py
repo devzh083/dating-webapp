@@ -20,38 +20,35 @@ class UserProfile(models.Model):
     # Interested In choices: "Men", "Women", or "Everyone"
     interested_in = models.JSONField(default=list, blank=True)
     
-    # Step 2: Relationship Status
-    relationship_type = models.CharField(max_length=50, blank=True)
-    
-    # Step 3: Distance
+    # Step 2: Distance
     distance = models.IntegerField(default=25)
     strict_distance = models.BooleanField(default=False)
     
-    # Step 4: Lifestyle
+    # Step 3: Lifestyle
     drinking = models.CharField(max_length=50, blank=True)
     smoking = models.CharField(max_length=50, blank=True)
     workout = models.CharField(max_length=50, blank=True)
     pets = models.CharField(max_length=50, blank=True)
     
-    # Step 5: Communication
+    # Step 4: Communication
     communication_style = models.JSONField(default=list, blank=True)
     response_pace = models.CharField(max_length=100, blank=True)
     
-    # Step 6: Interests
+    # Step 5: Interests
     interests = models.JSONField(default=list, blank=True)
     
-    # Step 7: Location
+    # Step 6: Location
     location = models.CharField(max_length=200, blank=True)
     use_current_location = models.BooleanField(default=False)
     
-    # Step 8: Photos
+    # Step 7: Photos
     photos = models.JSONField(default=list, blank=True)
     
-    # Step 9: Bio
+    # Step 8: Bio
     bio = models.TextField(max_length=500, blank=True)
     conversation_starter = models.CharField(max_length=300, blank=True)
     
-    # Step 10: Social Accounts
+    # Step 9: Social Accounts
     social_accounts = models.JSONField(default=dict, blank=True)
     
     # ===== ADMIN PANEL FIELDS =====

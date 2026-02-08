@@ -3,7 +3,6 @@ import { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import ProgressBar from "./ProgressBar";
-import { OnboardingData } from "./OnboardingFlow";
 import { cn } from "@/lib/utils";
 
 interface StepLayoutProps {
@@ -18,9 +17,6 @@ interface StepLayoutProps {
   nextLabel?: string;
   canProceed?: boolean;
   showBack?: boolean;
-  isSaving?: boolean;
-  data?: OnboardingData;
-  onStepClick?: (step: number) => void;
 }
 
 export default function StepLayout({
@@ -35,9 +31,6 @@ export default function StepLayout({
   nextLabel = "Next",
   canProceed = true,
   showBack = true,
-  isSaving = false,
-  data,
-  onStepClick,
 }: StepLayoutProps) {
   return (
     <div className="min-h-screen w-full bg-[#f5fbff] flex items-center justify-center pt-20">
@@ -57,23 +50,15 @@ export default function StepLayout({
                 </button>
               ) : <div />}
 
-              {onSkip && (
-                <button
-                  onClick={onSkip}
-                  className="text-sm font-medium text-gray-500 hover:text-gray-900"
-                >
-                  Skip
-                </button>
-              )}
+              <button
+                onClick={onSkip}
+                className="text-sm font-medium text-gray-500 hover:text-gray-900"
+              >
+                Skip
+              </button>
             </div>
 
-            <ProgressBar 
-              currentStep={currentStep} 
-              totalSteps={totalSteps}
-              isSaving={isSaving}
-              data={data}
-              onStepClick={onStepClick}
-            />
+            <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
 
             <div className="mt-6">
               <h1 className="text-2xl font-semibold text-gray-900">
@@ -103,18 +88,18 @@ export default function StepLayout({
         {/* FOOTER */}
         <footer className="border-t border-gray-200 px-10 py-4 rounded-b-2xl bg-white">
           <motion.button
-            whileHover={{ scale: canProceed && !isSaving ? 1.02 : 1 }}
-            whileTap={{ scale: canProceed && !isSaving ? 0.98 : 1 }}
+            whileHover={{ scale: canProceed ? 1.02 : 1 }}
+            whileTap={{ scale: canProceed ? 0.98 : 1 }}
             onClick={onNext}
-            disabled={!canProceed || isSaving}
+            disabled={!canProceed}
             className={cn(
               "mx-auto block w-[230px] py-3 text-base font-semibold rounded-full transition-all",
-              canProceed && !isSaving
+              canProceed
                 ? "bg-gradient-to-r from-[#00a7ff] via-[#00c2ff] to-[#00cf84] text-white shadow-lg"
                 : "bg-gray-100 text-gray-400 cursor-not-allowed"
             )}
           >
-            {isSaving ? "Saving..." : nextLabel}
+            {nextLabel}
           </motion.button>
         </footer>
       </div>
