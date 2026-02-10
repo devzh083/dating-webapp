@@ -4,7 +4,8 @@ from .models import UserProfile
 class UserProfileSerializer(serializers.ModelSerializer):
     # Read-only field to return username
     username = serializers.CharField(source='user.username', read_only=True)
-    email = serializers.EmailField(source='user.email', read_only=True)
+    email = serializers.EmailField(read_only=True)
+
     
     class Meta:
         model = UserProfile

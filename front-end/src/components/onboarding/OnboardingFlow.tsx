@@ -15,6 +15,8 @@ import Step10Review from "./steps/Step10Review";
 import { profileService } from "../../services/profileService";
 
 export type OnboardingData = {
+  email?: string; // ✅ ADD
+
   firstName: string;
   dateOfBirth: Date | null;
   gender: string;
@@ -46,6 +48,8 @@ export type OnboardingData = {
 };
 
 const initialData: OnboardingData = {
+  email: localStorage.getItem("userEmail") || "",
+
   firstName: "",
   dateOfBirth: null,
   gender: "",
@@ -75,6 +79,7 @@ const initialData: OnboardingData = {
   },
 };
 
+
 const TOTAL_STEPS = 10;
 
 export default function OnboardingFlow({ 
@@ -98,9 +103,11 @@ export default function OnboardingFlow({
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
+
         if (parsed.dateOfBirth) {
           parsed.dateOfBirth = new Date(parsed.dateOfBirth);
         }
+
         setData({ ...initialData, ...parsed });
       } catch (e) {
         console.error("Failed to parse onboarding data", e);
@@ -137,8 +144,12 @@ export default function OnboardingFlow({
   };
 
   const setStepData = (patch: Partial<OnboardingData>) => {
-    setData((prev) => ({ ...prev, ...patch }));
-  };
+  setData((prev) => ({
+    ...prev,
+    ...patch,
+    email: prev.email, // 🔒 lock email
+  }));
+};
 
   const goNext = () => {
     if (step < TOTAL_STEPS) {

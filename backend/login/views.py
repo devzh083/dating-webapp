@@ -1,4 +1,5 @@
 from decimal import Decimal
+import logging
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -1028,18 +1029,28 @@ class MatchRecommendationsView(APIView):
         return Response(results)
 
 
+logger = logging.getLogger(__name__)
+
+
+
+
 class LikeProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from_email = request.user.email.lower()
+        from_email = request.data.get("from_email")
         to_email = request.data.get("to_email")
 
+        # -------------------------
+        # Validation
+        # -------------------------
         if not to_email:
             return Response(
                 {"error": "to_email is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        to_email = to_email.lower()
 
         if from_email == to_email:
             return Response(
@@ -1047,84 +1058,102 @@ class LikeProfileView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 🔁 Send like via Firebase (or any matching engine)
+        # -------------------------
+        # Send like (MySQL)
+        # -------------------------
         result = FirebaseLikeManager.send_like(
             from_email=from_email,
             to_email=to_email
         )
 
-        # ❤️ MATCH CREATED
+        # -------------------------
+        # MATCH CREATED
+        # -------------------------
         if result.get("status") == "matched":
-            match_data = result["match"]
+            match_data = result.get("match")
 
             with transaction.atomic():
-                match = Match.objects.get(id=match_data["match_id"])
+                match = Match.objects.select_for_update().get(
+                    id=match_data["match_id"]
+                )
 
-                # 🔔 Create notifications (per user)
                 Notification.objects.bulk_create([
                     Notification(
                         user=from_email,
                         type="MATCH_CREATED",
                         match=match,
-                        chat_id=match_data["chat_id"]
+                        chat_id=match.chat_id
                     ),
                     Notification(
                         user=to_email,
                         type="MATCH_CREATED",
                         match=match,
-                        chat_id=match_data["chat_id"]
+                        chat_id=match.chat_id
                     )
                 ])
 
-            # ⚡ Realtime push (socket / firebase)
+            # Realtime push
             notify_user(from_email, {
                 "type": "MATCH_CREATED",
                 "match_id": match.id,
                 "chat_id": match.chat_id,
-                "other_user": to_email
+                "me": from_email,
+                "other": to_email
             })
 
             notify_user(to_email, {
                 "type": "MATCH_CREATED",
                 "match_id": match.id,
                 "chat_id": match.chat_id,
-                "other_user": from_email
+                "me": to_email,
+                "other": from_email
             })
 
-            # 📦 Frontend-friendly response
-            return Response({
-                "status": "matched",
-                "match_id": match.id,
-                "chat_id": match.chat_id
-            }, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    "status": "matched",
+                    "match_id": match.id,
+                    "chat_id": match.chat_id
+                },
+                status=status.HTTP_200_OK
+            )
 
-        # 👍 Like sent, but no match yet
-        return Response({
-            "status": "liked",
-            "message": "Like sent successfully"
-        }, status=status.HTTP_200_OK)
+        # -------------------------
+        # Like sent, no match yet
+        # -------------------------
+        return Response(
+            {
+                "status": result.get("status", "liked"),
+                "message": "Like sent successfully"
+            },
+            status=status.HTTP_200_OK
+        )
 
 
 class MatchedChatsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        my_email = request.user.username.lower()
+        # Use email consistently (matches Match.user_a / user_b)
+        my_email = request.user.email.lower()
 
-        matches = Match.objects.filter(
-            Q(user_a=my_email) | Q(user_b=my_email)
-        ).select_related("chat")
+        matches = (
+            Match.objects
+            .filter(Q(user_a=my_email) | Q(user_b=my_email))
+            .select_related("chat")
+        )
 
         chats = []
 
         for match in matches:
-            # Determine other user
-            if match.user_a == my_email:
-                other_email = match.user_b
-            else:
-                other_email = match.user_a
+            # Determine the other user's email
+            other_email = (
+                match.user_b if match.user_a == my_email else match.user_a
+            )
 
-            # ✅ Block checks (MUST be inside loop)
+            # -----------------------------
+            # Block checks
+            # -----------------------------
             is_blocked_by_me = BlockedUser.objects.filter(
                 blocker=my_email,
                 blocked=other_email
@@ -1135,22 +1164,35 @@ class MatchedChatsView(APIView):
                 blocked=my_email
             ).exists()
 
-            profile = FirebaseProfileManager.get_profile(other_email) or {}
+            # -----------------------------
+            # Fetch profile from DB (profiles app)
+            # -----------------------------
+            profile = (
+                UserProfile.objects
+                .filter(email__iexact=other_email)
+                .first()
+            )
+
 
             chats.append({
                 "chat_id": match.chat.id if match.chat else None,
                 "match_id": match.id,
                 "status": match.status,
                 "created_at": match.created_at.isoformat(),
+
                 "user_email": my_email,
                 "email": other_email,
-                "first_name": profile.get("firstName"),
-                "profile_photo": (
-                    profile.get("photos", [None])[0]
-                    if profile.get("photos")
-                    else None
-                ),
-                # ✅ expose block info to frontend
+
+                # ✅ Django model attribute access (NOT .get)
+                "first_name": profile.first_name if profile else None,
+
+                # ✅ ImageField / FileField safe access
+                # "profile_photo": (
+                #     profile.profile_photo.url
+                #     if profile and profile.profile_photo
+                #     else None
+                # ),
+
                 "blocked_by_me": is_blocked_by_me,
                 "blocked_me": is_blocked_me,
             })

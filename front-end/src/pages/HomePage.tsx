@@ -188,59 +188,112 @@ const HomePage = ({ onLogout }: HomePageProps) => {
       const data = JSON.parse(event.data);
 
       if (data.type === "MATCH_CREATED") {
-        try {
-            const res = await fetch(`http://127.0.0.1:8000/api/profile/${data.from_email}/`, {
-                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
-            });
-            let profileData = { firstName: data.from_email.split("@")[0], tagline: "New Match!", interests: [] };
-            if(res.ok) profileData = await res.json();
+        if (showMatchModal) return;
 
-            setMatchProfile({
-                id: data.from_email,
-                firstName: profileData.firstName,
-                selfDescription: profileData.tagline || "New Match!",
-                conversationHook: "Say hello!",
-                vibeTags: profileData.interests || []
-            });
-            setMatchChatId(data.chat_id);
-            setShowMatchModal(true);
-            toast.success("It's a match! 🎉");
-        } catch(e) { console.error(e); }
+        const otherEmail = data.other;
+        const chatId = String(data.chat_id);
+
+        if (!otherEmail) return;
+
+        // Open modal immediately
+        setMatchChatId(chatId);
+        setShowMatchModal(true);
+        toast.success("It's a match! 🎉");
+
+        // Fetch profile async
+        try {
+          const res = await fetch(
+            `http://127.0.0.1:8000/api/profile/${encodeURIComponent(
+              otherEmail
+            )}/`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+
+          if (!res.ok) return;
+
+          const profile = await res.json();
+
+          setMatchProfile({
+            id: otherEmail,
+            firstName: profile.first_name,
+            selfDescription: profile.bio || "New Match!",
+            conversationHook:
+              profile.conversation_starter || "Say hello!",
+            vibeTags: profile.interests || [],
+          });
+        } catch {}
       }
     };
 
     return () => ws.close();
-  }, []);
+  }, [showMatchModal]);
 
-  /* -------- HANDLERS -------- */
-  const handleLike = async (profileId: string) => {
-    const likedProfile = profiles.find((p) => p.id === profileId);
-    setProfiles((prev) => prev.filter((p) => p.id !== profileId));
+  /* -------- LIKE HANDLER -------- */
+const handleLike = async (toEmail: string) => {
+  // Optimistic UI update
+  const likedProfile = profiles.find((p) => p.id === toEmail);
+  setProfiles((prev) => prev.filter((p) => p.id !== toEmail));
 
-    try {
-      const token = localStorage.getItem("access_token");
-      if (!token) return;
+  try {
+    const token = localStorage.getItem("access_token");
+    const fromEmail = localStorage.getItem("user_email");
 
-      const res = await fetch("http://127.0.0.1:8000/api/like/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ to_email: profileId }),
-      });
-
-      const data = await res.json();
-
-      if (data.status === "matched") {
-        setMatchProfile(likedProfile || null);
-        setMatchChatId(data.match.chat_id);
-        setShowMatchModal(true);
-        toast.success("It's a match! 🎉");
-      } else {
-        toast.success("Like sent!");
-      }
-    } catch {
-      toast.error("Failed to like");
+    if (!token || !fromEmail) {
+      toast.error("Authentication required");
+      return;
     }
-  };
+
+    const res = await fetch("http://127.0.0.1:8000/api/like/", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from_email: fromEmail, // ✅ explicitly sent
+        to_email: toEmail,     // ✅ required by backend
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data?.error || "Like request failed");
+    }
+
+    // -------------------------
+    // MATCH CREATED
+    // -------------------------
+    if (data.status === "matched") {
+      if (!showMatchModal) {
+        setMatchChatId(String(data.chat_id));
+        setShowMatchModal(true);
+
+        if (likedProfile) {
+          setMatchProfile(likedProfile);
+        }
+
+        toast.success("It's a match! 🎉");
+      }
+      return;
+    }
+
+    // -------------------------
+    // LIKE SENT (NO MATCH)
+    // -------------------------
+    if (data.status === "liked") {
+      toast.success("Like sent ❤️");
+      return;
+    }
+
+    toast.error("Unexpected server response");
+  } catch (err: any) {
+    console.error("Like error:", err);
+    toast.error(err.message || "Failed to like profile");
+  }
+};
 
   const handleDislike = (profileId: string) => {
     setProfiles((prev) => prev.filter((p) => p.id !== profileId));

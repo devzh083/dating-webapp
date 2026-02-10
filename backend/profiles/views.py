@@ -33,49 +33,60 @@ def get_profile(request):
         )
 
 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+
+from .models import UserProfile
+from .serializers import UserProfileSerializer
+
+
 @api_view(['POST', 'PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def create_or_update_profile(request):
     """
-    POST: Create a new profile
-    PUT/PATCH: Update existing profile
-    All operations are scoped to the authenticated user only
+    POST  : Create profile for authenticated user
+    PUT   : Full update
+    PATCH : Partial update
     """
-    # Handle camelCase to snake_case conversion for socialAccounts
+
     data = request.data.copy()
+
+    # Handle camelCase → snake_case
     if 'socialAccounts' in data:
         data['social_accounts'] = data.pop('socialAccounts')
-    
+
     try:
-        # Try to get existing profile for this user
+        # Existing profile
         profile = UserProfile.objects.get(user=request.user)
-        
-        # Update existing profile
-        partial = request.method == 'PATCH'
         serializer = UserProfileSerializer(
-            profile, 
-            data=data, 
-            partial=partial
+            profile,
+            data=data,
+            partial=(request.method == 'PATCH')
         )
+        is_create = False
+
     except UserProfile.DoesNotExist:
-        # Create new profile for this user
+        # New profile
         serializer = UserProfileSerializer(data=data)
-    
+        is_create = True
+
     if serializer.is_valid():
-        # Always save with the current authenticated user
-        saved_profile = serializer.save(user=request.user)
-        
-        # Return the saved profile data
-        response_data = UserProfileSerializer(saved_profile).data
-        
+        # 🔐 Enforce authenticated ownership + email binding
+        saved_profile = serializer.save(
+            user=request.user,
+            email=request.data.get("email")  # <-- CRITICAL
+        )
+
         return Response(
             {
                 "message": "Profile saved successfully",
-                "profile": response_data
+                "profile": UserProfileSerializer(saved_profile).data
             },
-            status=status.HTTP_200_OK
+            status=status.HTTP_201_CREATED if is_create else status.HTTP_200_OK
         )
-    
+
     return Response(
         {
             "detail": "Invalid data",

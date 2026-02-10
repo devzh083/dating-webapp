@@ -17,36 +17,40 @@ const getAuthHeaders = () => {
 };
 
 // Convert OnboardingData to API format
-const formatProfileData = (data: OnboardingData) => {
-  const formatted = {
-    first_name: data.firstName,
-    date_of_birth: data.dateOfBirth ? data.dateOfBirth.toISOString().split('T')[0] : null,
-    gender: data.gender,
-    show_gender: data.showGender,
-    interested_in: data.interestedIn,
-    // orientation: data.orientation,
-    // show_orientation: data.showOrientation,
-    // relationship_type: data.relationshipType,
-    distance: data.distance,
-    strict_distance: data.strictDistance,
-    drinking: data.drinking,
-    smoking: data.smoking,
-    workout: data.workout,
-    pets: data.pets,
-    communication_style: data.communicationStyle,
-    response_pace: data.responsePace,
-    interests: data.interests,
-    location: data.location,
-    use_current_location: data.useCurrentLocation,
-    photos: data.photos,
-    bio: data.bio,
-    conversation_starter: data.conversationStarter,
-    social_accounts: data.socialAccounts || {},
-  };
-  
-  console.log('[profileService] Formatted data for API:', formatted);
-  console.log('[profileService] Social accounts being sent:', formatted.social_accounts);
-  return formatted;
+const formatProfileData = (data: Partial<OnboardingData>) => {
+  const formatted: any = {
+  first_name: data.firstName,
+  date_of_birth: data.dateOfBirth
+    ? data.dateOfBirth.toISOString().split('T')[0]
+    : null,
+  gender: data.gender,
+  show_gender: data.showGender,
+  interested_in: data.interestedIn,
+  distance: data.distance,
+  strict_distance: data.strictDistance,
+  drinking: data.drinking,
+  smoking: data.smoking,
+  workout: data.workout,
+  pets: data.pets,
+  communication_style: data.communicationStyle,
+  response_pace: data.responsePace,
+  interests: data.interests,
+  location: data.location,
+  use_current_location: data.useCurrentLocation,
+  photos: data.photos,
+  bio: data.bio,
+  conversation_starter: data.conversationStarter,
+  social_accounts: data.socialAccounts || {},
+};
+
+// ✅ only send email if it exists
+if (data.email) {
+  formatted.email = data.email;
+}
+
+console.log('[profileService] Formatted data for API:', formatted);
+console.log('[profileService] Social accounts being sent:', formatted.social_accounts);
+return formatted;
 };
 
 // Convert API response to OnboardingData format
@@ -103,6 +107,7 @@ const parseProfileData = (apiData: any): OnboardingData => {
   };
   
   const parsed = {
+    email: apiData.email || apiData.username || '',
     firstName: getField('first_name', 'firstName', ''),
     dateOfBirth: getDateField('date_of_birth', 'dateOfBirth'),
     gender: getField('gender', 'gender', ''),
@@ -172,6 +177,7 @@ export const profileService = {
 
       const data = await response.json();
       console.log('[profileService] Raw API response:', data);
+      localStorage.setItem("user_email", data.username);
       
       // CRITICAL FIX: Handle both formats
       // Some endpoints return the profile directly, others wrap it in a 'profile' key
@@ -235,8 +241,8 @@ export const profileService = {
     console.log('[profileService] Partial data:', partialData);
     
     try {
-      const formattedData = formatProfileData(partialData as OnboardingData);
-      
+      const formattedData = formatProfileData(partialData);
+
       const response = await fetch(`${API_BASE_URL}/profile/save/`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
