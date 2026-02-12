@@ -941,12 +941,12 @@ const submitReport = async () => {
             <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 relative">
                {/* Cover Image */}
                <div className="h-32 bg-gradient-to-r from-teal-400 to-teal-600 relative">
-                  <button 
+                  {/* <button 
                     onClick={() => setShowProfileModal(false)}
                     className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white rounded-full p-1.5 transition-colors"
                   >
                     <X className="w-5 h-5" />
-                  </button>
+                  </button> */}
                </div>
 
                {/* Profile Info */}

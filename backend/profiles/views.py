@@ -11,6 +11,8 @@ import uuid
 import os
 from .models import UserProfile
 from .serializers import UserProfileSerializer
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
 
 
 @api_view(['GET'])
@@ -190,4 +192,26 @@ def upload_photo(request):
         return Response(
             {"detail": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+class ProfileByEmailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, email):
+        """
+        Retrieve public profile data by email
+        Used when match is created to show modal
+        """
+
+        email = email.lower()
+
+        profile = get_object_or_404(UserProfile, email=email)
+
+        serializer = UserProfileSerializer(profile)
+
+        return Response(
+            {
+                "profile": serializer.data
+            },
+            status=status.HTTP_200_OK
         )

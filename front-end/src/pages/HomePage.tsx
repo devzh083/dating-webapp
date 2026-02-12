@@ -185,47 +185,43 @@ const HomePage = ({ onLogout }: HomePageProps) => {
     );
 
     ws.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
+    const data = JSON.parse(event.data);
 
-      if (data.type === "MATCH_CREATED") {
-        if (showMatchModal) return;
+    if (data.type !== "MATCH_CREATED") return;
 
-        const otherEmail = data.other;
-        const chatId = String(data.chat_id);
+    const otherEmail = data.other;
+    const chatId = String(data.chat_id);
 
-        if (!otherEmail) return;
+    if (!otherEmail) return;
 
-        // Open modal immediately
-        setMatchChatId(chatId);
-        setShowMatchModal(true);
-        toast.success("It's a match! 🎉");
+    // 🔥 Always open modal from WS
+    setMatchChatId(chatId);
+    setShowMatchModal(true);
+    toast.success("It's a match! 🎉");
 
-        // Fetch profile async
-        try {
-          const res = await fetch(
-            `http://127.0.0.1:8000/api/profile/${encodeURIComponent(
-              otherEmail
-            )}/`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:8000/api/profile/${encodeURIComponent(otherEmail)}/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-          if (!res.ok) return;
+      if (!res.ok) return;
 
-          const profile = await res.json();
+      const response = await res.json();
+      const profile = response.profile; 
 
-          setMatchProfile({
-            id: otherEmail,
-            firstName: profile.first_name,
-            selfDescription: profile.bio || "New Match!",
-            conversationHook:
-              profile.conversation_starter || "Say hello!",
-            vibeTags: profile.interests || [],
-          });
-        } catch {}
-      }
-    };
+      setMatchProfile({
+        id: otherEmail,
+        firstName: profile.first_name,
+        selfDescription: profile.bio || "New Match!",
+        conversationHook: profile.conversation_starter || "Say hello!",
+        vibeTags: profile.interests || [],
+      });
+    } catch {}
+  };
+
 
     return () => ws.close();
   }, [showMatchModal]);

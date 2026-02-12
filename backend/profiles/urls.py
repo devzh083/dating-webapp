@@ -21,4 +21,7 @@ urlpatterns = [
     
     # Upload photo
     path('upload-photo/', views.upload_photo, name='upload_photo'),
+
+    path("<str:email>/", views.ProfileByEmailView.as_view()),
+
 ]

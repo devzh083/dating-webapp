@@ -79,6 +79,8 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         # 3️⃣ Broadcast THIS user's presence
         await self.broadcast_presence(is_online=True)
 
+        print("✅ WebSocket connected for:", self.user_email)
+
     async def disconnect(self, close_code):
         if hasattr(self, "user_email"):
             remove_online_user(self.user_email)
